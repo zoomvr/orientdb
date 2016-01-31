@@ -488,10 +488,10 @@
                         <manifestEntries>
                             <Implementation-Build>${buildNumber}</Implementation-Build>
                             <Implementation-Url>${project.organization.url}</Implementation-Url>
-                            <Implementation-Build-Date>${maven.build.timestamp}</Implementation-Build-Date>
                             <X-Compile-Source-JDK>${maven.compiler.source}</X-Compile-Source-JDK>
                             <X-Compile-Target-JDK>${maven.compiler.target}</X-Compile-Target-JDK>
                         </manifestEntries>
+			<addMavenDescriptor>false</addMavenDescriptor>
                     </archive>
                 </configuration>
             </plugin>
