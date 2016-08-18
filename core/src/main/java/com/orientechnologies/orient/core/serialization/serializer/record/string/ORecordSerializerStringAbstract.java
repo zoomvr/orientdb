@@ -112,7 +112,8 @@ public abstract class ORecordSerializerStringAbstract implements ORecordSerializ
     return OType.convert(v, iExpectedType.getDefaultJavaType());
   }
 
-  public static void fieldTypeToString(final StringBuilder iBuffer, OType iType, final Object iValue) {
+  public static void fieldTypeToString(final StringBuilder iBuffer, OType iType, final Object iValue,
+      boolean convertDocumentsInRIDs) {
     if (iValue == null)
       return;
 
@@ -199,7 +200,7 @@ public abstract class ORecordSerializerStringAbstract implements ORecordSerializ
     case EMBEDDEDSET:
       ORecordSerializerSchemaAware2CSV.INSTANCE
           .embeddedCollectionToStream(ODatabaseRecordThreadLocal.INSTANCE.getIfDefined(), null, iBuffer, null, null, iValue, true,
-              true);
+              true, convertDocumentsInRIDs);
       PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedSet2string"), "Serialize embeddedset to string",
           timer);
       break;
@@ -207,14 +208,14 @@ public abstract class ORecordSerializerStringAbstract implements ORecordSerializ
     case EMBEDDEDLIST:
       ORecordSerializerSchemaAware2CSV.INSTANCE
           .embeddedCollectionToStream(ODatabaseRecordThreadLocal.INSTANCE.getIfDefined(), null, iBuffer, null, null, iValue, true,
-              false);
+              false, convertDocumentsInRIDs);
       PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedList2string"),
           "Serialize embeddedlist to string", timer);
       break;
 
     case EMBEDDEDMAP:
       ORecordSerializerSchemaAware2CSV.INSTANCE.embeddedMapToStream(ODatabaseRecordThreadLocal.INSTANCE.getIfDefined(), null,
-          iBuffer, null, null, iValue, true);
+          iBuffer, null, null, iValue, true, convertDocumentsInRIDs);
       PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedMap2string"), "Serialize embeddedmap to string",
           timer);
       break;

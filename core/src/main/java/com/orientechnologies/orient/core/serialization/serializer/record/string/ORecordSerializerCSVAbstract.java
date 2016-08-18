@@ -33,16 +33,8 @@ import com.orientechnologies.orient.core.db.OUserObject2RecordHandler;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.db.object.ODatabaseObject;
 import com.orientechnologies.orient.core.db.object.OLazyObjectMapInterface;
-import com.orientechnologies.orient.core.db.record.OAutoConvertToRecord;
-import com.orientechnologies.orient.core.db.record.OIdentifiable;
-import com.orientechnologies.orient.core.db.record.ORecordElement;
+import com.orientechnologies.orient.core.db.record.*;
 import com.orientechnologies.orient.core.db.record.ORecordElement.STATUS;
-import com.orientechnologies.orient.core.db.record.ORecordLazyList;
-import com.orientechnologies.orient.core.db.record.ORecordLazyMap;
-import com.orientechnologies.orient.core.db.record.ORecordLazySet;
-import com.orientechnologies.orient.core.db.record.OTrackedList;
-import com.orientechnologies.orient.core.db.record.OTrackedMap;
-import com.orientechnologies.orient.core.db.record.OTrackedSet;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBag;
 import com.orientechnologies.orient.core.entity.OEntityManagerInternal;
 import com.orientechnologies.orient.core.exception.OSerializationException;
@@ -61,12 +53,8 @@ import com.orientechnologies.orient.core.serialization.serializer.string.OString
 import com.orientechnologies.orient.core.serialization.serializer.string.OStringSerializerEmbedded;
 import com.orientechnologies.orient.core.storage.OStorageProxy;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
 @SuppressWarnings({ "unchecked", "serial" })
 public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStringAbstract {
@@ -94,8 +82,8 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
       // JUST THE REFERENCE
       rid = (ORID) iLinked;
 
-      assert rid.getIdentity().isValid() || (ODatabaseRecordThreadLocal.INSTANCE.get().getStorage() instanceof OStorageProxy) :
-          "Impossible to serialize invalid link " + rid.getIdentity();
+      assert rid.getIdentity().isValid() || (ODatabaseRecordThreadLocal.INSTANCE.get()
+          .getStorage() instanceof OStorageProxy) : "Impossible to serialize invalid link " + rid.getIdentity();
       resultRid = rid;
     } else {
       if (iLinked instanceof String)
@@ -115,8 +103,8 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
       ORecord iLinkedRecord = ((OIdentifiable) iLinked).getRecord();
       rid = iLinkedRecord.getIdentity();
 
-      assert rid.getIdentity().isValid() || (ODatabaseRecordThreadLocal.INSTANCE.get().getStorage() instanceof OStorageProxy) :
-          "Impossible to serialize invalid link " + rid.getIdentity();
+      assert rid.getIdentity().isValid() || (ODatabaseRecordThreadLocal.INSTANCE.get()
+          .getStorage() instanceof OStorageProxy) : "Impossible to serialize invalid link " + rid.getIdentity();
 
       final ODatabaseDocument database = ODatabaseRecordThreadLocal.INSTANCE.get();
       if (iParentRecord != null) {
@@ -299,9 +287,8 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
           try {
             map.put(key, mapValueObject);
           } catch (ClassCastException e) {
-            throw OException.wrapException(new OSerializationException(
-                "Cannot load map because the type was not the expected: key=" + key + "(type " + key.getClass().toString()
-                    + "), value=" + mapValueObject + "(type " + key.getClass() + ")"), e);
+            throw OException.wrapException(new OSerializationException("Cannot load map because the type was not the expected: key="
+                + key + "(type " + key.getClass().toString() + "), value=" + mapValueObject + "(type " + key.getClass() + ")"), e);
           }
         }
 
@@ -316,7 +303,7 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
 
   public void fieldToStream(final ODocument iRecord, final StringBuilder iOutput, OUserObject2RecordHandler iObjHandler,
       final OType iType, final OClass iLinkedClass, final OType iLinkedType, final String iName, final Object iValue,
-      final boolean iSaveOnlyDirty) {
+      final boolean iSaveOnlyDirty, final boolean convertDocumentsInRIDs) {
     if (iValue == null)
       return;
 
@@ -332,7 +319,8 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
 
       if (!((OIdentifiable) iValue).getIdentity().isValid() && iValue instanceof ODocument && ((ODocument) iValue).isEmbedded()) {
         // WRONG: IT'S EMBEDDED!
-        fieldToStream(iRecord, iOutput, iObjHandler, OType.EMBEDDED, iLinkedClass, iLinkedType, iName, iValue, iSaveOnlyDirty);
+        fieldToStream(iRecord, iOutput, iObjHandler, OType.EMBEDDED, iLinkedClass, iLinkedType, iName, iValue, iSaveOnlyDirty,
+            convertDocumentsInRIDs);
       } else {
         final Object link = linkToStream(iOutput, iRecord, iValue);
         if (link != null)
@@ -462,7 +450,7 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
           if (items++ > 0)
             iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
 
-          fieldTypeToString(iOutput, OType.STRING, entry.getKey());
+          fieldTypeToString(iOutput, OType.STRING, entry.getKey(), convertDocumentsInRIDs);
           iOutput.append(OStringSerializerHelper.ENTRY_SEPARATOR);
           final Object link = linkToStream(iOutput, iRecord, entry.getValue());
 
@@ -508,26 +496,24 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
 
       } else if (iValue != null)
         iOutput.append(iValue.toString());
-      PROFILER
-          .stopChrono(PROFILER.getProcessMetric("serializer.record.string.embed2string"), "Serialize embedded to string", timer);
+      PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embed2string"), "Serialize embedded to string",
+          timer);
       break;
 
     case EMBEDDEDLIST:
-      embeddedCollectionToStream(null, iObjHandler, iOutput, iLinkedClass, iLinkedType, iValue, iSaveOnlyDirty,
-          false);
+      embeddedCollectionToStream(null, iObjHandler, iOutput, iLinkedClass, iLinkedType, iValue, iSaveOnlyDirty, false, convertDocumentsInRIDs);
       PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedList2string"),
           "Serialize embeddedlist to string", timer);
       break;
 
     case EMBEDDEDSET:
-      embeddedCollectionToStream(null, iObjHandler, iOutput, iLinkedClass, iLinkedType, iValue, iSaveOnlyDirty,
-          true);
+      embeddedCollectionToStream(null, iObjHandler, iOutput, iLinkedClass, iLinkedType, iValue, iSaveOnlyDirty, true, convertDocumentsInRIDs);
       PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedSet2string"), "Serialize embeddedset to string",
           timer);
       break;
 
     case EMBEDDEDMAP: {
-      embeddedMapToStream(null, iObjHandler, iOutput, iLinkedClass, iLinkedType, iValue, iSaveOnlyDirty);
+      embeddedMapToStream(null, iObjHandler, iOutput, iLinkedClass, iLinkedType, iValue, iSaveOnlyDirty, convertDocumentsInRIDs);
       PROFILER.stopChrono(PROFILER.getProcessMetric("serializer.record.string.embedMap2string"), "Serialize embeddedmap to string",
           timer);
       break;
@@ -541,12 +527,13 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
     }
 
     default:
-      fieldTypeToString(iOutput, iType, iValue);
+      fieldTypeToString(iOutput, iType, iValue, convertDocumentsInRIDs);
     }
   }
 
   public void embeddedMapToStream(ODatabase<?> iDatabase, final OUserObject2RecordHandler iObjHandler, final StringBuilder iOutput,
-      final OClass iLinkedClass, OType iLinkedType, final Object iValue, final boolean iSaveOnlyDirty) {
+      final OClass iLinkedClass, OType iLinkedType, final Object iValue, final boolean iSaveOnlyDirty,
+      boolean convertDocumentsInRIDs) {
     iOutput.append(OStringSerializerHelper.MAP_BEGIN);
 
     if (iValue != null) {
@@ -557,11 +544,11 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
           iOutput.append(OStringSerializerHelper.RECORD_SEPARATOR);
 
         if (o != null) {
-          fieldTypeToString(iOutput, OType.STRING, o.getKey());
+          fieldTypeToString(iOutput, OType.STRING, o.getKey(), convertDocumentsInRIDs);
           iOutput.append(OStringSerializerHelper.ENTRY_SEPARATOR);
 
           if (o.getValue() instanceof ODocument && ((ODocument) o.getValue()).getIdentity().isValid()) {
-            fieldTypeToString(iOutput, OType.LINK, o.getValue());
+            fieldTypeToString(iOutput, OType.LINK, o.getValue(), convertDocumentsInRIDs);
           } else if (o.getValue() instanceof ORecord || o.getValue() instanceof ODocumentSerializable) {
             final ODocument record;
             if (o.getValue() instanceof ODocument)
@@ -574,10 +561,10 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
                 iDatabase = ODatabaseRecordThreadLocal.INSTANCE.get();
 
               record = OObjectSerializerHelperManager.getInstance().toStream(o.getValue(),
-                  new ODocument(o.getValue().getClass().getSimpleName()), iDatabase instanceof ODatabaseObject ?
-                      ((ODatabaseObject) iDatabase).getEntityManager() :
-                      OEntityManagerInternal.INSTANCE, iLinkedClass,
-                  iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler() {
+                  new ODocument(o.getValue().getClass().getSimpleName()),
+                  iDatabase instanceof ODatabaseObject ? ((ODatabaseObject) iDatabase).getEntityManager()
+                      : OEntityManagerInternal.INSTANCE,
+                  iLinkedClass, iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler() {
 
                     public Object getUserObjectByRecord(OIdentifiable iRecord, final String iFetchPlan) {
                       return iRecord;
@@ -603,19 +590,19 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
             iOutput.append(OStringSerializerHelper.EMBEDDED_END);
           } else if (o.getValue() instanceof Set<?>) {
             // SUB SET
-            fieldTypeToString(iOutput, OType.EMBEDDEDSET, o.getValue());
+            fieldTypeToString(iOutput, OType.EMBEDDEDSET, o.getValue(), convertDocumentsInRIDs);
           } else if (o.getValue() instanceof Collection<?>) {
             // SUB LIST
-            fieldTypeToString(iOutput, OType.EMBEDDEDLIST, o.getValue());
+            fieldTypeToString(iOutput, OType.EMBEDDEDLIST, o.getValue(), convertDocumentsInRIDs);
           } else if (o.getValue() instanceof Map<?, ?>) {
             // SUB MAP
-            fieldTypeToString(iOutput, OType.EMBEDDEDMAP, o.getValue());
+            fieldTypeToString(iOutput, OType.EMBEDDEDMAP, o.getValue(), convertDocumentsInRIDs);
           } else {
             // EMBEDDED LITERALS
             if (iLinkedType == null && o.getValue() != null) {
-              fieldTypeToString(iOutput, OType.getTypeByClass(o.getValue().getClass()), o.getValue());
+              fieldTypeToString(iOutput, OType.getTypeByClass(o.getValue().getClass()), o.getValue(), convertDocumentsInRIDs);
             } else {
-              fieldTypeToString(iOutput, iLinkedType, o.getValue());
+              fieldTypeToString(iOutput, iLinkedType, o.getValue(), convertDocumentsInRIDs);
             }
           }
         }
@@ -638,9 +625,8 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
     Collection<?> coll;
     if (iLinkedType == OType.LINK) {
       if (iDocument != null)
-        coll = (Collection<?>) (iType == OType.EMBEDDEDLIST ?
-            new ORecordLazyList(iDocument).setStreamedContent(new StringBuilder(value)) :
-            unserializeSet(iDocument, value));
+        coll = (Collection<?>) (iType == OType.EMBEDDEDLIST
+            ? new ORecordLazyList(iDocument).setStreamedContent(new StringBuilder(value)) : unserializeSet(iDocument, value));
       else {
         if (iType == OType.EMBEDDEDLIST)
           coll = (Collection<?>) new ORecordLazyList().setStreamedContent(new StringBuilder(value));
@@ -716,7 +702,7 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
 
   public StringBuilder embeddedCollectionToStream(ODatabase<?> iDatabase, final OUserObject2RecordHandler iObjHandler,
       final StringBuilder iOutput, final OClass iLinkedClass, final OType iLinkedType, final Object iValue,
-      final boolean iSaveOnlyDirty, final boolean iSet) {
+      final boolean iSaveOnlyDirty, final boolean iSet, final boolean convertDocumentsInRIDs) {
     iOutput.append(iSet ? OStringSerializerHelper.SET_BEGIN : OStringSerializerHelper.LIST_BEGIN);
 
     final Iterator<Object> iterator = OMultiValue.getMultiValueIterator(iValue, false);
@@ -752,12 +738,20 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
       } else {
         id = (OIdentifiable) o;
 
-        if (iLinkedType == null)
+        if (iLinkedType == null) {
           // AUTO-DETERMINE LINKED TYPE
-          if (id.getIdentity().isValid())
-            linkedType = OType.LINK;
-          else
-            linkedType = OType.EMBEDDED;
+          if (id instanceof ORecord) {
+            if (convertDocumentsInRIDs && id.getIdentity().isValid())
+              linkedType = OType.LINK;
+            else
+              linkedType = OType.EMBEDDED;
+          } else {
+            if (id.getIdentity().isValid())
+              linkedType = OType.LINK;
+            else
+              linkedType = OType.EMBEDDED;
+          }
+        }
 
         if (id instanceof ODocument) {
           doc = (ODocument) id;
@@ -785,10 +779,9 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
             iDatabase = ODatabaseRecordThreadLocal.INSTANCE.get();
 
           id = OObjectSerializerHelperManager.getInstance().toStream(o, new ODocument(o.getClass().getSimpleName()),
-              iDatabase instanceof ODatabaseObject ?
-                  ((ODatabaseObject) iDatabase).getEntityManager() :
-                  OEntityManagerInternal.INSTANCE, iLinkedClass,
-              iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler() {
+              iDatabase instanceof ODatabaseObject ? ((ODatabaseObject) iDatabase).getEntityManager()
+                  : OEntityManagerInternal.INSTANCE,
+              iLinkedClass, iObjHandler != null ? iObjHandler : new OUserObject2RecordHandler() {
                 public Object getUserObjectByRecord(OIdentifiable iRecord, final String iFetchPlan) {
                   return iRecord;
                 }
@@ -816,7 +809,7 @@ public abstract class ORecordSerializerCSVAbstract extends ORecordSerializerStri
             linkedType = OType.getTypeByClass(o.getClass());
         } else if (iLinkedType == OType.CUSTOM)
           iOutput.append(OStringSerializerHelper.CUSTOM_TYPE);
-        fieldTypeToString(iOutput, linkedType, o);
+        fieldTypeToString(iOutput, linkedType, o, convertDocumentsInRIDs);
       }
 
       if (id != null && linkedType != OType.LINK)

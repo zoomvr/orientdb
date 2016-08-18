@@ -19,11 +19,10 @@
   */
 package com.orientechnologies.orient.core.serialization.serializer.stream;
 
-import java.io.IOException;
-
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.serialization.OBinaryProtocol;
 import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerStringAbstract;
+
+import java.io.IOException;
 
 public class OStreamSerializerLiteral implements OStreamSerializer {
 	public static final String										NAME			= "li";
@@ -43,7 +42,8 @@ public class OStreamSerializerLiteral implements OStreamSerializer {
 			return null;
 
 		final StringBuilder buffer = new StringBuilder();
-		ORecordSerializerStringAbstract.fieldTypeToString(buffer, OType.getTypeByClass(iObject.getClass()), iObject);
+		ORecordSerializerStringAbstract.fieldTypeToString(buffer, OType.getTypeByClass(iObject.getClass()), iObject,
+				false);
 		return buffer.toString().getBytes("UTF-8");
 	}
 }

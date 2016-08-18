@@ -1655,7 +1655,8 @@ public class ONetworkProtocolBinary extends ONetworkProtocol {
       final StringBuilder value = new StringBuilder(64);
       if (listener != null)
         listener.result(result);
-      ORecordSerializerStringAbstract.fieldTypeToString(value, OType.getTypeByClass(result.getClass()), result);
+      ORecordSerializerStringAbstract.fieldTypeToString(value, OType.getTypeByClass(result.getClass()), result,
+          false);
       channel.writeString(value.toString());
     }
   }
