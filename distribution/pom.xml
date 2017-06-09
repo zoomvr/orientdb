@@ -17,11 +17,12 @@
     <parent>
         <groupId>com.orientechnologies</groupId>
         <artifactId>orientdb-parent</artifactId>
-        <version>3.0.0-SNAPSHOT</version>
+	<version>3.0.0-SNAPSHOT</version>
         <relativePath>../</relativePath>
     </parent>
 
     <artifactId>orientdb-community</artifactId>
+    <packaging>pom</packaging>
 
     <name>OrientDB Community Distribution</name>
 
@@ -101,21 +102,7 @@
     </dependencies>
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <configuration>
-                    <archive>
-                    </archive>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+	<!--
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
@@ -143,7 +130,7 @@
                     </execution>
                 </executions>
             </plugin>
-
+-->
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -169,6 +156,7 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>com.spotify</groupId>
                 <artifactId>docker-maven-plugin</artifactId>
