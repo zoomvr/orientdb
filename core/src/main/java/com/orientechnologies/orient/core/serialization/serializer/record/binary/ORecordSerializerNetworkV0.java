@@ -836,4 +836,8 @@ public class ORecordSerializerNetworkV0 implements ODocumentSerializer {
     return toCalendar.getTimeInMillis();
   }
 
+  @Override
+  public Object deserializeFieldValue(BytesContainer bytes, OClass iClass, String iFieldName) {
+    throw new UnsupportedOperationException();
+  }
 }

@@ -27,6 +27,7 @@ import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.listener.OProgressListener;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
+import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
@@ -34,11 +35,13 @@ import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.exception.OConfigurationException;
 import com.orientechnologies.orient.core.exception.OInvalidIndexEngineIdException;
 import com.orientechnologies.orient.core.exception.OTooBigIndexKeyException;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
+import com.orientechnologies.orient.core.storage.ORawBuffer;
 import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.storage.cache.OReadCache;
 import com.orientechnologies.orient.core.storage.cache.OWriteCache;
@@ -832,6 +835,15 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
 
   protected abstract OBinarySerializer determineValueSerializer();
 
+  protected void populateIndex(ORecordId doc, Object fieldValue) {
+    if (fieldValue instanceof Collection) {
+      for (final Object fieldValueItem : (Collection<?>) fieldValue) {
+        put(fieldValueItem, doc);
+      }
+    } else
+      put(fieldValue, doc);
+  }
+
   protected void populateIndex(ODocument doc, Object fieldValue) {
     if (fieldValue instanceof Collection) {
       for (final Object fieldValueItem : (Collection<?>) fieldValue) {
@@ -917,30 +929,33 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
   protected long[] indexCluster(final String clusterName, final OProgressListener iProgressListener, long documentNum,
       long documentIndexed, long documentTotal) {
     try {
-      for (final ORecord record : getDatabase().browseCluster(clusterName)) {
+      OAbstractPaginatedStorage embStorage = (OAbstractPaginatedStorage) getDatabase().getStorage();
+//      Iterator<ORawBuffer> browser = ;
+      Iterator<OPair<ORecordId, ORawBuffer>> iterator = embStorage.browseCluster(clusterName);
+      while (iterator.hasNext()) {
+        final OPair<ORecordId, ORawBuffer> record = iterator.next();
         if (Thread.interrupted())
           throw new OCommandExecutionException("The index rebuild has been interrupted");
 
-        if (record instanceof ODocument) {
-          final ODocument doc = (ODocument) record;
+        if (record.getValue().recordType == ODocument.RECORD_TYPE) {
 
           if (indexDefinition == null)
             throw new OConfigurationException(
                 "Index '" + name + "' cannot be rebuilt because has no a valid definition (" + indexDefinition + ")");
 
-          final Object fieldValue = indexDefinition.getDocumentValueToIndex(doc);
+          final Object fieldValue = indexDefinition.getDocumentValueToIndex(record.value);
 
           if (fieldValue != null || !indexDefinition.isNullValuesIgnored()) {
             try {
-              populateIndex(doc, fieldValue);
+              populateIndex(record.key, fieldValue);
             } catch (OTooBigIndexKeyException e) {
-              OLogManager.instance().error(this,
-                  "Exception during index rebuild. Exception was caused by following key/ value pair - key %s, value %s."
-                      + " Rebuild will continue from this point", e, fieldValue, doc.getIdentity());
+//              OLogManager.instance().error(this,
+//                  "Exception during index rebuild. Exception was caused by following key/ value pair - key %s, value %s."
+//                      + " Rebuild will continue from this point", e, fieldValue, doc.getIdentity());
             } catch (OIndexException e) {
-              OLogManager.instance().error(this,
-                  "Exception during index rebuild. Exception was caused by following key/ value pair - key %s, value %s."
-                      + " Rebuild will continue from this point", e, fieldValue, doc.getIdentity());
+//              OLogManager.instance().error(this,
+//                  "Exception during index rebuild. Exception was caused by following key/ value pair - key %s, value %s."
+//                      + " Rebuild will continue from this point", e, fieldValue, doc.getIdentity());
             }
 
             ++documentIndexed;

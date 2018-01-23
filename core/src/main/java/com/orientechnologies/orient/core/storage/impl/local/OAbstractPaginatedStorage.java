@@ -1723,6 +1723,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
    * Traditional commit that support already temporary rid and already assigned rids
    *
    * @param clientTx the transaction to commit
+   *
    * @return The list of operations applied by the transaction
    */
   @Override
@@ -1926,7 +1927,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       throw logAndPrepareForRethrow(t);
     }
   }
-  
+
   private void commitIndexes(final Map<String, OTransactionIndexChanges> indexesToCommit) {
     final Map<OIndex, OIndexAbstract.IndexTxSnapshot> snapshots = new IdentityHashMap<>();
 
@@ -5245,6 +5246,47 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   @SuppressWarnings("unused")
   public void setStorageConfigurationUpdateListener(OStorageConfigurationUpdateListener storageConfigurationUpdateListener) {
     this.getConfiguration().setConfigurationUpdateListener(storageConfigurationUpdateListener);
+  }
+
+  public Iterator<OPair<ORecordId, ORawBuffer>> browseCluster(String clusterName) {
+    int pcl = getClusterIdByName(clusterName);
+    Iterator<OPair<ORecordId, ORawBuffer>> buffer = new Iterator<OPair<ORecordId, ORawBuffer>>() {
+      private final int clusterId = pcl;
+      private long lastPos;
+      private Iterator<OPair<ORecordId, ORawBuffer>> page;
+
+      @Override
+      public boolean hasNext() {
+        if (page == null || !page.hasNext()) {
+          try {
+            OCluster cluster = OAbstractPaginatedStorage.this.getClusterById(clusterId);
+            OPhysicalPosition[] nexts = cluster.higherPositions(new OPhysicalPosition(lastPos));
+            if(nexts.length >0) {
+              lastPos = nexts[nexts.length - 1].clusterPosition;
+
+              List<OPair<ORecordId, ORawBuffer>> nexv = new ArrayList<>();
+//            for(nexts)
+              for (OPhysicalPosition pos : nexts) {
+                ORecordId recId = new ORecordId(clusterId, pos.clusterPosition);
+                nexv.add(new OPair<>(recId, doReadRecord(cluster, recId, false)));
+              }
+              page = nexv.iterator();
+            }
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+        }
+        if(page == null)
+          return false;
+        return page.hasNext();
+      }
+
+      @Override
+      public OPair<ORecordId, ORawBuffer> next() {
+        return page.next();
+      }
+    };
+    return buffer;
   }
 
   private static class ORIDOLockManager extends OComparableLockManager<ORID> {

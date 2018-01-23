@@ -20,18 +20,24 @@
 package com.orientechnologies.orient.core.index;
 
 import com.orientechnologies.orient.core.collate.ODefaultCollate;
+import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.ORecordElement;
+import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.ODocumentSerializer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.ORecordSerializerBinary;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.ORecordSerializerBinaryV0;
 import com.orientechnologies.orient.core.sql.OCommandExecutorSQLCreateIndex;
+import com.orientechnologies.orient.core.storage.ORawBuffer;
 
 import java.util.Collections;
 import java.util.List;
 
 /**
  * Index implementation bound to one schema class property.
- * 
  */
 public class OPropertyIndexDefinition extends OAbstractIndexDefinition {
   private static final long serialVersionUID = 7395728581151922197L;
@@ -76,6 +82,20 @@ public class OPropertyIndexDefinition extends OAbstractIndexDefinition {
         return null;
     }
     return createValue(iDocument.<Object>field(field));
+  }
+
+  public Object getDocumentValueToIndex(final ORawBuffer iDocument) {
+    OClass clazz = ODatabaseRecordThreadLocal.instance().get().getClass(className);
+    ODocumentSerializer des = ORecordSerializerBinary.INSTANCE.getCurrentSerializer();
+    Object value = des.deserializeFieldValue(new BytesContainer(iDocument.buffer).skip(1), clazz, field);
+    if (OType.LINK.equals(keyType)) {
+      final OIdentifiable identifiable = (OIdentifiable) value;
+      if (identifiable != null)
+        return createValue(identifiable.getIdentity());
+      else
+        return null;
+    }
+    return createValue(value);
   }
 
   @Override
@@ -172,12 +192,12 @@ public class OPropertyIndexDefinition extends OAbstractIndexDefinition {
     keyType = OType.valueOf(keyTypeStr);
 
     setCollate((String) document.field("collate"));
-    setNullValuesIgnored(!Boolean.FALSE.equals(document.<Boolean> field("nullValuesIgnored")));
+    setNullValuesIgnored(!Boolean.FALSE.equals(document.<Boolean>field("nullValuesIgnored")));
   }
 
   /**
    * {@inheritDoc}
-   * 
+   *
    * @param indexName
    * @param indexType
    */
@@ -186,12 +206,12 @@ public class OPropertyIndexDefinition extends OAbstractIndexDefinition {
   }
 
   protected StringBuilder createIndexDDLWithFieldType(String indexName, String indexType, String engine) {
-    final StringBuilder ddl = createIndexDDLWithoutFieldType(indexName, indexType,engine);
+    final StringBuilder ddl = createIndexDDLWithoutFieldType(indexName, indexType, engine);
     ddl.append(' ').append(keyType.name());
     return ddl;
   }
 
-  protected StringBuilder createIndexDDLWithoutFieldType(final String indexName, final String indexType,final String engine) {
+  protected StringBuilder createIndexDDLWithoutFieldType(final String indexName, final String indexType, final String engine) {
     final StringBuilder ddl = new StringBuilder("create index `");
 
     ddl.append(indexName).append("` on `");
