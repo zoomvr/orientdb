@@ -169,23 +169,30 @@ public class ONetworkProtocolBinary extends ONetworkProtocol {
       }
 
       if (requestType == OChannelBinaryProtocol.REQUEST_HANDSHAKE) {
+        OLogManager.instance().info(this, "Handshake processing");
         handleHandshake();
+        OLogManager.instance().info(this, "Handshake finished");
         return;
       }
       if (requestType == OChannelBinaryProtocol.REQUEST_OK_PUSH) {
+        OLogManager.instance().info(this, "Push processing");
         handlePushResponse();
+        OLogManager.instance().info(this, "Push finished");
         return;
       }
 
       clientTxId = channel.readInt();
+      OLogManager.instance().info(this, "Request " + requestType + " start processing. Client id: " + clientTxId);
       // GET THE CONNECTION IF EXIST
       OClientConnection connection = server.getClientConnectionManager().getConnection(clientTxId, this);
       if (isDistributed(requestType)) {
         distributedRequest(connection, requestType, clientTxId);
       } else
         sessionRequest(connection, requestType, clientTxId);
+      OLogManager.instance().info(this, "Request " + requestType + " finished processing.Client id: " + clientTxId);
     } catch (IOException e) {
       // if an exception arrive to this point we need to kill the current socket.
+      OLogManager.instance().info(this, "Request " + requestType + " failed processing.Client id: " + clientTxId);
       sendShutdown();
       throw e;
     }
@@ -198,8 +205,9 @@ public class ONetworkProtocolBinary extends ONetworkProtocol {
     byte encoding = channel.readByte();
     byte errorEncoding = channel.readByte();
     OBinaryProtocolHelper.checkProtocolVersion(this, protocolVersion);
+    OLogManager.instance().debug(this, "Protocol version: " + protocolVersion + " validated");
     this.handshakeInfo = new HandshakeInfo(protocolVersion, driverName, driverVersion, encoding, errorEncoding);
-    this.factory = ONetworkBinaryProtocolFactory.matchProtocol(protocolVersion);
+    this.factory = ONetworkBinaryProtocolFactory.matchProtocol(protocolVersion);    
   }
 
   public void setHandshakeInfo(HandshakeInfo handshakeInfo) {
