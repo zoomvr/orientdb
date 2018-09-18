@@ -20,6 +20,7 @@
 package com.orientechnologies.orient.core.db;
 
 import com.orientechnologies.common.exception.OException;
+import com.orientechnologies.common.io.OFileUtils;
 import com.orientechnologies.common.io.OIOUtils;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.Orient;
@@ -319,11 +320,17 @@ public class OrientDBEmbedded implements OrientDBInternal {
     synchronized (this) {
       checkOpen();
     }
+    File storagePath = null;
     ODatabaseDocumentInternal db = openNoAuthenticate(name, user);
     for (Iterator<ODatabaseLifecycleListener> it = orient.getDbLifecycleListeners(); it.hasNext(); ) {
       it.next().onDrop(db);
     }
+    if (db.getStorage() instanceof OLocalPaginatedStorage){
+      OLocalPaginatedStorage localStorage = (OLocalPaginatedStorage)db.getStorage();
+      storagePath = localStorage.getStoragePath().toFile();
+    }
     db.close();
+    
     synchronized (this) {
       if (exists(name, user, password)) {
         OAbstractPaginatedStorage storage = getOrInitStorage(name);
@@ -333,6 +340,9 @@ public class OrientDBEmbedded implements OrientDBInternal {
         storage.delete();
         storages.remove(name);
         sharedContexts.remove(name);
+        if (storagePath != null){
+          OFileUtils.deleteRecursively(storagePath, true);
+        }
       }
     }
   }
