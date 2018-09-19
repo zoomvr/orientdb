@@ -341,6 +341,7 @@ public class OrientDBEmbedded implements OrientDBInternal {
         storages.remove(name);
         sharedContexts.remove(name);
         if (storagePath != null){
+          //delete inner dirs (mostly index dirs)
           OFileUtils.deleteRecursively(storagePath, true);
         }
       }
