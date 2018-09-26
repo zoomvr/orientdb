@@ -60,6 +60,7 @@ import java.io.*;
 import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -3885,4 +3886,220 @@ public class ODocument extends ORecordAbstract
     return false;
   }
 
+  public static class TraverseResult{
+    ODocument doc;
+    TraverseResult parent;
+    EdgeDirection edgeDirection;
+
+    @Override
+    public int hashCode() {
+      int hash = 7;
+      hash = 17 * hash + Objects.hashCode(this.doc);
+      return hash;
+    }
+    
+    @Override
+    public boolean equals(Object other){
+      if (!(other instanceof TraverseResult)){
+        return false;
+      }
+      
+      TraverseResult oTr = (TraverseResult)other;
+      return doc.equals(oTr.doc);
+    }
+  }
+  
+  public static enum TraverseStrategy{
+    BREADTH_FIRST,
+    DEPTH_FIRST
+  }
+  
+  public static class EdgeDirection{
+    String edgeName;
+    ODirection direction;
+  }    
+  
+  /**
+   * check if node is already in path so depth first can avoid circular relations
+   * @param node
+   * @param parent
+   * @return 
+   */
+  private static boolean isNodeAlreadyInPath(ODocument node, TraverseResult parent){
+    while (parent != null){
+      if (parent.doc.equals(node)){
+        return true;
+      }
+      parent = parent.parent;
+    }
+    return false;
+  }
+  
+  private static void processEdgeDepthFirst(OEdge edge, List<TraverseResult> currentResults, ODirection initialDirection, 
+          TraverseResult parent, EdgeDirection...filterEdges){    
+    if (initialDirection == ODirection.BOTH){
+      throw new IllegalArgumentException("Direction can be either IN or OUT");
+    }
+    //reverse direction. Directions can be only IN and OUT here      
+    ODirection wantedDirection = initialDirection == ODirection.IN ? ODirection.OUT : ODirection.IN;
+    OVertex child = edge.getVertex(wantedDirection);
+    if (child.getRecord() instanceof ODocument){
+      EdgeDirection incomingEdge = new EdgeDirection();
+      incomingEdge.direction = wantedDirection;
+      incomingEdge.edgeName = edge.getSchemaType().get().getName();
+      if (!isNodeAlreadyInPath(child.getRecord(), parent)){
+        List<TraverseResult> childResults = traverseDepthFirst(child.getRecord(), parent, incomingEdge, filterEdges);
+        if (childResults != null){
+          currentResults.addAll(childResults);
+        }
+      }
+    }
+  }
+  
+  private static void processEdgesDepthFirst(Iterable<OEdge> edges, List<TraverseResult> currentResults, ODirection initialDirection, 
+          TraverseResult parent, EdgeDirection...filterEdges){
+    edges.forEach(new Consumer<OEdge>() {
+      @Override
+      public void accept(OEdge edge) {
+        processEdgeDepthFirst(edge, currentResults, initialDirection, parent, filterEdges);
+      }
+    });
+  }
+  
+  private static List<TraverseResult> traverseDepthFirst(ODocument node, TraverseResult path, EdgeDirection incomingEdge, EdgeDirection...filterEdges){
+    OVertex vertex = node.asVertex().orElse(null);
+    if (vertex == null){
+      return null;
+    }
+    
+    //add current node to path
+    TraverseResult tr = new TraverseResult();
+    tr.doc = node;
+    tr.parent = path;
+    tr.edgeDirection = incomingEdge;
+    
+    List<TraverseResult> retList = new ArrayList<>();
+    retList.add(tr);       
+        
+    if (filterEdges.length == 0){
+      Iterable<OEdge> edges = vertex.getEdges(ODirection.IN);
+      processEdgesDepthFirst(edges, retList, ODirection.IN, tr, filterEdges);
+      
+      edges = vertex.getEdges(ODirection.OUT);
+      processEdgesDepthFirst(edges, retList, ODirection.OUT, tr, filterEdges);
+    }
+    else{
+      for (EdgeDirection ed : filterEdges){
+        //translate direction BOTH to separate IN and OUT
+        if (ed.direction == ODirection.BOTH){
+          Iterable<OEdge> edges = vertex.getEdges(ODirection.IN, ed.edgeName);
+          processEdgesDepthFirst(edges, retList, ODirection.IN, tr, filterEdges);
+          
+          edges = vertex.getEdges(ODirection.OUT, ed.edgeName);
+          processEdgesDepthFirst(edges, retList, ODirection.OUT, tr, filterEdges);
+        }
+        else{
+          Iterable<OEdge> edges = vertex.getEdges(ed.direction, ed.edgeName);
+          processEdgesDepthFirst(edges, retList, ed.direction, tr, filterEdges);
+        }
+      }
+    }        
+    
+    return retList;
+  }
+  
+  private static void processEdgeBreadthFirst(OEdge edge, ODirection initialDirection, TraverseResult parent,
+          Queue<TraverseResult> openList, Set<TraverseResult> closedList){
+    if (initialDirection == ODirection.BOTH){
+      throw new IllegalArgumentException("Direction can be either IN or OUT");
+    }
+    //reverse direction. Directions can be only IN and OUT here      
+    ODirection wantedDirection = initialDirection == ODirection.IN ? ODirection.OUT : ODirection.IN;
+    OVertex child = edge.getVertex(wantedDirection);
+    if (child.getRecord() instanceof ODocument){
+      EdgeDirection incomingEdge = new EdgeDirection();
+      incomingEdge.direction = wantedDirection;
+      incomingEdge.edgeName = edge.getSchemaType().get().getName();
+      TraverseResult tr = new TraverseResult();
+      tr.doc = child.getRecord();
+      tr.parent = parent;
+      tr.edgeDirection = incomingEdge;
+      if (!closedList.contains(tr)){
+        openList.add(tr);
+      }
+    }
+  }
+  
+  private static void processEdgesBreadthFirst(Iterable<OEdge> edges, ODirection initialDirection, TraverseResult parent,
+          Queue<TraverseResult> openList, Set<TraverseResult> closedList){
+    edges.forEach(new Consumer<OEdge>() {
+      @Override
+      public void accept(OEdge edge) {
+        processEdgeBreadthFirst(edge, initialDirection, parent, openList, closedList);
+      }
+    });
+  }
+  
+  private List<TraverseResult> traverseBreadthFirst(ODocument node, TraverseResult path, EdgeDirection incomingEdge, EdgeDirection...filterEdges){
+    OVertex vertex = node.asVertex().orElse(null);
+    if (vertex == null){
+      return null;
+    }
+    
+    Queue<TraverseResult> openList = new LinkedList<>();
+    TraverseResult tr = new TraverseResult();
+    tr.doc = node;
+    tr.edgeDirection = null;
+    tr.parent = null;
+    openList.add(tr);
+    Set<TraverseResult> closedList = new HashSet<>();
+    
+    List<TraverseResult> retList = new ArrayList<>();
+    
+    while (!openList.isEmpty()){
+      TraverseResult current = openList.poll();
+      retList.add(current);
+      vertex = current.doc.asVertex().orElse(null);
+      if (vertex == null){
+        return null;
+      }
+      if (filterEdges.length == 0){
+        Iterable<OEdge> edges = vertex.getEdges(ODirection.IN);
+        processEdgesBreadthFirst(edges, ODirection.IN, current, openList, closedList);
+
+        edges = vertex.getEdges(ODirection.OUT);
+        processEdgesBreadthFirst(edges, ODirection.OUT, current, openList, closedList);
+      }
+      else{
+        for (EdgeDirection ed : filterEdges){
+          //translate direction BOTH to separate IN and OUT
+          if (ed.direction == ODirection.BOTH){
+            Iterable<OEdge> edges = vertex.getEdges(ODirection.IN, ed.edgeName);
+            processEdgesBreadthFirst(edges, ODirection.IN, current, openList, closedList);
+
+            edges = vertex.getEdges(ODirection.OUT, ed.edgeName);
+            processEdgesBreadthFirst(edges, ODirection.OUT, current, openList, closedList);
+          }
+          else{
+            Iterable<OEdge> edges = vertex.getEdges(ed.direction, ed.edgeName);
+            processEdgesBreadthFirst(edges, ed.direction, current, openList, closedList);
+          }
+        }
+      }
+      closedList.add(current);
+    }
+
+    return retList;
+  }
+  
+  public List<TraverseResult> traverse(TraverseStrategy strategy, EdgeDirection...filterEdges){
+    switch(strategy){
+      case DEPTH_FIRST:
+        return traverseDepthFirst(this, null, null, filterEdges);
+      case BREADTH_FIRST:
+        return traverseBreadthFirst(this, null, null, filterEdges);
+      default:
+        throw new UnsupportedOperationException("Traverse strategy not supported");
+    }
+  }
 }
