@@ -122,10 +122,10 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     lastAccess.set(System.currentTimeMillis());
   }
 
-  protected void addDocument(Document doc) {
+  protected void addDocument(Document doc, OIdentifiable rid) {
     try {
-
       reopenToken = indexWriter.addDocument(doc);
+      OLuceneTracker.instance().track(rid, reopenToken);
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);
     }
@@ -267,7 +267,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
         metaDoc.add(new StringField("_DEF_JSON", defAsJson, Field.Store.YES));
         metaDoc.add(new StringField("_DEF_CLASS_NAME", indexDefinition.getClass().getCanonicalName(), Field.Store.YES));
         metaDoc.add(new StringField("_CLASS", "JSON_METADATA", Field.Store.YES));
-        addDocument(metaDoc);
+        addDocument(metaDoc, null);
       }
 
     } catch (IOException e) {

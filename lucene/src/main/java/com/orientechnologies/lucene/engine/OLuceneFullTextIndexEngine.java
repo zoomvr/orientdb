@@ -151,7 +151,7 @@ public class OLuceneFullTextIndexEngine extends OLuceneIndexEngineAbstract {
 
       Document doc = buildDocument(key, oIdentifiable);
 
-      addDocument(doc);
+      addDocument(doc, oIdentifiable);
 
     }
   }

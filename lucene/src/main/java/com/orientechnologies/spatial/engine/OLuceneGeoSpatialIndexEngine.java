@@ -113,7 +113,7 @@ public class OLuceneGeoSpatialIndexEngine extends OLuceneSpatialIndexEngineAbstr
       Collection<OIdentifiable> container = (Collection<OIdentifiable>) value;
       for (OIdentifiable oIdentifiable : container) {
         updateLastAccess();
-        addDocument(newGeoDocument(oIdentifiable, factory.fromDoc(location)));
+        addDocument(newGeoDocument(oIdentifiable, factory.fromDoc(location)), oIdentifiable);
       }
     } else {
 
