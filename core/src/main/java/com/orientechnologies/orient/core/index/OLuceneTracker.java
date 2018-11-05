@@ -48,8 +48,10 @@ public class OLuceneTracker {
   
   private Long highestSequnceNumberCanBeFlushed = null;
   private Long highestFlushedSequenceNumber = null;
+  private boolean hasUnflushedSequences = false;
   
   public void track(ORecordId rec, long sequenceNumber){
+    hasUnflushedSequences = true;
     if (rec == null){
       return;
     }
@@ -70,13 +72,14 @@ public class OLuceneTracker {
         Long val = mappedHighestsequnceNumbers.get(rec);
         if (val != null && val > retVal){
           retVal = val;          
-        }
-        else if (val != null){
-          mappedHighestsequnceNumbers.remove(rec);
-        }
+        }        
       }
     }
     return retVal;
+  }
+  
+  public void clearMappedRidsToHighestSequenceNumbers(){
+    mappedHighestsequnceNumbers.clear();
   }
   
   public void mapLSNToHighestSequenceNumber(OLogSequenceNumber lsn, Long sequenceNumber){
@@ -130,20 +133,34 @@ public class OLuceneTracker {
     return LSNForHighestSequenceNumber.get(sequenceNumber);
   }
   
-  public void setHighestSequnceNumberCanBeFlushed(Long value){
+  public synchronized void setHighestSequnceNumberCanBeFlushed(Long value){
     highestSequnceNumberCanBeFlushed = value;
   }
   
-  public void setHighestFlushedSequenceNumber(Long value){
+  public synchronized void setHighestFlushedSequenceNumber(Long value){
     highestFlushedSequenceNumber = value;
   }
 
-  public Long getHighestSequnceNumberCanBeFlushed() {
+  public synchronized Long getHighestSequnceNumberCanBeFlushed() {
     return highestSequnceNumberCanBeFlushed;
   }
 
-  public Long getHighestFlushedSequenceNumber() {
+  public synchronized Long getHighestFlushedSequenceNumber() {
     return highestFlushedSequenceNumber;
-  }      
-     
+  }     
+
+  public boolean isHasUnflushedSequences() {
+    return hasUnflushedSequences;
+  }
+
+  public void setHasUnflushedSequences(boolean hasUnflushedSequences) {
+    this.hasUnflushedSequences = hasUnflushedSequences;
+  }    
+   
+  public void resetHasUnflushedSequences(){
+    if (mappedHighestsequnceNumbers.isEmpty()){
+      hasUnflushedSequences = true;
+    }
+  }
+  
 }

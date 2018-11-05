@@ -35,7 +35,7 @@ public class OLuceneBlockingCallbackContainer {
     @Override
     public void run() {
       Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed();
-      while (highestSequnceCanBeFlushed != null && getSequenceNumber() < highestSequnceCanBeFlushed){
+      while (highestSequnceCanBeFlushed == null || getSequenceNumber() < highestSequnceCanBeFlushed){
         waitSomeTime(10l);
       }
     }

@@ -2168,6 +2168,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
               }
               Long largestSequenceNumber = OLuceneTracker.instance().getLargestsequenceNumber(recordRids);
               OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber);
+              OLuceneTracker.instance().clearMappedRidsToHighestSequenceNumbers();
             }
             this.transaction.set(null);
           }
@@ -4106,8 +4107,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         //here set signal for lucene, what lucene can flush
         OLogSequenceNumber nearest = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(endLSN);
-        //nulls should be sign that lucene index is not involved
-        //TODO ensure that
         if (nearest != null){
           Long sequenceNumberCanBeFlushed = OLuceneTracker.instance().getMappedSequenceNumber(nearest);
           if (sequenceNumberCanBeFlushed != null){
@@ -4117,6 +4116,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         
         OLogSequenceNumber cutTillLSN = lastLSN;
         //find truncate point
+        boolean foundInLuceneTracker = false;
         Long lastFlushedSequenceNumber = OLuceneTracker.instance().getHighestFlushedSequenceNumber();
         if (lastFlushedSequenceNumber != null){
           Long nearestToLastFlushed = OLuceneTracker.instance().getNearestSmallerOrEqualSequenceNumber(lastFlushedSequenceNumber);
@@ -4124,10 +4124,14 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           //take earlier LSN
           if (mappedLSN != null && mappedLSN.compareTo(lastLSN) < 0){
             cutTillLSN = mappedLSN;
+            foundInLuceneTracker = true;
           }
+          OLuceneTracker.instance().resetHasUnflushedSequences();
         }
         
-        writeAheadLog.cutTill(cutTillLSN);
+        if (foundInLuceneTracker || !OLuceneTracker.instance().isHasUnflushedSequences()){
+          writeAheadLog.cutTill(cutTillLSN);
+        }
 
         if (jvmError.get() == null) {
           clearStorageDirty();
