@@ -84,6 +84,7 @@ public interface OWriteAheadLog {
    * @param lsn Maximum value of LSN till WAL will be cut.
    *
    * @return <code>true</code> if some portion of WAL will be cut and <code>false</code> if WAL left untouched.
+   * @throws java.io.IOException
    */
   boolean cutTill(OLogSequenceNumber lsn) throws IOException;
 

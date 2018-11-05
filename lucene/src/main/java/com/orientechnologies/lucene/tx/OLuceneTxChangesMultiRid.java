@@ -20,7 +20,7 @@ package com.orientechnologies.lucene.tx;
 
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.lucene.engine.OLuceneIndexEngine;
-import com.orientechnologies.lucene.engine.OLuceneTracker;
+import com.orientechnologies.orient.core.index.OLuceneTracker;
 import com.orientechnologies.lucene.exception.OLuceneIndexException;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import org.apache.lucene.analysis.core.KeywordAnalyzer;
@@ -46,8 +46,7 @@ public class OLuceneTxChangesMultiRid extends OLuceneTxChangesAbstract {
 
   public void put(Object key, OIdentifiable value, Document doc) {
     try {
-      long sequenceNum = writer.addDocument(doc);
-      OLuceneTracker.instance().track(value, sequenceNum);
+      long sequenceNum = writer.addDocument(doc);      
     } catch (IOException e) {
       throw OException.wrapException(new OLuceneIndexException("unable to add document to changes index"), e);
     }
@@ -66,8 +65,7 @@ public class OLuceneTxChangesMultiRid extends OLuceneTxChangesAbstract {
 
         Document doc = engine.buildDocument(key, value);
         deletedDocs.add(doc);
-        long sequenceNumber = deletedIdx.addDocument(doc);
-        OLuceneTracker.instance().track(value, sequenceNumber);
+        long sequenceNumber = deletedIdx.addDocument(doc);        
       }
     } catch (IOException e) {
       throw OException

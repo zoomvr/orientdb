@@ -90,6 +90,7 @@ import com.orientechnologies.orient.core.index.OIndexKeyCursor;
 import com.orientechnologies.orient.core.index.OIndexKeyUpdater;
 import com.orientechnologies.orient.core.index.OIndexManager;
 import com.orientechnologies.orient.core.index.OIndexes;
+import com.orientechnologies.orient.core.index.OLuceneTracker;
 import com.orientechnologies.orient.core.index.ORuntimeKeyIndexDefinition;
 import com.orientechnologies.orient.core.metadata.OMetadataDefault;
 import com.orientechnologies.orient.core.metadata.schema.OImmutableClass;
@@ -105,6 +106,7 @@ import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
 import com.orientechnologies.orient.core.serialization.serializer.binary.impl.index.OCompositeKeySerializer;
 import com.orientechnologies.orient.core.serialization.serializer.binary.impl.index.OSimpleKeySerializer;
 import com.orientechnologies.orient.core.serialization.serializer.record.ORecordSerializer;
+import com.orientechnologies.orient.core.sql.parser.OLuceneOperator;
 import com.orientechnologies.orient.core.storage.OCluster;
 import com.orientechnologies.orient.core.storage.OIdentifiableStorage;
 import com.orientechnologies.orient.core.storage.OPhysicalPosition;
@@ -2067,7 +2069,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           for (ORID rid : recordLocks) {
             acquireWriteLock(rid);
           }
-        }
+        }        
         try {
           checkOpenness();
 
@@ -2075,6 +2077,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
           boolean rollback = false;
           startStorageTx(transaction);
+          OLogSequenceNumber lsn = null;
           try {
             final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
 
@@ -2155,9 +2158,17 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             if (rollback) {
               rollback(transaction);
             } else {
-              endStorageTx(transaction, recordOperations);
+              lsn = endStorageTx(transaction, recordOperations);
             }
 
+            if (lsn != null){
+              final List<ORecordId> recordRids = new ArrayList<>();
+              for (ORecordOperation operation : recordOperations){
+                recordRids.add(new ORecordId(operation.getRID()));
+              }
+              Long largestSequenceNumber = OLuceneTracker.instance().getLargestsequenceNumber(recordRids);
+              OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber);
+            }
             this.transaction.set(null);
           }
         } finally {
@@ -4214,13 +4225,14 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  private void endStorageTx(final OTransactionInternal txi, final Collection<ORecordOperation> recordOperations)
+  private OLogSequenceNumber endStorageTx(final OTransactionInternal txi, final Collection<ORecordOperation> recordOperations)
       throws IOException {
     final OLogSequenceNumber lsn = atomicOperationsManager.endAtomicOperation(false);
     assert OAtomicOperationsManager.getCurrentOperation() == null;
 
     OTransactionAbstract.updateCacheFromEntries(txi.getDatabase(), recordOperations, true);
     txCommit.incrementAndGet();
+    return lsn;
   }
 
   private void startStorageTx(OTransactionInternal clientTx) throws IOException {

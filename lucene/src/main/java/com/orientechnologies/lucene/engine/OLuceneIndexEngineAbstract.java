@@ -16,6 +16,7 @@
 
 package com.orientechnologies.lucene.engine;
 
+import com.orientechnologies.orient.core.index.OLuceneTracker;
 import com.orientechnologies.common.concur.resource.OSharedResourceAdaptiveExternal;
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.log.OLogManager;
@@ -77,6 +78,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.INDEX;
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.QUERY;
+import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.id.ORecordId;
 
 public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptiveExternal implements OLuceneIndexEngine {
 
@@ -125,7 +128,9 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   protected void addDocument(Document doc, OIdentifiable rid) {
     try {
       reopenToken = indexWriter.addDocument(doc);
-      OLuceneTracker.instance().track(rid, reopenToken);
+      if (rid instanceof ORID){
+        OLuceneTracker.instance().track(new ORecordId((ORID)rid), reopenToken);
+      }
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);
     }
