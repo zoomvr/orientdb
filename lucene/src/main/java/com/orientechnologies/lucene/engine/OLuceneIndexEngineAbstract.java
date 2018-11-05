@@ -21,6 +21,7 @@ import com.orientechnologies.common.concur.resource.OSharedResourceAdaptiveExter
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
+import com.orientechnologies.lucene.OLuceneBlockingCallbackContainer;
 import com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory;
 import com.orientechnologies.lucene.builder.OLuceneIndexType;
 import com.orientechnologies.lucene.exception.OLuceneIndexException;
@@ -237,7 +238,9 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
 
       directory = directoryFactory.createDirectory(getDatabase(), name, metadata);
 
-      indexWriter = createIndexWriter(directory);
+      indexWriter = createIndexWriter(directory);      
+      indexWriter.setFlushTaskBefore(OLuceneBlockingCallbackContainer.beforeCallback);
+      indexWriter.setFlushTaskAfter(OLuceneBlockingCallbackContainer.afterCallback);
       searcherManager = new SearcherManager(indexWriter, true, true, null);
 
       reopenToken = 0;

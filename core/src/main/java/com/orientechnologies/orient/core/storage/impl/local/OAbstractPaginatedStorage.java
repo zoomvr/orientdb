@@ -4101,10 +4101,33 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         final OLogSequenceNumber lastLSN = writeAheadLog.logFullCheckpointStart();
         writeCache.flush();
-        writeAheadLog.logFullCheckpointEnd();
+        final OLogSequenceNumber endLSN = writeAheadLog.logFullCheckpointEnd();
         writeAheadLog.flush();
 
-        writeAheadLog.cutTill(lastLSN);
+        //here set signal for lucene, what lucene can flush
+        OLogSequenceNumber nearest = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(endLSN);
+        //nulls should be sign that lucene index is not involved
+        //TODO ensure that
+        if (nearest != null){
+          Long sequenceNumberCanBeFlushed = OLuceneTracker.instance().getMappedSequenceNumber(nearest);
+          if (sequenceNumberCanBeFlushed != null){
+            OLuceneTracker.instance().setHighestSequnceNumberCanBeFlushed(sequenceNumberCanBeFlushed);
+          }
+        }
+        
+        OLogSequenceNumber cutTillLSN = lastLSN;
+        //find truncate point
+        Long lastFlushedSequenceNumber = OLuceneTracker.instance().getHighestFlushedSequenceNumber();
+        if (lastFlushedSequenceNumber != null){
+          Long nearestToLastFlushed = OLuceneTracker.instance().getNearestSmallerOrEqualSequenceNumber(lastFlushedSequenceNumber);
+          OLogSequenceNumber mappedLSN = OLuceneTracker.instance().getMappedLSN(nearestToLastFlushed);
+          //take earlier LSN
+          if (mappedLSN != null && mappedLSN.compareTo(lastLSN) < 0){
+            cutTillLSN = mappedLSN;
+          }
+        }
+        
+        writeAheadLog.cutTill(cutTillLSN);
 
         if (jvmError.get() == null) {
           clearStorageDirty();
