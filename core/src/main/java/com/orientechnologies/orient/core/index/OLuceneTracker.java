@@ -112,9 +112,12 @@ public class OLuceneTracker {
   }
   
   public Long getHighestSequnceNumberCanBeFlushed(Long writerId){
+    System.out.println("INTO GET HIGHEST SEQUENCE CAN BE FLUSHED");
     if (highestSequnceNumberCanBeFlushed != null){
+      System.out.println("INTO GET HIGHEST SEQUENCE CAN BE FLUSHED RETURN: " + highestSequnceNumberCanBeFlushed.get());
       return highestSequnceNumberCanBeFlushed.get();
     }
+    System.out.println("INTO GET HIGHEST SEQUENCE CAN BE FLUSHED RETURN: null");
     return null;
   }
   
@@ -127,6 +130,7 @@ public class OLuceneTracker {
       }
     }
     highestSequnceNumberCanBeFlushed.set(value);
+    System.out.println("Sequence number can be flushed value: " + highestSequnceNumberCanBeFlushed.get());
   }
   
   public void setHighestFlushedSequenceNumber(Long value, Long writerId) {

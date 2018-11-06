@@ -39,7 +39,9 @@ public class OLuceneBlockingCallbackContainer {
         while (highestSequnceCanBeFlushed == null || getSequenceNumber() < highestSequnceCanBeFlushed){
           System.out.println("WAITING for: " + getSequenceNumber());
           waitSomeTime(10l);
+          highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
         }
+        OLuceneTracker.instance().resetHasUnflushedSequences();
       }
     }
   };

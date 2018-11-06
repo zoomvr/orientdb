@@ -4160,8 +4160,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             if (mappedLSN != null && mappedLSN.compareTo(lastLSN) < 0){
               cutTillLSN = mappedLSN;
               foundInLuceneTracker = true;
-            }
-            OLuceneTracker.instance().resetHasUnflushedSequences();
+            }            
           }
 
           if (foundInLuceneTracker || !OLuceneTracker.instance().isHasUnflushedSequences()){
