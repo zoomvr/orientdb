@@ -66,5 +66,10 @@ public interface OLuceneIndexEngine extends OIndexEngine, OFreezableStorageCompo
 
 
   boolean isCollectionIndex();
+  
+  @Override
+  default boolean isLuceneIndexEngine(){
+    return true;
+  }    
 
 }

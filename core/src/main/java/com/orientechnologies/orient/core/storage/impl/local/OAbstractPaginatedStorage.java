@@ -2004,6 +2004,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     //
     //  OAbstractPaginatedStorage.commit(com.orientechnologies.orient.core.storage.impl.local.OMicroTransaction)
 
+    System.out.println("COMMIT ENTER");
     try {
       checkOpenness();
       checkLowDiskSpaceRequestsAndReadOnlyConditions();
@@ -2156,19 +2157,24 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             }
           } finally {
             if (rollback) {
+              System.out.println("ROLLBACK");
               rollback(transaction);
             } else {
               lsn = endStorageTx(transaction, recordOperations);
+              System.out.println("END STORAGE WITH: " + lsn);
             }
 
+            System.out.println("COMMIT");
             if (lsn != null){
+              List<Long> luceneWritersIds = getInvolvedLuceneIndexesWritersIndexes(indexOperations);
+              System.out.println("INVOLVED INDEXES SIZE: " + (luceneWritersIds == null ? 0 : luceneWritersIds.size()) + " OF INDEX OPERATIONS: " + (indexOperations == null ? 0 : indexOperations.size()));
               final List<ORecordId> recordRids = new ArrayList<>();
               for (ORecordOperation operation : recordOperations){
                 recordRids.add(new ORecordId(operation.getRID()));
               }
-              Long largestSequenceNumber = OLuceneTracker.instance().getLargestsequenceNumber(recordRids);
-              OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber);
-              OLuceneTracker.instance().clearMappedRidsToHighestSequenceNumbers();
+              Long largestSequenceNumber = OLuceneTracker.instance().getLargestsequenceNumber(recordRids, luceneWritersIds);              
+              OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWritersIds);              
+              OLuceneTracker.instance().clearMappedRidsToHighestSequenceNumbers(luceneWritersIds);
             }
             this.transaction.set(null);
           }
@@ -2206,7 +2212,28 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       throw logAndPrepareForRethrow(t);
     }
   }
-
+  
+  private List<Long> getInvolvedLuceneIndexesWritersIndexes(Map<String, OTransactionIndexChanges> indexOperations){
+    List<Long> writersIds = null;
+    for (OTransactionIndexChanges transactionIndexChanges : indexOperations.values()){
+      OIndexInternal<?> associatedIndex = transactionIndexChanges.getAssociatedIndex();
+      int indexId = associatedIndex.getIndexId();
+      OIndexEngine indexEngine = indexEngines.get(indexId);
+      System.out.println("INDEX TYPE : " + indexEngine.getClass().getSimpleName());
+      System.out.println("IS LUCENE : " + indexEngine.isLuceneIndexEngine());
+      if (indexEngine.isLuceneIndexEngine()){
+        Long backendWriterId = indexEngine.getBackEndWriterId();
+        if (backendWriterId != null){
+          if (writersIds == null){
+            writersIds = new ArrayList<>();
+          }
+          writersIds.add(backendWriterId);
+        }
+      }
+    }
+    return writersIds;
+  }
+  
   private static void commitIndexes(final Map<String, OTransactionIndexChanges> indexesToCommit,
       final OAtomicOperation atomicOperation) {
     final Map<OIndex, OIndexAbstract.IndexTxSnapshot> snapshots = new IdentityHashMap<>();
@@ -4031,6 +4058,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   }
 
   protected void makeFuzzyCheckpoint() {
+    System.out.println("====================================FUZZY CHECK POINT 1");
     if (writeAheadLog == null) {
       return;
     }
@@ -4087,6 +4115,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   }
 
   protected void makeFullCheckpoint() {
+    System.out.println("====================================FUL CHECK POINT");
     final OSessionStoragePerformanceStatistic statistic = performanceStatisticManager.getSessionPerformanceStatistic();
     if (statistic != null)
       statistic.startFullCheckpointTimer();
@@ -4106,33 +4135,45 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         writeAheadLog.flush();
 
         //here set signal for lucene, what lucene can flush
+        System.out.println("END LSN: " + endLSN);
         OLogSequenceNumber nearest = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(endLSN);
+        System.out.println("NEAREST LSN: " + nearest);
         if (nearest != null){
           Long sequenceNumberCanBeFlushed = OLuceneTracker.instance().getMappedSequenceNumber(nearest);
+          System.out.println("Sequence number can be flushed: " + sequenceNumberCanBeFlushed);
           if (sequenceNumberCanBeFlushed != null){
             OLuceneTracker.instance().setHighestSequnceNumberCanBeFlushed(sequenceNumberCanBeFlushed);
           }
         }
+        System.out.println("Setting highest sequence number can be flushed finished");
         
         OLogSequenceNumber cutTillLSN = lastLSN;
         //find truncate point
-        boolean foundInLuceneTracker = false;
-        Long lastFlushedSequenceNumber = OLuceneTracker.instance().getHighestFlushedSequenceNumber();
-        if (lastFlushedSequenceNumber != null){
-          Long nearestToLastFlushed = OLuceneTracker.instance().getNearestSmallerOrEqualSequenceNumber(lastFlushedSequenceNumber);
-          OLogSequenceNumber mappedLSN = OLuceneTracker.instance().getMappedLSN(nearestToLastFlushed);
-          //take earlier LSN
-          if (mappedLSN != null && mappedLSN.compareTo(lastLSN) < 0){
-            cutTillLSN = mappedLSN;
-            foundInLuceneTracker = true;
+        int counter = 0;
+        while (counter < 2){
+          boolean foundInLuceneTracker = false;
+          Long lastFlushedSequenceNumber = OLuceneTracker.instance().getHighestFlushedSequenceNumber();
+          if (lastFlushedSequenceNumber != null){
+            Long nearestToLastFlushed = OLuceneTracker.instance().getNearestSmallerOrEqualSequenceNumber(lastFlushedSequenceNumber);
+            OLogSequenceNumber mappedLSN = OLuceneTracker.instance().getMappedLSN(nearestToLastFlushed);
+            //take earlier LSN
+            if (mappedLSN != null && mappedLSN.compareTo(lastLSN) < 0){
+              cutTillLSN = mappedLSN;
+              foundInLuceneTracker = true;
+            }
+            OLuceneTracker.instance().resetHasUnflushedSequences();
           }
-          OLuceneTracker.instance().resetHasUnflushedSequences();
-        }
-        
-        if (foundInLuceneTracker || !OLuceneTracker.instance().isHasUnflushedSequences()){
-          writeAheadLog.cutTill(cutTillLSN);
+
+          if (foundInLuceneTracker || !OLuceneTracker.instance().isHasUnflushedSequences()){
+            writeAheadLog.cutTill(cutTillLSN);
+            break;
+          }
+          
+          ++counter;
         }
 
+        writeAheadLog.cutTill(cutTillLSN);
+        
         if (jvmError.get() == null) {
           clearStorageDirty();
         }

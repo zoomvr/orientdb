@@ -34,9 +34,12 @@ public class OLuceneBlockingCallbackContainer {
   public static IndexWriter.FlushCallback beforeCallback = new IndexWriter.FlushCallback() {
     @Override
     public void run() {
-      Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed();
-      while (highestSequnceCanBeFlushed == null || getSequenceNumber() < highestSequnceCanBeFlushed){
-        waitSomeTime(10l);
+      Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
+      if (OLuceneTracker.instance().isHasUnflushedSequences()){
+        while (highestSequnceCanBeFlushed == null || getSequenceNumber() < highestSequnceCanBeFlushed){
+          System.out.println("WAITING for: " + getSequenceNumber());
+          waitSomeTime(10l);
+        }
       }
     }
   };
@@ -44,7 +47,7 @@ public class OLuceneBlockingCallbackContainer {
   public static IndexWriter.FlushCallback afterCallback = new IndexWriter.FlushCallback(){
     @Override
     public void run() {
-      OLuceneTracker.instance().setHighestFlushedSequenceNumber(this.getSequenceNumber());
+      OLuceneTracker.instance().setHighestFlushedSequenceNumber(this.getSequenceNumber(), getWriterIndex());
     }    
   };
   

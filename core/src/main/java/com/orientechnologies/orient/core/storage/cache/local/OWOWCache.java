@@ -906,6 +906,8 @@ public final class OWOWCache extends OAbstractWriteCache implements OWriteCache,
 
   @Override
   public void makeFuzzyCheckpoint(final long segmentId) throws IOException {
+    System.out.println("====================================FUZZY CHECK POINT 2");
+    
     if (writeAheadLog != null) {
       filesLock.acquireReadLock();
       try {

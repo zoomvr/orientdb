@@ -106,6 +106,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   private          long          flushIndexInterval;
   private          long          closeAfterInterval;
   private          long          firstFlushAfter;
+  private boolean callbackSetUp = false;
 
   private Lock openCloseLock;
 
@@ -126,11 +127,25 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     lastAccess.set(System.currentTimeMillis());
   }
 
+  @Override
+  public Long getBackEndWriterId(){
+    if (indexWriter != null){
+      return indexWriter.getUniqueIndex();
+    }
+    return null;
+  }
+  
   protected void addDocument(Document doc, OIdentifiable rid) {
+    System.out.println("ADDED DOC");
+    if (!callbackSetUp){
+      indexWriter.setFlushTaskBefore(OLuceneBlockingCallbackContainer.beforeCallback);
+      indexWriter.setFlushTaskAfter(OLuceneBlockingCallbackContainer.afterCallback);
+      callbackSetUp = true;
+    }    
     try {
       reopenToken = indexWriter.addDocument(doc);
       if (rid instanceof ORID){
-        OLuceneTracker.instance().track(new ORecordId((ORID)rid), reopenToken);
+        OLuceneTracker.instance().track(new ORecordId((ORID)rid), reopenToken, indexWriter.getUniqueIndex());
       }
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);
@@ -239,8 +254,6 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
       directory = directoryFactory.createDirectory(getDatabase(), name, metadata);
 
       indexWriter = createIndexWriter(directory);      
-      indexWriter.setFlushTaskBefore(OLuceneBlockingCallbackContainer.beforeCallback);
-      indexWriter.setFlushTaskAfter(OLuceneBlockingCallbackContainer.afterCallback);
       searcherManager = new SearcherManager(indexWriter, true, true, null);
 
       reopenToken = 0;
@@ -257,8 +270,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     } finally {
 
       openCloseLock.unlock();
-    }
-
+    }    
   }
 
   private void addMetadataDocumentIfNotPresent() {

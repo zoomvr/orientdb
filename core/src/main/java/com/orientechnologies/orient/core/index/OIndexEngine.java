@@ -103,6 +103,14 @@ public interface OIndexEngine {
   int getVersion();
 
   String getName();
+  
+  default boolean isLuceneIndexEngine(){
+    return false;
+  }
+  
+  default Long getBackEndWriterId(){
+    return null;
+  }
 
   /**
    * <p>Acquires exclusive lock in the active atomic operation running on the current thread for this index engine.
