@@ -841,9 +841,11 @@ public class Orient extends OListenerManger<OOrientListener> {
 
     @Override
     public void shutdown() throws Exception {
-      if (threadGroup != null)
+      if (threadGroup != null){
         // STOP ALL THE PENDING THREADS
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!SHUT 1 DOWN CALLED!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         threadGroup.interrupt();
+      }
 
       if (timer != null) {
         timer.cancel();

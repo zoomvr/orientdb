@@ -135,8 +135,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     return null;
   }
   
-  protected void addDocument(Document doc, OIdentifiable rid) {
-    System.out.println("ADDED DOC");
+  protected void addDocument(Document doc, OIdentifiable rid) {    
     if (!callbackSetUp){
       indexWriter.setFlushTaskBefore(OLuceneBlockingCallbackContainer.beforeCallback);
       indexWriter.setFlushTaskAfter(OLuceneBlockingCallbackContainer.afterCallback);

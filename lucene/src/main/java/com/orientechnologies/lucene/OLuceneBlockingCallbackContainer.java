@@ -36,11 +36,13 @@ public class OLuceneBlockingCallbackContainer {
     public void run() {
       Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
       if (OLuceneTracker.instance().isHasUnflushedSequences()){
-        while (highestSequnceCanBeFlushed == null || getSequenceNumber() < highestSequnceCanBeFlushed){
-          System.out.println("WAITING for: " + getSequenceNumber());
-          waitSomeTime(10l);
+        while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed){
+          System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis());
+          waitSomeTime(100l);
           highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
+          System.out.println("DETECTED HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", " + System.currentTimeMillis());
         }
+        System.out.println("RELEASED LUCENE LOCK for: " + getSequenceNumber() + ", " + System.currentTimeMillis());
         OLuceneTracker.instance().resetHasUnflushedSequences();
       }
     }

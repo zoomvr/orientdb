@@ -111,13 +111,10 @@ public class OLuceneTracker {
     }
   }
   
-  public Long getHighestSequnceNumberCanBeFlushed(Long writerId){
-    System.out.println("INTO GET HIGHEST SEQUENCE CAN BE FLUSHED");
-    if (highestSequnceNumberCanBeFlushed != null){
-      System.out.println("INTO GET HIGHEST SEQUENCE CAN BE FLUSHED RETURN: " + highestSequnceNumberCanBeFlushed.get());
+  public synchronized Long getHighestSequnceNumberCanBeFlushed(Long writerId){    
+    if (highestSequnceNumberCanBeFlushed != null){      
       return highestSequnceNumberCanBeFlushed.get();
-    }
-    System.out.println("INTO GET HIGHEST SEQUENCE CAN BE FLUSHED RETURN: null");
+    }    
     return null;
   }
   
@@ -250,7 +247,7 @@ public class OLuceneTracker {
       if (rec == null) {
         return;
       }
-      System.out.println("----------------------------SEQUNCE NUMBER: " + sequenceNumber);
+      System.out.println("----------------------------SEQUENCE NUMBER: " + sequenceNumber);
       //TODO need better synchronization
       synchronized (this) {
         Long val = mappedHighestsequnceNumbers.get(rec);
