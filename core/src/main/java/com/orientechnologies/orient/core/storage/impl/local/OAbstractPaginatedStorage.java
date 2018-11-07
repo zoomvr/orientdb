@@ -2168,13 +2168,20 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             if (lsn != null){
               List<Long> luceneWritersIds = getInvolvedLuceneIndexesWritersIndexes(indexOperations);
               System.out.println("INVOLVED INDEXES SIZE: " + (luceneWritersIds == null ? 0 : luceneWritersIds.size()) + " OF INDEX OPERATIONS: " + (indexOperations == null ? 0 : indexOperations.size()));
-              final List<ORecordId> recordRids = new ArrayList<>();
-              for (ORecordOperation operation : recordOperations){
-                recordRids.add(new ORecordId(operation.getRID()));
+              List<Long> detectedHighestSequencesNumberForClear = new ArrayList<>();
+              if (luceneWritersIds != null){
+                final List<ORecordId> recordRids = new ArrayList<>();
+                for (ORecordOperation operation : recordOperations){
+                  recordRids.add(new ORecordId(operation.getRID()));
+                }              
+                for (Long luceneWriterId : luceneWritersIds){
+                  Long largestSequenceNumber = OLuceneTracker.instance().getLargestSequenceNumber(recordRids, luceneWriterId);              
+                  detectedHighestSequencesNumberForClear.add(largestSequenceNumber);
+                  OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWriterId);
+                }
+                OLuceneTracker.instance().clearMappedRidsToHighestSequenceNumbers(luceneWritersIds);
+                OLuceneTracker.instance().mapWriterIdsToSpecificLSN(lsn, luceneWritersIds);
               }
-              Long largestSequenceNumber = OLuceneTracker.instance().getLargestsequenceNumber(recordRids, luceneWritersIds);              
-              OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWritersIds);              
-              OLuceneTracker.instance().clearMappedRidsToHighestSequenceNumbers(luceneWritersIds);
             }
             this.transaction.set(null);
           }
@@ -4136,13 +4143,28 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         //here set signal for lucene, what lucene can flush
         System.out.println("END LSN: " + endLSN);
-        OLogSequenceNumber nearest = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(endLSN);
+        OLogSequenceNumber nearest;
+        Collection<OLogSequenceNumber> previousLSNs;
+        Collection<Long> involvedIndexWriters;
+        synchronized(OLuceneTracker.instance()){
+          //find nearest recorded but smaller LSN
+          nearest = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(endLSN);
+          //get all previous LSNs
+          previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearest);
+          //get all writers involved till this LSN
+          involvedIndexWriters = OLuceneTracker.instance().getMappedIndexWritersIds(previousLSNs);
+        }
         System.out.println("NEAREST LSN: " + nearest);
         if (nearest != null){
-          Long sequenceNumberCanBeFlushed = OLuceneTracker.instance().getMappedSequenceNumber(nearest);
-          System.out.println("Sequence number can be flushed: " + sequenceNumberCanBeFlushed);
-          if (sequenceNumberCanBeFlushed != null){
-            OLuceneTracker.instance().setHighestSequnceNumberCanBeFlushed(sequenceNumberCanBeFlushed);
+          //for each writer find max sequence number can be flushed
+          for (Long indexWriterId : involvedIndexWriters){
+            //find max mapped sequence number into these LSNs for writer
+            Long sequenceNumberCanBeFlushed = OLuceneTracker.instance().getHighestMappedSequenceNumber(previousLSNs, indexWriterId);
+            System.out.println("Sequence number can be flushed: " + sequenceNumberCanBeFlushed + " for index writer: " + indexWriterId);
+            if (sequenceNumberCanBeFlushed != null){
+              //set max sequence number for this writer can be flushed
+              OLuceneTracker.instance().setHighestSequnceNumberCanBeFlushed(sequenceNumberCanBeFlushed, indexWriterId);
+            }
           }
         }
         System.out.println("Setting highest sequence number can be flushed finished");
@@ -4152,18 +4174,16 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         int counter = 0;
         while (counter < 2){
           boolean foundInLuceneTracker = false;
-          Long lastFlushedSequenceNumber = OLuceneTracker.instance().getHighestFlushedSequenceNumber();
-          if (lastFlushedSequenceNumber != null){
-            Long nearestToLastFlushed = OLuceneTracker.instance().getNearestSmallerOrEqualSequenceNumber(lastFlushedSequenceNumber);
-            OLogSequenceNumber mappedLSN = OLuceneTracker.instance().getMappedLSN(nearestToLastFlushed);
-            //take earlier LSN
-            if (mappedLSN != null && mappedLSN.compareTo(lastLSN) < 0){
-              cutTillLSN = mappedLSN;
-              foundInLuceneTracker = true;
-            }            
+          //find largest safe lsn(which is minimal LSN), based on writers highest flushed sequence numbers, compare it to lastLSN and use it if it is smaller
+          OLogSequenceNumber safeLSN = OLuceneTracker.instance().getMinimalFlushedLSNForAllWriters(involvedIndexWriters, lastLSN);          
+          if (safeLSN != null && safeLSN.compareTo(lastLSN) < 0){            
+            cutTillLSN = safeLSN;
+            foundInLuceneTracker = true;
+            //relax tracker's collections
+            OLuceneTracker.instance().cleanUpTillLSN(involvedIndexWriters, cutTillLSN);
           }
 
-          if (foundInLuceneTracker || !OLuceneTracker.instance().isHasUnflushedSequences()){
+          if (foundInLuceneTracker || !OLuceneTracker.instance().hasUnflushedSequences(involvedIndexWriters)){
             writeAheadLog.cutTill(cutTillLSN);
             break;
           }

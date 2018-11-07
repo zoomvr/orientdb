@@ -16,6 +16,8 @@
 package com.orientechnologies.lucene;
 
 import com.orientechnologies.orient.core.index.OLuceneTracker;
+import java.util.LinkedList;
+import java.util.List;
 import org.apache.lucene.index.IndexWriter;
 
 /**
@@ -35,14 +37,16 @@ public class OLuceneBlockingCallbackContainer {
     @Override
     public void run() {
       Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
-      if (OLuceneTracker.instance().isHasUnflushedSequences()){
+      List<Long> tmpCollection = new LinkedList<>();
+      tmpCollection.add(getWriterIndex());
+      if (OLuceneTracker.instance().hasUnflushedSequences(tmpCollection)){
         while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed){
-          System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis());
+          System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
           waitSomeTime(100l);
           highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
-          System.out.println("DETECTED HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", " + System.currentTimeMillis());
+          System.out.println("DETECTED HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
         }
-        System.out.println("RELEASED LUCENE LOCK for: " + getSequenceNumber() + ", " + System.currentTimeMillis());
+        System.out.println("RELEASED LUCENE LOCK for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
         OLuceneTracker.instance().resetHasUnflushedSequences();
       }
     }
