@@ -137,7 +137,7 @@ public class OLuceneTracker {
       synchronized(getLockObject(writerId)){
         PerIndexWriterTRracker tracker = mappedTrackers.get(writerId);
         if (tracker != null){
-          tracker.clearMappedRidsToHighestSequenceNumbers();
+          tracker.clearMappedRidsToHighestSequenceNumbers(tillSequenceNumber);
         }
       }
     }
@@ -365,7 +365,7 @@ public class OLuceneTracker {
       if (lsn == null || sequenceNumber == null) {
         return;
       }
-      synchronized (highestSequenceNumberForLSN) {
+      synchronized (this) {
         highestSequenceNumberForLSN.put(lsn, sequenceNumber);
         LSNForHighestSequenceNumber.put(sequenceNumber, lsn);
       }
@@ -379,10 +379,7 @@ public class OLuceneTracker {
         Long[] tmpListForSort = LSNForHighestSequenceNumber.keySet().toArray(new Long[0]);
         Arrays.sort(tmpListForSort);
         //find last smaller then specified
-        for (int i = tmpListForSort.length - 1; i >= 0; i--) {
-          if (tmpListForSort[i] == null) {
-            System.out.println("Index is: " + i);
-          }
+        for (int i = tmpListForSort.length - 1; i >= 0; i--) {          
           if (tmpListForSort[i] <= referentVal) {
             return tmpListForSort[i];
           }
@@ -393,7 +390,7 @@ public class OLuceneTracker {
     }
 
     public OLogSequenceNumber getNearestSmallerOrEqualLSN(OLogSequenceNumber toLsn) {
-      synchronized (highestSequenceNumberForLSN) {
+      synchronized (this) {
         OLogSequenceNumber[] tmpListForSort = highestSequenceNumberForLSN.keySet().toArray(new OLogSequenceNumber[0]);
         Arrays.sort(tmpListForSort);
         //find last smaller then specified
@@ -409,7 +406,7 @@ public class OLuceneTracker {
 
     public Long getHighestMappedSequenceNumber(Collection<OLogSequenceNumber> observedLSNs) {
       Long ret = null;
-      synchronized(highestSequenceNumberForLSN){
+      synchronized(this){
         for (OLogSequenceNumber lsn : observedLSNs){
           Long val = highestSequenceNumberForLSN.get(lsn);
           if ((val != null) && (ret == null || val > ret)){
@@ -471,7 +468,7 @@ public class OLuceneTracker {
       return highestSequenceNumberCanBeFlushed.get();
     }
 
-    private void cleanUpTillLSN(OLogSequenceNumber toLSN) {
+    private synchronized void cleanUpTillLSN(OLogSequenceNumber toLSN) {
 //      Long highestFlushed = getHighestFlushedSequenceNumber();
 //      Long mappedEquivalent = getNearestSmallerOrEqualSequenceNumber(highestFlushed);
 //      OLogSequenceNumber referentLSN = getMappedLSN(mappedEquivalent);

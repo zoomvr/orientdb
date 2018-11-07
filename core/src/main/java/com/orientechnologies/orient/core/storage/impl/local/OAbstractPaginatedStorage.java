@@ -2179,7 +2179,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
                   detectedHighestSequencesNumberForClear.add(largestSequenceNumber);
                   OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWriterId);
                 }
-                OLuceneTracker.instance().clearMappedRidsToHighestSequenceNumbers(luceneWritersIds);
+                OLuceneTracker.instance().clearMappedRidsToHighestSequenceNumbers(luceneWritersIds, detectedHighestSequencesNumberForClear);
                 OLuceneTracker.instance().mapWriterIdsToSpecificLSN(lsn, luceneWritersIds);
               }
             }
