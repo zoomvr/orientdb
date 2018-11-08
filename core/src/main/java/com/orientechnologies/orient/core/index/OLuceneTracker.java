@@ -84,6 +84,13 @@ public class OLuceneTracker {
     return ret;
   }
   
+  public synchronized void clearInvolvedWriterIdsInLSN(OLogSequenceNumber referent){
+    Collection<OLogSequenceNumber> allTill = getPreviousLSNsTill(referent);
+    for (OLogSequenceNumber lsn : allTill){
+      involvedWriterIdsInLSN.remove(lsn);
+    }
+  }
+  
   public void track(ORecordId rec, long sequenceNumber, Long writerIndex){
     synchronized(getLockObject(writerIndex)){
       System.out.println("----------------------------SEQUENCE NUMBER: " + sequenceNumber + ", WRITER INDEX: " + writerIndex);
@@ -373,33 +380,37 @@ public class OLuceneTracker {
       if (referentVal == null){
         return null;
       }
-      synchronized (this) {
-        Long[] tmpListForSort = LSNForHighestSequenceNumber.keySet().toArray(new Long[0]);
-        Arrays.sort(tmpListForSort);
+      Long retVal = null;
+      synchronized (this) {        
         //find last smaller then specified
-        for (int i = tmpListForSort.length - 1; i >= 0; i--) {          
-          if (tmpListForSort[i] <= referentVal) {
-            return tmpListForSort[i];
+        for (Long sequenceNumber : LSNForHighestSequenceNumber.keySet()){
+          if (sequenceNumber < referentVal){
+            if (retVal == null || sequenceNumber > retVal){
+              retVal = sequenceNumber;
+            }
           }
-        }
+        }      
       }
 
-      return null;
+      return retVal;
     }
 
     public OLogSequenceNumber getNearestSmallerOrEqualLSN(OLogSequenceNumber toLsn) {
+      if (toLsn == null){
+        return null;
+      }
+      OLogSequenceNumber retVal = null;
       synchronized (this) {
-        OLogSequenceNumber[] tmpListForSort = highestSequenceNumberForLSN.keySet().toArray(new OLogSequenceNumber[0]);
-        Arrays.sort(tmpListForSort);
-        //find last smaller then specified
-        for (int i = tmpListForSort.length - 1; i >= 0; i--) {
-          if (tmpListForSort[i].compareTo(toLsn) <= 0) {
-            return tmpListForSort[i];
+        for (OLogSequenceNumber lsn : highestSequenceNumberForLSN.keySet()){
+          if (lsn.compareTo(toLsn) <= 0){
+            if (retVal == null || lsn.compareTo(retVal) > 0){
+              retVal = lsn;
+            }
           }
-        }
+        }                
       }
 
-      return null;
+      return retVal;
     }
 
     public Long getHighestMappedSequenceNumber(Collection<OLogSequenceNumber> observedLSNs) {

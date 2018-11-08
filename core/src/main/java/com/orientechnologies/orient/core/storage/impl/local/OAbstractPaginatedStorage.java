@@ -4153,6 +4153,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearest);
           //get all writers involved till this LSN
           involvedIndexWriters = OLuceneTracker.instance().getMappedIndexWritersIds(previousLSNs);
+          OLuceneTracker.instance().clearInvolvedWriterIdsInLSN(endLSN);
         }
         System.out.println("NEAREST LSN: " + nearest);
         if (nearest != null){
