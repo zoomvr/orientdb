@@ -33,7 +33,8 @@ public class OLuceneBlockingCallbackContainer {
     catch (InterruptedException ignore){}
   }
   
-  public static IndexWriter.FlushCallback beforeCallback = new IndexWriter.FlushCallback() {
+  public static class OLuceneSynchCallbackBefore extends IndexWriter.FlushCallback{
+
     @Override
     public void run() {
       Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
@@ -47,16 +48,22 @@ public class OLuceneBlockingCallbackContainer {
           System.out.println("DETECTED HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
         }
         System.out.println("RELEASED LUCENE LOCK for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
-        OLuceneTracker.instance().resetHasUnflushedSequences();
+        OLuceneTracker.instance().resetHasUnflushedSequences(getWriterIndex());
+      }
+      else{
+        System.out.println("NOTHING TO FLUSH FOR INDEX WRITER: " + getWriterIndex() +  ", " + System.currentTimeMillis());
       }
     }
-  };
+    
+  }    
   
-  public static IndexWriter.FlushCallback afterCallback = new IndexWriter.FlushCallback(){
+  public static class OLuceneSynchCallbackAfter extends IndexWriter.FlushCallback{
+
     @Override
     public void run() {
       OLuceneTracker.instance().setHighestFlushedSequenceNumber(this.getSequenceNumber(), getWriterIndex());
-    }    
-  };
+    }
+    
+  }  
   
 }

@@ -255,12 +255,10 @@ public class OLuceneTracker {
     return retVal;
   }
   
-  public void resetHasUnflushedSequences(){    
-    for (Long writerId : mappedTrackers.keySet()){
-      synchronized(getLockObject(writerId)){
-        PerIndexWriterTRracker tracker = mappedTrackers.get(writerId);
-        tracker.resetHasUnflushedSequences();
-      }
+  public void resetHasUnflushedSequences(Long writerId){        
+    synchronized(getLockObject(writerId)){
+      PerIndexWriterTRracker tracker = mappedTrackers.get(writerId);
+      tracker.resetHasUnflushedSequences();
     }    
   }
   

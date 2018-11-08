@@ -843,7 +843,7 @@ public class Orient extends OListenerManger<OOrientListener> {
     public void shutdown() throws Exception {
       if (threadGroup != null){
         // STOP ALL THE PENDING THREADS
-        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!SHUT 1 DOWN CALLED!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!SHUT 1 DOWN CALLED!!!!!!!!!!!!!!!!!!!!!!!!!!!");        
         threadGroup.interrupt();
       }
 

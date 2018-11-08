@@ -136,9 +136,10 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   }
   
   protected void addDocument(Document doc, OIdentifiable rid) {    
+    //lazy initialization to give lucene time for boostrap
     if (!callbackSetUp){
-      indexWriter.setFlushTaskBefore(OLuceneBlockingCallbackContainer.beforeCallback);
-      indexWriter.setFlushTaskAfter(OLuceneBlockingCallbackContainer.afterCallback);
+      indexWriter.setFlushTaskBefore(new OLuceneBlockingCallbackContainer.OLuceneSynchCallbackBefore());
+      indexWriter.setFlushTaskAfter(new OLuceneBlockingCallbackContainer.OLuceneSynchCallbackAfter());
       callbackSetUp = true;
     }    
     try {
@@ -323,6 +324,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   }
 
   private void commitAndCloseWriter() throws IOException {
+    System.out.println("CLOSING WRITER WITH ID: " + indexWriter.getUniqueIndex());
     if (indexWriter != null && indexWriter.isOpen()) {
       indexWriter.commit();
       indexWriter.close();
