@@ -4173,26 +4173,31 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         OLogSequenceNumber cutTillLSN = lastLSN;
         //find truncate point
         int counter = 0;
-        while (counter < 2){
+        int maxCounter = 5;
+        //try few times to achieve max truncate
+        while (counter < maxCounter){
           boolean foundInLuceneTracker = false;
           //find largest safe lsn(which is minimal LSN), based on writers highest flushed sequence numbers, compare it to lastLSN and use it if it is smaller
           OLogSequenceNumber safeLSN = OLuceneTracker.instance().getMinimalFlushedLSNForAllWriters(involvedIndexWriters, lastLSN);          
           if (safeLSN != null && safeLSN.compareTo(lastLSN) < 0){            
             cutTillLSN = safeLSN;
+            System.out.println("FOUND SAFE LSN IN TRACKERS: " + cutTillLSN);
             foundInLuceneTracker = true;
             //relax tracker's collections
             OLuceneTracker.instance().cleanUpTillLSN(involvedIndexWriters, cutTillLSN);
           }
-
+          else{
+            System.out.println("NOT FOUND SAFE LSN");
+          }
+          
           if (foundInLuceneTracker || !OLuceneTracker.instance().hasUnflushedSequences(involvedIndexWriters)){
+            System.out.println("WAL TRUNCATED TILL: " + cutTillLSN);
             writeAheadLog.cutTill(cutTillLSN);
             break;
           }
           
           ++counter;
-        }
-
-        writeAheadLog.cutTill(cutTillLSN);
+        }        
         
         if (jvmError.get() == null) {
           clearStorageDirty();

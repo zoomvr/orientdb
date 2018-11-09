@@ -478,9 +478,6 @@ public class OLuceneTracker {
     }
 
     private synchronized void cleanUpTillLSN(OLogSequenceNumber toLSN) {
-//      Long highestFlushed = getHighestFlushedSequenceNumber();
-//      Long mappedEquivalent = getNearestSmallerOrEqualSequenceNumber(highestFlushed);
-//      OLogSequenceNumber referentLSN = getMappedLSN(mappedEquivalent);
       Set<OLogSequenceNumber> toBeRemoved = new HashSet<>();
       for (OLogSequenceNumber lsn : highestSequenceNumberForLSN.keySet()){
         if (lsn.compareTo(toLSN) <= 0){
