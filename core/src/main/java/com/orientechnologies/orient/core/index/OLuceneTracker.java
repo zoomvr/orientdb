@@ -93,7 +93,7 @@ public class OLuceneTracker {
   
   public void track(ORecordId rec, long sequenceNumber, Long writerIndex){
     synchronized(getLockObject(writerIndex)){
-      System.out.println("----------------------------SEQUENCE NUMBER: " + sequenceNumber + ", WRITER INDEX: " + writerIndex);
+      System.out.println("----------------------------SEQUENCE NUMBER: " + sequenceNumber + ", WRITER INDEX: " + writerIndex);      
       PerIndexWriterTRracker tracker = mappedTrackers.get(writerIndex);
       if (tracker == null){
         tracker = new PerIndexWriterTRracker();

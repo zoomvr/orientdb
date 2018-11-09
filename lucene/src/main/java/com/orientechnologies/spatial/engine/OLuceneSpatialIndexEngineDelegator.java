@@ -339,4 +339,9 @@ public class OLuceneSpatialIndexEngineDelegator implements OLuceneIndexEngine, O
   public OLuceneIndexEngine getDelegate() {
     return delegate;
   }
+  
+  @Override
+  public Long getBackEndWriterId(){
+    return delegate.getBackEndWriterId();
+  }
 }

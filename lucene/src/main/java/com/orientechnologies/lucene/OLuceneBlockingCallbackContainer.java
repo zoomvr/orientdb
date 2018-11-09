@@ -37,14 +37,18 @@ public class OLuceneBlockingCallbackContainer {
 
     @Override
     public void run() {
+      if (isRAMDirectory()){
+        System.out.println("RAM DIRECTORY NO NEED TO WAIT");
+        return;
+      }
       Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
       List<Long> tmpCollection = new LinkedList<>();
       tmpCollection.add(getWriterIndex());
       if (OLuceneTracker.instance().hasUnflushedSequences(tmpCollection)){
         while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed){
           System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
-          waitSomeTime(100l);
-          highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
+          waitSomeTime(1000l);
+          highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());          
           System.out.println("DETECTED HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
         }
         System.out.println("RELEASED LUCENE LOCK for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
