@@ -4173,7 +4173,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         OLogSequenceNumber cutTillLSN = lastLSN;
         //find truncate point
         int counter = 0;
-        int maxCounter = 5;
+        int maxCounter = 10;
         //try few times to achieve max truncate
         while (counter < maxCounter){
           boolean foundInLuceneTracker = false;
@@ -4197,6 +4197,10 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           }
           
           ++counter;
+          try{
+            Thread.sleep(1000l);
+          }
+          catch (InterruptedException exc){}
         }        
         
         if (jvmError.get() == null) {

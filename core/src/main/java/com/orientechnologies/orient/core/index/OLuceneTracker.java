@@ -233,19 +233,19 @@ public class OLuceneTracker {
     return null;
   }
     
-  public Long getHighestFlushedSequenceNumber(){
-    Long retVal = null;
-    for (Long writerId : mappedTrackers.keySet()){
-      synchronized(getLockObject(writerId)){
-        PerIndexWriterTRracker tracker = mappedTrackers.get(writerId);
-        Long tmpVal = tracker.getHighestFlushedSequenceNumber();
-        if ((tmpVal != null) && (retVal == null || tmpVal > retVal)){
-          retVal = tmpVal;
-        }
-      }
-    }
-    return retVal;
-  }
+//  public Long getHighestFlushedSequenceNumber(){
+//    Long retVal = null;
+//    for (Long writerId : mappedTrackers.keySet()){
+//      synchronized(getLockObject(writerId)){
+//        PerIndexWriterTRracker tracker = mappedTrackers.get(writerId);
+//        Long tmpVal = tracker.getHighestFlushedSequenceNumber();
+//        if ((tmpVal != null) && (retVal == null || tmpVal > retVal)){
+//          retVal = tmpVal;
+//        }
+//      }
+//    }
+//    return retVal;
+//  }
   
   public OLogSequenceNumber getMappedLSN(Long sequenceNumber) {
     OLogSequenceNumber retVal = null;
@@ -290,6 +290,7 @@ public class OLuceneTracker {
         Long highestFlushed = tracker.getHighestFlushedSequenceNumber();
         //if some writer still doesn't have flushed return null is minimal
         if (highestFlushed == null){
+          System.out.println("NOT FOUND SAFE LSN FOR: " + writerId);
           return null;
         }
         Long mappedEquivalent = tracker.getNearestSmallerOrEqualSequenceNumber(highestFlushed);
@@ -337,8 +338,8 @@ public class OLuceneTracker {
           mappedHighestsequnceNumbers.put(rec, sequenceNumber);
         }
       }
-    }
-
+    }    
+    
     public long getLargestsequenceNumber(List<ORecordId> observedIds) {
       long retVal = -1l;
       synchronized (mappedHighestsequnceNumbers) {
@@ -443,9 +444,9 @@ public class OLuceneTracker {
       return hasUnflushedSequences;
     }
 
-    public synchronized void setHasUnflushedSequences(boolean hasUnflushedSequences) {
-      this.hasUnflushedSequences = hasUnflushedSequences;
-    }
+//    public synchronized void setHasUnflushedSequences(boolean hasUnflushedSequences) {
+//      this.hasUnflushedSequences = hasUnflushedSequences;
+//    }
 
     public void resetHasUnflushedSequences() {
       synchronized(mappedHighestsequnceNumbers){

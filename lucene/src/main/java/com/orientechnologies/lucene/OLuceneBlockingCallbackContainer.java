@@ -36,16 +36,15 @@ public class OLuceneBlockingCallbackContainer {
   public static class OLuceneSynchCallbackBefore extends IndexWriter.FlushCallback{
 
     @Override
-    public void run() {
+    public void run(){
       if (isRAMDirectory()){
-        System.out.println("RAM DIRECTORY NO NEED TO WAIT");
-        return;
+        System.out.println("RAM DIRECTORY NO NEED TO WAIT");        
       }
       Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
       List<Long> tmpCollection = new LinkedList<>();
       tmpCollection.add(getWriterIndex());
-      if (OLuceneTracker.instance().hasUnflushedSequences(tmpCollection)){
-        while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed){
+      if (OLuceneTracker.instance().hasUnflushedSequences(tmpCollection)){        
+        while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed){          
           System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
           waitSomeTime(1000l);
           highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());          
@@ -56,7 +55,7 @@ public class OLuceneBlockingCallbackContainer {
       }
       else{
         System.out.println("NOTHING TO FLUSH FOR INDEX WRITER: " + getWriterIndex() +  ", " + System.currentTimeMillis());
-      }
+      }      
     }
     
   }    
@@ -64,8 +63,9 @@ public class OLuceneBlockingCallbackContainer {
   public static class OLuceneSynchCallbackAfter extends IndexWriter.FlushCallback{
 
     @Override
-    public void run() {
-      OLuceneTracker.instance().setHighestFlushedSequenceNumber(this.getSequenceNumber(), getWriterIndex());
+    public void run(){
+      System.out.println("HIGHEST FLUSHED FOR: " + getWriterIndex() + ", IS: " + getSequenceNumber());
+      OLuceneTracker.instance().setHighestFlushedSequenceNumber(this.getSequenceNumber(), getWriterIndex());      
     }
     
   }  
