@@ -2169,13 +2169,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
               List<Long> luceneWritersIds = getInvolvedLuceneIndexesWritersIndexes(indexOperations);
               System.out.println("INVOLVED INDEXES SIZE: " + (luceneWritersIds == null ? 0 : luceneWritersIds.size()) + " OF INDEX OPERATIONS: " + (indexOperations == null ? 0 : indexOperations.size()));
               List<Long> detectedHighestSequencesNumberForClear = new ArrayList<>();
-              if (luceneWritersIds != null){
-                final List<ORecordId> recordRids = new ArrayList<>();
-                for (ORecordOperation operation : recordOperations){
-                  recordRids.add(new ORecordId(operation.getRID()));
-                }              
+              if (luceneWritersIds != null){                 
                 for (Long luceneWriterId : luceneWritersIds){
-                  Long largestSequenceNumber = OLuceneTracker.instance().getLargestSequenceNumber(recordRids, luceneWriterId);              
+                  Long largestSequenceNumber = OLuceneTracker.instance().getLargestSequenceNumber(luceneWriterId);
                   detectedHighestSequencesNumberForClear.add(largestSequenceNumber);
                   OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWriterId);
                 }

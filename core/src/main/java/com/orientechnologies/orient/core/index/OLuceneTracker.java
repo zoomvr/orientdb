@@ -19,7 +19,6 @@ import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -91,7 +90,7 @@ public class OLuceneTracker {
     }
   }
   
-  public void track(ORecordId rec, long sequenceNumber, Long writerIndex){
+  public void track(long sequenceNumber, Long writerIndex){
     synchronized(getLockObject(writerIndex)){
       System.out.println("----------------------------SEQUENCE NUMBER: " + sequenceNumber + ", WRITER INDEX: " + writerIndex);      
       PerIndexWriterTRracker tracker = mappedTrackers.get(writerIndex);
@@ -99,11 +98,11 @@ public class OLuceneTracker {
         tracker = new PerIndexWriterTRracker();
         mappedTrackers.put(writerIndex, tracker);
       }
-      tracker.track(rec, sequenceNumber);
+      tracker.track(sequenceNumber);
     }
   }
   
-  public long getLargestSequenceNumber(List<ORecordId> observedIds, Long writerIndex){
+  public long getLargestSequenceNumber(Long writerIndex){
     long retVal = -1;
     if (writerIndex == null){
       return retVal;
@@ -111,7 +110,7 @@ public class OLuceneTracker {
     synchronized(getLockObject(writerIndex)){
       PerIndexWriterTRracker tracker = mappedTrackers.get(writerIndex);
       if (tracker != null){
-        long val = tracker.getLargestsequenceNumber(observedIds);
+        long val = tracker.getLargestsequenceNumber();
         if (val > retVal){
           System.out.println("GET LARGEST SEQUENCE NUMBER: " + val + " WriterID: " + writerIndex);
           retVal = val;
@@ -319,7 +318,7 @@ public class OLuceneTracker {
   
   private class PerIndexWriterTRracker {
 
-    private final Map<ORecordId, Long> mappedHighestsequnceNumbers = new HashMap<>();
+    private AtomicLong highestMappedSequenceNumber;
     private final Map<OLogSequenceNumber, Long> highestSequenceNumberForLSN = new HashMap<>();
     private final Map<Long, OLogSequenceNumber> LSNForHighestSequenceNumber = new HashMap<>();
     
@@ -327,43 +326,36 @@ public class OLuceneTracker {
     private boolean hasUnflushedSequences = false;
     private AtomicLong highestSequenceNumberCanBeFlushed = null;
 
-    public void track(ORecordId rec, long sequenceNumber) {
+    public void track(long sequenceNumber) {
       hasUnflushedSequences = true;
-      if (rec == null) {
-        return;
-      }            
-      synchronized (mappedHighestsequnceNumbers) {
-        Long val = mappedHighestsequnceNumbers.get(rec);
-        if (val == null || val < sequenceNumber) {
-          mappedHighestsequnceNumbers.put(rec, sequenceNumber);
+       
+      if (highestMappedSequenceNumber == null || highestMappedSequenceNumber.get() < sequenceNumber) {
+        if (highestMappedSequenceNumber == null){
+          synchronized (this){
+            if (highestMappedSequenceNumber == null){
+              highestMappedSequenceNumber = new AtomicLong();
+            }
+          }
         }
+        highestMappedSequenceNumber.set(sequenceNumber);
       }
+      
     }    
     
-    public long getLargestsequenceNumber(List<ORecordId> observedIds) {
-      long retVal = -1l;
-      synchronized (mappedHighestsequnceNumbers) {
-        for (ORecordId rec : observedIds) {
-          Long val = mappedHighestsequnceNumbers.get(rec);
-          if (val != null && val > retVal) {
-            retVal = val;
+    public Long getLargestsequenceNumber() {
+      if (highestMappedSequenceNumber == null){
+        synchronized (this){
+          if (highestMappedSequenceNumber == null){
+            return null;
           }
         }
       }
-      return retVal;
+      return highestMappedSequenceNumber.get();
     }
 
     public void clearMappedRidsToHighestSequenceNumbers(Long tillSequenceNumber) {
-      synchronized(mappedHighestsequnceNumbers){
-        List<ORecordId> toBeRemovedCollection = new ArrayList<>();
-        for (Map.Entry<ORecordId, Long> entry : mappedHighestsequnceNumbers.entrySet()){
-          if (entry.getValue() <= tillSequenceNumber){
-            toBeRemovedCollection.add(entry.getKey());
-          }
-        }
-        for (ORecordId toRemove : toBeRemovedCollection){
-          mappedHighestsequnceNumbers.remove(toRemove);
-        }
+      synchronized(this){
+        highestMappedSequenceNumber = null;
       }
     }
 
@@ -449,8 +441,8 @@ public class OLuceneTracker {
 //    }
 
     public void resetHasUnflushedSequences() {
-      synchronized(mappedHighestsequnceNumbers){
-        if (mappedHighestsequnceNumbers.isEmpty()) {
+      synchronized(this){
+        if (highestMappedSequenceNumber == null) {
           hasUnflushedSequences = false;
         }
       }

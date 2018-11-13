@@ -145,7 +145,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     try {
       reopenToken = indexWriter.addDocument(doc);
       if (rid instanceof ORID){
-        OLuceneTracker.instance().track(new ORecordId((ORID)rid), reopenToken, indexWriter.getUniqueIndex());
+        OLuceneTracker.instance().track(reopenToken, indexWriter.getUniqueIndex());
       }
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);

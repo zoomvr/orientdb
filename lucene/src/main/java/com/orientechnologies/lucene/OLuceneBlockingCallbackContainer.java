@@ -50,10 +50,10 @@ public class OLuceneBlockingCallbackContainer {
         int counter = 0;
         System.out.println("BEFORE CALLBACK INDEX WRITER: " + getWriterIndex() + ", SEQ NO: " + getSequenceNumber() + ", HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", CYCLE NO: " + cycleNo);
         while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed + (cycleNo * getLuceneMagicNumber())){
-          if (counter > 10){
-            System.out.println("RETRY OVERCOUNT FOR WRITER: " + getWriterIndex() + ", CYCLE NO: " + cycleNo);
-            throw new IndexWriter.RetryOvercount();
-          }
+//          if (counter > 10){
+//            System.out.println("RETRY OVERCOUNT FOR WRITER: " + getWriterIndex() + ", CYCLE NO: " + cycleNo);
+//            throw new IndexWriter.RetryOvercount();
+//          }
           System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
           waitSomeTime(1000l);
           highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());          
