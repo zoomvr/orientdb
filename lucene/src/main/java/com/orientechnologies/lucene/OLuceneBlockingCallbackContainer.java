@@ -35,27 +35,40 @@ public class OLuceneBlockingCallbackContainer {
   
   public static class OLuceneSynchCallbackBefore extends IndexWriter.FlushCallback{
 
+    private int cycleNo = 0;
+    
     @Override
-    public void run(){
+    public Long call() throws IndexWriter.RetryOvercount{      
       if (isRAMDirectory()){
         System.out.println("RAM DIRECTORY NO NEED TO WAIT");        
       }
       Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
       List<Long> tmpCollection = new LinkedList<>();
       tmpCollection.add(getWriterIndex());
-      if (OLuceneTracker.instance().hasUnflushedSequences(tmpCollection)){        
-        while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed){          
+      if (OLuceneTracker.instance().hasUnflushedSequences(tmpCollection)){
+        ++cycleNo;
+        int counter = 0;
+        System.out.println("BEFORE CALLBACK INDEX WRITER: " + getWriterIndex() + ", SEQ NO: " + getSequenceNumber() + ", HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", CYCLE NO: " + cycleNo);
+        while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed + (cycleNo * getLuceneMagicNumber())){
+          if (counter > 10){
+            System.out.println("RETRY OVERCOUNT FOR WRITER: " + getWriterIndex() + ", CYCLE NO: " + cycleNo);
+            throw new IndexWriter.RetryOvercount();
+          }
           System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
           waitSomeTime(1000l);
           highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());          
           System.out.println("DETECTED HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
+          counter++;
         }
         System.out.println("RELEASED LUCENE LOCK for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
-        OLuceneTracker.instance().resetHasUnflushedSequences(getWriterIndex());
+        cycleNo = 0;
+        OLuceneTracker.instance().resetHasUnflushedSequences(getWriterIndex());        
       }
       else{
         System.out.println("NOTHING TO FLUSH FOR INDEX WRITER: " + getWriterIndex() +  ", " + System.currentTimeMillis());
-      }      
+      }
+            
+      return getSequenceNumber();      
     }
     
   }    
@@ -63,9 +76,10 @@ public class OLuceneBlockingCallbackContainer {
   public static class OLuceneSynchCallbackAfter extends IndexWriter.FlushCallback{
 
     @Override
-    public void run(){
+    public Long call(){
       System.out.println("HIGHEST FLUSHED FOR: " + getWriterIndex() + ", IS: " + getSequenceNumber());
-      OLuceneTracker.instance().setHighestFlushedSequenceNumber(this.getSequenceNumber(), getWriterIndex());      
+      OLuceneTracker.instance().setHighestFlushedSequenceNumber(this.getSequenceNumber(), getWriterIndex());
+      return getSequenceNumber();
     }
     
   }  
