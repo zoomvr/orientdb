@@ -88,7 +88,7 @@ public interface OWriteAheadLog {
    */
   boolean cutTill(OLogSequenceNumber lsn) throws IOException;
 
-  boolean cutAllSegmentsSmallerThan(long segmentId) throws IOException;
+  boolean cutAllSegmentsSmallerThan(Long segmentId) throws IOException;
 
   void addFullCheckpointListener(OCheckpointRequestListener listener);
 

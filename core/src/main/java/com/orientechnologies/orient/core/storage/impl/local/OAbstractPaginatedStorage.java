@@ -174,6 +174,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -4060,7 +4062,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       throw new OStorageException("Storage " + name + " is not opened.");
   }
 
-  protected void makeFuzzyCheckpoint() {
+  public void makeFuzzyCheckpoint() {
     System.out.println("====================================FUZZY CHECK POINT 1");
     if (writeAheadLog == null) {
       return;
@@ -4117,7 +4119,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  protected void makeFullCheckpoint() {
+  public void makeFullCheckpoint() {
     System.out.println("====================================FUL CHECK POINT");
     final OSessionStoragePerformanceStatistic statistic = performanceStatisticManager.getSessionPerformanceStatistic();
     if (statistic != null)
@@ -4138,66 +4140,13 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         writeAheadLog.flush();
 
         //here set signal for lucene, what lucene can flush
-        System.out.println("END LSN: " + endLSN);
-        OLogSequenceNumber nearest;
-        Collection<OLogSequenceNumber> previousLSNs;
-        Collection<Long> involvedIndexWriters;
-        synchronized(OLuceneTracker.instance()){
-          //find nearest recorded but smaller LSN
-          nearest = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(endLSN);
-          //get all previous LSNs
-          previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearest);
-          //get all writers involved till this LSN
-          involvedIndexWriters = OLuceneTracker.instance().getMappedIndexWritersIds(previousLSNs);
-          OLuceneTracker.instance().clearInvolvedWriterIdsInLSN(endLSN);
+        Collection<Long> involvedIndexWriters = setLuceneSequenceNUmbersCanBeFlushed(endLSN);
+        try{
+          trimWAL(lastLSN, involvedIndexWriters, OWriteAheadLog.class.getDeclaredMethod("cutTill", OLogSequenceNumber.class), writeAheadLog);
         }
-        System.out.println("NEAREST LSN: " + nearest);
-        if (nearest != null){
-          //for each writer find max sequence number can be flushed
-          for (Long indexWriterId : involvedIndexWriters){
-            //find max mapped sequence number into these LSNs for writer
-            Long sequenceNumberCanBeFlushed = OLuceneTracker.instance().getHighestMappedSequenceNumber(previousLSNs, indexWriterId);
-            System.out.println("Sequence number can be flushed: " + sequenceNumberCanBeFlushed + " for index writer: " + indexWriterId);
-            if (sequenceNumberCanBeFlushed != null){
-              //set max sequence number for this writer can be flushed
-              OLuceneTracker.instance().setHighestSequnceNumberCanBeFlushed(sequenceNumberCanBeFlushed, indexWriterId);
-            }
-          }
+        catch (NoSuchMethodException exc){
+          System.out.println("!!!!!ERROR FINDING METHOD cutTll!!!!!");
         }
-        System.out.println("Setting highest sequence number can be flushed finished");
-        
-        OLogSequenceNumber cutTillLSN = lastLSN;
-        //find truncate point
-        int counter = 0;
-        int maxCounter = 10;
-        //try few times to achieve max truncate
-        while (counter < maxCounter){
-          boolean foundInLuceneTracker = false;
-          //find largest safe lsn(which is minimal LSN), based on writers highest flushed sequence numbers, compare it to lastLSN and use it if it is smaller
-          OLogSequenceNumber safeLSN = OLuceneTracker.instance().getMinimalFlushedLSNForAllWriters(involvedIndexWriters, lastLSN);          
-          if (safeLSN != null && safeLSN.compareTo(lastLSN) < 0){            
-            cutTillLSN = safeLSN;
-            System.out.println("FOUND SAFE LSN IN TRACKERS: " + cutTillLSN);
-            foundInLuceneTracker = true;
-            //relax tracker's collections
-            OLuceneTracker.instance().cleanUpTillLSN(involvedIndexWriters, cutTillLSN);
-          }
-          else{
-            System.out.println("NOT FOUND SAFE LSN");
-          }
-          
-          if (foundInLuceneTracker || !OLuceneTracker.instance().hasUnflushedSequences(involvedIndexWriters)){
-            System.out.println("WAL TRUNCATED TILL: " + cutTillLSN);
-            writeAheadLog.cutTill(cutTillLSN);
-            break;
-          }
-          
-          ++counter;
-          try{
-            Thread.sleep(1000l);
-          }
-          catch (InterruptedException exc){}
-        }        
         
         if (jvmError.get() == null) {
           clearStorageDirty();
@@ -4212,6 +4161,80 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       if (statistic != null)
         statistic.stopFullCheckpointTimer();
     }
+  }
+  
+  public static Collection<Long> setLuceneSequenceNUmbersCanBeFlushed(OLogSequenceNumber lsn){
+    System.out.println("END LSN: " + lsn);
+    OLogSequenceNumber nearest;
+    Collection<OLogSequenceNumber> previousLSNs;
+    Collection<Long> involvedIndexWriters;
+    synchronized(OLuceneTracker.instance()){
+      //find nearest recorded but smaller LSN
+      nearest = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(lsn);
+      //get all previous LSNs
+      previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearest);
+      //get all writers involved till this LSN
+      involvedIndexWriters = OLuceneTracker.instance().getMappedIndexWritersIds(previousLSNs);
+      OLuceneTracker.instance().clearInvolvedWriterIdsInLSN(lsn);
+    }
+    System.out.println("NEAREST LSN: " + nearest);
+    if (nearest != null){
+      //for each writer find max sequence number can be flushed
+      for (Long indexWriterId : involvedIndexWriters){
+        //find max mapped sequence number into these LSNs for writer
+        Long sequenceNumberCanBeFlushed = OLuceneTracker.instance().getHighestMappedSequenceNumber(previousLSNs, indexWriterId);
+        System.out.println("Sequence number can be flushed: " + sequenceNumberCanBeFlushed + " for index writer: " + indexWriterId);
+        if (sequenceNumberCanBeFlushed != null){
+          //set max sequence number for this writer can be flushed
+          OLuceneTracker.instance().setHighestSequnceNumberCanBeFlushed(sequenceNumberCanBeFlushed, indexWriterId);
+        }
+      }
+    }
+    System.out.println("Setting highest sequence number can be flushed finished");
+    return involvedIndexWriters;
+  }
+  
+  public static void trimWAL(OLogSequenceNumber lastLSN, Collection<Long> involvedIndexWriters, Method methodToCall, OWriteAheadLog callerObject) throws IOException{
+    OLogSequenceNumber cutTillLSN = lastLSN;
+    //find truncate point
+    int counter = 0;
+    int maxCounter = 10;
+    //try few times to achieve max truncate
+    while (counter < maxCounter){
+      boolean foundInLuceneTracker = false;
+      //find largest safe lsn(which is minimal LSN), based on writers highest flushed sequence numbers, compare it to lastLSN and use it if it is smaller
+      OLogSequenceNumber safeLSN = OLuceneTracker.instance().getMinimalFlushedLSNForAllWriters(involvedIndexWriters, lastLSN);          
+      if (safeLSN != null && safeLSN.compareTo(lastLSN) < 0){            
+        cutTillLSN = safeLSN;
+        System.out.println("FOUND SAFE LSN IN TRACKERS: " + cutTillLSN);
+        foundInLuceneTracker = true;
+        //relax tracker's collections
+        OLuceneTracker.instance().cleanUpTillLSN(involvedIndexWriters, cutTillLSN);
+      }
+      else{
+        System.out.println("NOT FOUND SAFE LSN");
+      }
+
+      if (foundInLuceneTracker || !OLuceneTracker.instance().hasUnflushedSequences(involvedIndexWriters)){
+        System.out.println("WAL TRUNCATED TILL: " + cutTillLSN);
+//        writeAheadLog.cutTill(cutTillLSN);
+        methodToCall.setAccessible(true);
+        try{
+          methodToCall.invoke(callerObject, cutTillLSN);
+        }
+        catch (IllegalAccessException | InvocationTargetException exc){
+          exc.printStackTrace();
+          System.out.println("!!!!!!!!!!!!!!!!!!!ERROR TRUNCATE WAL!!!!!!!!!!!!!!!!");
+        }
+        break;
+      }
+
+      ++counter;
+      try{
+        Thread.sleep(1000l);
+      }
+      catch (InterruptedException exc){}
+    }        
   }
 
   public long getFullCheckpointCount() {

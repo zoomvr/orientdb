@@ -138,7 +138,8 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   protected void addDocument(Document doc, OIdentifiable rid) {    
     //lazy initialization to give lucene time for boostrap
     if (!callbackSetUp){
-      indexWriter.setFlushTaskBefore(new OLuceneBlockingCallbackContainer.OLuceneSynchCallbackBefore());
+      OStorage storage = getDatabase().getStorage();
+      indexWriter.setFlushTaskBefore(new OLuceneBlockingCallbackContainer.OLuceneSynchCallbackBefore(storage));
       indexWriter.setFlushTaskAfter(new OLuceneBlockingCallbackContainer.OLuceneSynchCallbackAfter());
       callbackSetUp = true;
     }    

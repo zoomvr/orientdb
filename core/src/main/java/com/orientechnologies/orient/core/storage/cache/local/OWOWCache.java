@@ -49,15 +49,18 @@ import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 import com.orientechnologies.orient.core.storage.cache.OPageDataVerificationError;
 import com.orientechnologies.orient.core.storage.cache.OWriteCache;
 import com.orientechnologies.orient.core.storage.fs.OFileClassic;
+import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OLowDiskSpaceInformation;
 import com.orientechnologies.orient.core.storage.impl.local.OLowDiskSpaceListener;
 import com.orientechnologies.orient.core.storage.impl.local.OPageIsBrokenListener;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OAbstractPageWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
@@ -934,10 +937,19 @@ public final class OWOWCache extends OAbstractWriteCache implements OWriteCache,
 
         }
 
-        writeAheadLog.logFuzzyCheckPointEnd();
+        OLogSequenceNumber endLSN = writeAheadLog.logFuzzyCheckPointEnd();
         writeAheadLog.flush();
-
-        writeAheadLog.cutAllSegmentsSmallerThan(segmentId);
+        
+        Collection<Long> involvedIndexWriters = OAbstractPaginatedStorage.setLuceneSequenceNUmbersCanBeFlushed(endLSN);
+        try{
+          Method method = OWriteAheadLog.class.getDeclaredMethod("cutTill", OLogSequenceNumber.class);
+          OLogSequenceNumber cutLSN = new OLogSequenceNumber(segmentId, 0l);
+//          writeAheadLog.cutAllSegmentsSmallerThan(segmentId);
+          OAbstractPaginatedStorage.trimWAL(cutLSN, involvedIndexWriters, method, writeAheadLog);
+        }
+        catch (NoSuchMethodException exc){
+          System.out.println("!!!!!ERROR FINDING METHOD cutTll!!!!!");
+        }
       } catch (final InterruptedException e) {
         throw OException.wrapException(new OStorageException("Fuzzy checkpoint was interrupted"), e);
       } finally {

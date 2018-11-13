@@ -1134,7 +1134,8 @@ public final class OCASDiskWriteAheadLog implements OWriteAheadLog {
     return null;
   }
 
-  public boolean cutAllSegmentsSmallerThan(long segmentId) throws IOException {
+  @Override
+  public boolean cutAllSegmentsSmallerThan(Long segmentId) throws IOException {
     cuttingLock.lock();
     try {
       segmentLock.sharedLock();

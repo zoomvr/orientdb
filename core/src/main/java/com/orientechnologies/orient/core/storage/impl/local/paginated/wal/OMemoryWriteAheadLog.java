@@ -149,7 +149,7 @@ public class OMemoryWriteAheadLog extends OAbstractWriteAheadLog {
   }
 
   @Override
-  public boolean cutAllSegmentsSmallerThan(long segmentId) {
+  public boolean cutAllSegmentsSmallerThan(Long segmentId) {
     return false;
   }
 
