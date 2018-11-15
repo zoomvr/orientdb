@@ -18,6 +18,7 @@ package com.orientechnologies.orient.core.serialization.serializer.record.binary
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
+import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.OSerializationException;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
@@ -132,13 +133,19 @@ public class HelperClasses {
     return value;
   }
 
-  protected static ORecordId readOptimizedLink(final BytesContainer bytes, boolean justRunThrough) {
+  public static ORecordId readOptimizedLink(final BytesContainer bytes, boolean justRunThrough) {
     int clusterId = OVarIntSerializer.readAsInteger(bytes);
     long clusterPos = OVarIntSerializer.readAsLong(bytes);
     if (justRunThrough)
       return null;
     else
       return new ORecordId(clusterId, clusterPos);
+  }
+  
+  public static void writeLinkOptimized(final BytesContainer bytes, OIdentifiable link) {
+    ORID id = link.getIdentity();
+    OVarIntSerializer.write(bytes, id.getClusterId());
+    OVarIntSerializer.write(bytes, id.getClusterPosition());
   }
 
   protected static String stringFromBytes(final byte[] bytes, final int offset, final int len) {

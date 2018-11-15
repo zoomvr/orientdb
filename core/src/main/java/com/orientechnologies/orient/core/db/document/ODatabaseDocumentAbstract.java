@@ -1430,6 +1430,7 @@ public abstract class ODatabaseDocumentAbstract extends OListenerManger<ODatabas
     return rid.getClusterId();
   }
 
+  @Override
   public <RET extends ORecord> RET executeSaveEmptyRecord(ORecord record, String clusterName) {
     ORecordId rid = (ORecordId) record.getIdentity();
     assert rid.isNew();
@@ -1451,10 +1452,12 @@ public abstract class ODatabaseDocumentAbstract extends OListenerManger<ODatabas
     return (RET) record;
   }
 
+  @Override
   public abstract <RET extends ORecord> RET executeSaveRecord(final ORecord record, String clusterName, final int ver,
       final OPERATION_MODE mode, boolean forceCreate, final ORecordCallback<? extends Number> recordCreatedCallback,
       ORecordCallback<Integer> recordUpdatedCallback);
 
+  @Override
   public abstract void executeDeleteRecord(OIdentifiable record, final int iVersion, final boolean iRequired,
       final OPERATION_MODE iMode, boolean prohibitTombstones);
 

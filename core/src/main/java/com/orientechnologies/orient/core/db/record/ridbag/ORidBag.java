@@ -205,6 +205,10 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
   public boolean isEmbedded() {
     return delegate instanceof OEmbeddedRidBag;
   }
+  
+  public boolean isFastRidBag(){
+    return delegate instanceof OFastRidBag;
+  }
 
   public int toStream(BytesContainer bytesContainer) throws OSerializationException {
 
@@ -227,8 +231,12 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
     final byte[] stream = bytesContainer.bytes;
 
     byte configByte = 0;
-    if (isEmbedded())
+    if (isFastRidBag()){
+      configByte |= 4;
+    }
+    else if (isEmbedded()){
       configByte |= 1;
+    }
 
     if (hasUuid)
       configByte |= 2;
@@ -320,10 +328,17 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
 
   public void fromStream(BytesContainer stream) {
     final byte first = stream.bytes[stream.offset++];
-    if ((first & 1) == 1)
-      delegate = new OEmbeddedRidBag();
-    else
-      delegate = new OSBTreeRidBag();
+    if ((first & 4) == 4){
+      delegate = new OFastRidBag();
+    }
+    else{
+      if ((first & 1) == 1){
+        delegate = new OEmbeddedRidBag();
+      }
+      else{
+        delegate = new OSBTreeRidBag();
+      }
+    }
 
     if ((first & 2) == 2) {
       uuid = OUUIDSerializer.INSTANCE.deserialize(stream.bytes, stream.offset);
