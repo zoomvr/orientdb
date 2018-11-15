@@ -20,8 +20,8 @@ import com.orientechnologies.orient.core.db.record.OMultiValueChangeEvent;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeListener;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
+import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.record.ORecord;
-import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OLinkSerializer;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
@@ -37,10 +37,18 @@ import java.util.UUID;
  */
 public class OFastRidBag implements ORidBagDelegate{
 
-  private ORID ridbagRid;
+  private class ORidBagNode<T>{
+    private ORID ridBagNodeRid;
+    private T rids;
+    private final int maxNodeSize = 600;
+  };
+  
+  private ORID ridbagRid;  
+  private OIndex<ORID> index;
+  private List<ORidBagNode> linkedNodes;
   
   @Override
-  public void addAll(Collection<OIdentifiable> values) {
+  public void addAll(Collection<OIdentifiable> values) {    
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
   }
 
@@ -87,8 +95,7 @@ public class OFastRidBag implements ORidBagDelegate{
   }
 
   @Override
-  public void requestDelete() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  public void requestDelete() {   
   }
 
   @Override
@@ -183,7 +190,7 @@ public class OFastRidBag implements ORidBagDelegate{
 
   @Override
   public Class<?> getGenericClass() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return OIdentifiable.class;
   }
 
   @Override
