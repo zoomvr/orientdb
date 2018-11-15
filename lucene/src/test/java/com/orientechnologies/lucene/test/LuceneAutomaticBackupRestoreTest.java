@@ -79,6 +79,7 @@ public class LuceneAutomaticBackupRestoreTest {
   @Before
   public void setUp() throws Exception {
 
+    try{
     final String os = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
     Assume.assumeFalse(os.contains("win"));
 
@@ -126,6 +127,13 @@ public class LuceneAutomaticBackupRestoreTest {
     ODocument doc = new ODocument("City");
     doc.field("name", "Rome");
     db.save(doc);
+    }
+    catch (Exception exc){
+      System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+      exc.printStackTrace();
+      System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+      throw exc;
+    }
   }
 
   private void dropIfExists() {

@@ -36,18 +36,17 @@ public class OLuceneBlockingCallbackContainer {
   }
   
   public static class OLuceneSynchCallbackBefore extends IndexWriter.FlushCallback{
-
-    private final OStorage storage;
+    
     private int cycleNo = 0;
     
-    public OLuceneSynchCallbackBefore(OStorage storage){
-      this.storage = storage;
+    public OLuceneSynchCallbackBefore(){      
     }
     
     @Override
     public Long call() throws IndexWriter.RetryOvercount{      
       if (isRAMDirectory()){
-        System.out.println("RAM DIRECTORY NO NEED TO WAIT");        
+        System.out.println("RAM DIRECTORY NO NEED TO WAIT");
+        return getSequenceNumber();
       }
       Long highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());
       final List<Long> tmpCollection = new LinkedList<>();
@@ -57,15 +56,15 @@ public class OLuceneBlockingCallbackContainer {
         int counter = 0;
         System.out.println("BEFORE CALLBACK INDEX WRITER: " + getWriterIndex() + ", SEQ NO: " + getSequenceNumber() + ", HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", CYCLE NO: " + cycleNo);
         while (highestSequnceCanBeFlushed == null || getSequenceNumber() > highestSequnceCanBeFlushed + (cycleNo * getLuceneMagicNumber())){
-          if (counter == 10){
-            System.out.println("RETRY OVERCOUNT FOR WRITER: " + getWriterIndex() + ", CYCLE NO: " + cycleNo);
-            System.out.println("PERFORMING SYNC FOR WRITER: " + getWriterIndex());
-            synchronized(storage){
-              if (storage instanceof OAbstractPaginatedStorage){
-                ((OAbstractPaginatedStorage)storage).makeFuzzyCheckpoint();
-              }              
-            }
-          }
+//          if (counter == 10){
+//            System.out.println("RETRY OVERCOUNT FOR WRITER: " + getWriterIndex() + ", CYCLE NO: " + cycleNo);
+//            System.out.println("PERFORMING SYNC FOR WRITER: " + getWriterIndex());
+//            synchronized(storage){
+//              if (storage instanceof OAbstractPaginatedStorage){
+//                ((OAbstractPaginatedStorage)storage).makeFuzzyCheckpoint();
+//              }              
+//            }
+//          }
           System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
           waitSomeTime(1000l);
           highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequnceNumberCanBeFlushed(getWriterIndex());          

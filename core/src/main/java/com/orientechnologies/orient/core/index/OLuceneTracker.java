@@ -16,7 +16,6 @@
 package com.orientechnologies.orient.core.index;
 
 import com.orientechnologies.orient.core.exception.ODatabaseException;
-import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -110,8 +109,8 @@ public class OLuceneTracker {
     synchronized(getLockObject(writerIndex)){
       PerIndexWriterTRracker tracker = mappedTrackers.get(writerIndex);
       if (tracker != null){
-        long val = tracker.getLargestsequenceNumber();
-        if (val > retVal){
+        Long val = tracker.getLargestSequenceNumber();
+        if (val != null && val > retVal){
           System.out.println("GET LARGEST SEQUENCE NUMBER: " + val + " WriterID: " + writerIndex);
           retVal = val;
         }
@@ -133,17 +132,20 @@ public class OLuceneTracker {
     }    
   }
   
-  public void clearMappedRidsToHighestSequenceNumbers(List<Long> writerIds, List<Long> highestSequenceNumbers){
+  public void clearMappedHighestSequenceNumbers(List<Long> writerIds, List<Long> highestSequenceNumbers){
     if (writerIds == null){
       return;
     }
     for (int i = 0; i < writerIds.size(); i++){
       Long writerId = writerIds.get(i);
       Long tillSequenceNumber = highestSequenceNumbers.get(i);
+      if (tillSequenceNumber <= 0){
+        continue;
+      }
       synchronized(getLockObject(writerId)){
         PerIndexWriterTRracker tracker = mappedTrackers.get(writerId);
         if (tracker != null){
-          tracker.clearMappedRidsToHighestSequenceNumbers(tillSequenceNumber);
+          tracker.clearMappedHighestSequenceNumbers(tillSequenceNumber);
         }
       }
     }
@@ -342,7 +344,7 @@ public class OLuceneTracker {
       
     }    
     
-    public Long getLargestsequenceNumber() {
+    public Long getLargestSequenceNumber() {
       if (highestMappedSequenceNumber == null){
         synchronized (this){
           if (highestMappedSequenceNumber == null){
@@ -353,9 +355,11 @@ public class OLuceneTracker {
       return highestMappedSequenceNumber.get();
     }
 
-    public void clearMappedRidsToHighestSequenceNumbers(Long tillSequenceNumber) {
+    public void clearMappedHighestSequenceNumbers(Long tillSequenceNumber) {
       synchronized(this){
-        highestMappedSequenceNumber = null;
+        if (highestMappedSequenceNumber != null && highestMappedSequenceNumber.get() <= tillSequenceNumber){
+          highestMappedSequenceNumber = null;
+        }
       }
     }
 

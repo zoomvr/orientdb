@@ -605,7 +605,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         }
 
         if (contextConfiguration.getValueAsBoolean(OGlobalConfiguration.STORAGE_MAKE_FULL_CHECKPOINT_AFTER_CREATE))
-          makeFullCheckpoint();
+          makeFullCheckpoint(true);
 
         postCreateSteps();
 
@@ -932,7 +932,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         makeStorageDirty();
         ((OStorageConfigurationImpl) configuration).setClusterStatus(clusterId, iStatus);
 
-        makeFullCheckpoint();
+        makeFullCheckpoint(true);
         return true;
       } catch (Exception e) {
         throw OException.wrapException(new OStorageException("Error while removing cluster '" + clusterId + "'"), e);
@@ -2173,11 +2173,13 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
               List<Long> detectedHighestSequencesNumberForClear = new ArrayList<>();
               if (luceneWritersIds != null){                 
                 for (Long luceneWriterId : luceneWritersIds){
-                  Long largestSequenceNumber = OLuceneTracker.instance().getLargestSequenceNumber(luceneWriterId);
+                  Long largestSequenceNumber = OLuceneTracker.instance().getLargestSequenceNumber(luceneWriterId);                  
                   detectedHighestSequencesNumberForClear.add(largestSequenceNumber);
-                  OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWriterId);
+                  if (largestSequenceNumber > 0){
+                    OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWriterId);
+                  }                  
                 }
-                OLuceneTracker.instance().clearMappedRidsToHighestSequenceNumbers(luceneWritersIds, detectedHighestSequencesNumberForClear);
+                OLuceneTracker.instance().clearMappedHighestSequenceNumbers(luceneWritersIds, detectedHighestSequencesNumberForClear);
                 OLuceneTracker.instance().mapWriterIdsToSpecificLSN(lsn, luceneWritersIds);
               }
             }
@@ -3346,24 +3348,32 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         final long lockId = atomicOperationsManager.freezeAtomicOperations(null, null);
         try {
           checkOpenness();
-          if (jvmError.get() == null) {
-            for (OIndexEngine indexEngine : indexEngines)
-              try {
-                if (indexEngine != null)
-                  indexEngine.flush();
-              } catch (Throwable t) {
-                OLogManager.instance().error(this, "Error while flushing index via index engine of class %s.", t,
-                    indexEngine.getClass().getSimpleName());
-              }
+          if (jvmError.get() == null) {            
 
-            if (writeAheadLog != null) {
-              makeFullCheckpoint();
-              return;
+            try{
+              if (writeAheadLog != null) {
+                makeFullCheckpoint(true);
+                return;
+              }              
+
+              writeCache.flush();
+
+              clearStorageDirty();
             }
-
-            writeCache.flush();
-
-            clearStorageDirty();
+            finally{
+              //because if writeAheadLog is != null indexes are flushed in makeFullCheckpoint()
+              if (writeAheadLog == null){
+                for (OIndexEngine indexEngine : indexEngines){
+                  try {
+                    if (indexEngine != null)
+                      indexEngine.flush();
+                  } catch (Throwable t) {
+                    OLogManager.instance().error(this, "Error while flushing index via index engine of class %s.", t,
+                        indexEngine.getClass().getSimpleName());
+                  }
+                }
+              }
+            }
           } else {
             OLogManager.instance().errorNoDb(this, "Sync can not be performed because of JVM error on storage", null);
           }
@@ -4062,7 +4072,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       throw new OStorageException("Storage " + name + " is not opened.");
   }
 
-  public void makeFuzzyCheckpoint() {
+  protected void makeFuzzyCheckpoint() {
     System.out.println("====================================FUZZY CHECK POINT 1");
     if (writeAheadLog == null) {
       return;
@@ -4119,7 +4129,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  public void makeFullCheckpoint() {
+  protected void makeFullCheckpoint(boolean flushIndexes) {
     System.out.println("====================================FUL CHECK POINT");
     final OSessionStoragePerformanceStatistic statistic = performanceStatisticManager.getSessionPerformanceStatistic();
     if (statistic != null)
@@ -4141,12 +4151,20 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         //here set signal for lucene, what lucene can flush
         Collection<Long> involvedIndexWriters = setLuceneSequenceNUmbersCanBeFlushed(endLSN);
-        try{
-          trimWAL(lastLSN, involvedIndexWriters, OWriteAheadLog.class.getDeclaredMethod("cutTill", OLogSequenceNumber.class), writeAheadLog);
+        
+        if (flushIndexes){
+          for (OIndexEngine indexEngine : indexEngines){
+            try {
+              if (indexEngine != null)
+                indexEngine.flush();
+            } catch (Throwable t) {
+              OLogManager.instance().error(this, "Error while flushing index via index engine of class %s.", t,
+                  indexEngine.getClass().getSimpleName());
+            }
+          }
         }
-        catch (NoSuchMethodException exc){
-          System.out.println("!!!!!ERROR FINDING METHOD cutTll!!!!!");
-        }
+                
+        trimWAL(lastLSN, involvedIndexWriters, writeAheadLog);        
         
         if (jvmError.get() == null) {
           clearStorageDirty();
@@ -4166,19 +4184,21 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   public static Collection<Long> setLuceneSequenceNUmbersCanBeFlushed(OLogSequenceNumber lsn){
     System.out.println("END LSN: " + lsn);
     OLogSequenceNumber nearest;
-    Collection<OLogSequenceNumber> previousLSNs;
-    Collection<Long> involvedIndexWriters;
+    Collection<OLogSequenceNumber> previousLSNs = null;
+    Collection<Long> involvedIndexWriters = null;
     synchronized(OLuceneTracker.instance()){
       //find nearest recorded but smaller LSN
       nearest = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(lsn);
-      //get all previous LSNs
-      previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearest);
-      //get all writers involved till this LSN
-      involvedIndexWriters = OLuceneTracker.instance().getMappedIndexWritersIds(previousLSNs);
-      OLuceneTracker.instance().clearInvolvedWriterIdsInLSN(lsn);
+      if (nearest != null){
+        //get all previous LSNs
+        previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearest);
+        //get all writers involved till this LSN
+        involvedIndexWriters = OLuceneTracker.instance().getMappedIndexWritersIds(previousLSNs);
+        OLuceneTracker.instance().clearInvolvedWriterIdsInLSN(lsn);
+      }
     }
     System.out.println("NEAREST LSN: " + nearest);
-    if (nearest != null){
+    if (nearest != null && previousLSNs != null && involvedIndexWriters != null){
       //for each writer find max sequence number can be flushed
       for (Long indexWriterId : involvedIndexWriters){
         //find max mapped sequence number into these LSNs for writer
@@ -4194,8 +4214,13 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     return involvedIndexWriters;
   }
   
-  public static void trimWAL(OLogSequenceNumber lastLSN, Collection<Long> involvedIndexWriters, Method methodToCall, OWriteAheadLog callerObject) throws IOException{
+  public static void trimWAL(OLogSequenceNumber lastLSN, Collection<Long> involvedIndexWriters, OWriteAheadLog writeAheadLog) throws IOException{
     OLogSequenceNumber cutTillLSN = lastLSN;
+    if (involvedIndexWriters == null){
+      System.out.println("0 WAL TRUNCATED TILL: " + cutTillLSN);
+      writeAheadLog.cutTill(cutTillLSN);      
+      return;
+    }
     //find truncate point
     int counter = 0;
     int maxCounter = 10;
@@ -4217,15 +4242,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
       if (foundInLuceneTracker || !OLuceneTracker.instance().hasUnflushedSequences(involvedIndexWriters)){
         System.out.println("WAL TRUNCATED TILL: " + cutTillLSN);
-//        writeAheadLog.cutTill(cutTillLSN);
-        methodToCall.setAccessible(true);
-        try{
-          methodToCall.invoke(callerObject, cutTillLSN);
-        }
-        catch (IllegalAccessException | InvocationTargetException exc){
-          exc.printStackTrace();
-          System.out.println("!!!!!!!!!!!!!!!!!!!ERROR TRUNCATE WAL!!!!!!!!!!!!!!!!");
-        }
+        writeAheadLog.cutTill(cutTillLSN);        
         break;
       }
 
@@ -4382,7 +4399,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           recoverListener.onStorageRecover();
         }
 
-        makeFullCheckpoint();
+        makeFullCheckpoint(true);
       } catch (Exception e) {
         OLogManager.instance().error(this, "Exception during storage data restore", e);
         throw e;
@@ -4837,7 +4854,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         readCache.storeCacheState(writeCache);
 
         if (!onDelete && jvmError.get() == null)
-          makeFullCheckpoint();
+          makeFullCheckpoint(true);
 
         params = preCloseSteps();
 

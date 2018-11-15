@@ -36,13 +36,10 @@ import com.orientechnologies.orient.server.handler.OAutomaticBackup;
 import com.sun.jna.Platform;
 import org.junit.*;
 import org.junit.rules.TestName;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;

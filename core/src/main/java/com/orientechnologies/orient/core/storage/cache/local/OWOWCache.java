@@ -940,16 +940,9 @@ public final class OWOWCache extends OAbstractWriteCache implements OWriteCache,
         OLogSequenceNumber endLSN = writeAheadLog.logFuzzyCheckPointEnd();
         writeAheadLog.flush();
         
-        Collection<Long> involvedIndexWriters = OAbstractPaginatedStorage.setLuceneSequenceNUmbersCanBeFlushed(endLSN);
-        try{
-          Method method = OWriteAheadLog.class.getDeclaredMethod("cutTill", OLogSequenceNumber.class);
-          OLogSequenceNumber cutLSN = new OLogSequenceNumber(segmentId, 0l);
-//          writeAheadLog.cutAllSegmentsSmallerThan(segmentId);
-          OAbstractPaginatedStorage.trimWAL(cutLSN, involvedIndexWriters, method, writeAheadLog);
-        }
-        catch (NoSuchMethodException exc){
-          System.out.println("!!!!!ERROR FINDING METHOD cutTll!!!!!");
-        }
+        Collection<Long> involvedIndexWriters = OAbstractPaginatedStorage.setLuceneSequenceNUmbersCanBeFlushed(endLSN);                
+        OLogSequenceNumber cutLSN = new OLogSequenceNumber(segmentId, 0l);
+        OAbstractPaginatedStorage.trimWAL(cutLSN, involvedIndexWriters, writeAheadLog);
       } catch (final InterruptedException e) {
         throw OException.wrapException(new OStorageException("Fuzzy checkpoint was interrupted"), e);
       } finally {
