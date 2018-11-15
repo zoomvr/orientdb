@@ -95,9 +95,7 @@ public enum OType {
 
   LINKBAG("LinkBag", 22, ORidBag.class, new Class<?>[] { ORidBag.class }),
 
-  ANY("Any", 23, null, new Class<?>[] {}),
-  
-  FASTLINKBAG("FastLinkBag", 24, null, new Class<?>[] {});
+  ANY("Any", 23, null, new Class<?>[] {});
 
   // Don't change the order, the type discover get broken if you change the order.
   protected static final OType[] TYPES = new OType[] { EMBEDDEDLIST, EMBEDDEDSET, EMBEDDEDMAP, LINK, CUSTOM, EMBEDDED, STRING,
