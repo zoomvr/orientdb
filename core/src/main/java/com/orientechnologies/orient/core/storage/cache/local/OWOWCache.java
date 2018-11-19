@@ -42,6 +42,8 @@ import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.exception.OStorageException;
 import com.orientechnologies.orient.core.exception.OWriteCacheException;
+import com.orientechnologies.orient.core.index.OLuceneTracker;
+import com.orientechnologies.orient.core.sql.parser.OLuceneOperator;
 import com.orientechnologies.orient.core.storage.OChecksumMode;
 import com.orientechnologies.orient.core.storage.OStorageAbstract;
 import com.orientechnologies.orient.core.storage.cache.OAbstractWriteCache;
@@ -940,7 +942,14 @@ public final class OWOWCache extends OAbstractWriteCache implements OWriteCache,
         OLogSequenceNumber endLSN = writeAheadLog.logFuzzyCheckPointEnd();
         writeAheadLog.flush();
         
-        Collection<Long> involvedIndexWriters = OAbstractPaginatedStorage.setLuceneSequenceNUmbersCanBeFlushed(endLSN);                
+        //flush all lucene indexes till endLSN
+        Collection<Long> involvedIndexWriters = OAbstractPaginatedStorage.setLuceneSequenceNUmbersCanBeFlushed(endLSN);
+        OLogSequenceNumber nearestSmaller = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(endLSN);
+        if (nearestSmaller != null){
+          Collection<OLogSequenceNumber> previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearestSmaller);
+          OLuceneTracker.instance().flushMappedIndexes(previousLSNs);
+        }
+        
         OLogSequenceNumber cutLSN = new OLogSequenceNumber(segmentId, 0l);
         OAbstractPaginatedStorage.trimWAL(cutLSN, involvedIndexWriters, writeAheadLog);
       } catch (final InterruptedException e) {
@@ -2298,6 +2307,14 @@ public final class OWOWCache extends OAbstractWriteCache implements OWriteCache,
         flushedLSN = writeAheadLog.getFlushedLsn();
         waitedForWALFlush = true;
       }
+      
+      //flush all lucene indexes till flushedLSN
+      Collection<Long> involvedIndexWriters = OAbstractPaginatedStorage.setLuceneSequenceNUmbersCanBeFlushed(flushedLSN);
+      OLogSequenceNumber nearestSmaller = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(flushedLSN);
+      if (nearestSmaller != null){
+        Collection<OLogSequenceNumber> previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearestSmaller);
+        OLuceneTracker.instance().flushMappedIndexes(previousLSNs);
+      }
     }
 
     long walTs = startTs;
@@ -3005,6 +3022,14 @@ public final class OWOWCache extends OAbstractWriteCache implements OWriteCache,
           writeAheadLog.flush();
           flushedLSN = writeAheadLog.getFlushedLsn();
           wasWaitingForWAL = true;
+        }
+        
+        //flush all lucene indexes till flushedLSN
+        Collection<Long> involvedIndexWriters = OAbstractPaginatedStorage.setLuceneSequenceNUmbersCanBeFlushed(flushedLSN);
+        OLogSequenceNumber nearestSmaller = OLuceneTracker.instance().getNearestSmallerOrEqualLSN(flushedLSN);
+        if (nearestSmaller != null){
+          Collection<OLogSequenceNumber> previousLSNs = OLuceneTracker.instance().getPreviousLSNsTill(nearestSmaller);
+          OLuceneTracker.instance().flushMappedIndexes(previousLSNs);
         }
       }
     }

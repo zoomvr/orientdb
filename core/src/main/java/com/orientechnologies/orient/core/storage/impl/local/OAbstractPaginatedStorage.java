@@ -2168,19 +2168,21 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
             System.out.println("COMMIT");
             if (lsn != null){
-              List<Long> luceneWritersIds = getInvolvedLuceneIndexesWritersIndexes(indexOperations);
-              System.out.println("INVOLVED INDEXES SIZE: " + (luceneWritersIds == null ? 0 : luceneWritersIds.size()) + " OF INDEX OPERATIONS: " + (indexOperations == null ? 0 : indexOperations.size()));
+              Collection<OIndexEngine> luceneWriters = getInvolvedLuceneIndexesWritersIndexes(indexOperations);
+              System.out.println("INVOLVED INDEXES SIZE: " + (luceneWriters == null ? 0 : luceneWriters.size()) + " OF INDEX OPERATIONS: " + (indexOperations == null ? 0 : indexOperations.size()));
               List<Long> detectedHighestSequencesNumberForClear = new ArrayList<>();
-              if (luceneWritersIds != null){                 
-                for (Long luceneWriterId : luceneWritersIds){
-                  Long largestSequenceNumber = OLuceneTracker.instance().getLargestSequenceNumber(luceneWriterId);                  
+              List<Long> luceneWritersIds = new ArrayList<>();
+              if (luceneWriters != null){                 
+                for (OIndexEngine luceneWriter : luceneWriters){
+                  Long largestSequenceNumber = OLuceneTracker.instance().getLargestSequenceNumber(luceneWriter.getBackEndWriterId());                  
                   detectedHighestSequencesNumberForClear.add(largestSequenceNumber);
                   if (largestSequenceNumber > 0){
-                    OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWriterId);
-                  }                  
+                    OLuceneTracker.instance().mapLSNToHighestSequenceNumber(lsn, largestSequenceNumber, luceneWriter.getBackEndWriterId());
+                  }
+                  luceneWritersIds.add(luceneWriter.getBackEndWriterId());
                 }
                 OLuceneTracker.instance().clearMappedHighestSequenceNumbers(luceneWritersIds, detectedHighestSequencesNumberForClear);
-                OLuceneTracker.instance().mapWriterIdsToSpecificLSN(lsn, luceneWritersIds);
+                OLuceneTracker.instance().mapWritersToSpecificLSN(lsn, luceneWriters);
               }
             }
             this.transaction.set(null);
@@ -2220,8 +2222,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
   
-  private List<Long> getInvolvedLuceneIndexesWritersIndexes(Map<String, OTransactionIndexChanges> indexOperations){
-    List<Long> writersIds = null;
+  private Collection<OIndexEngine> getInvolvedLuceneIndexesWritersIndexes(Map<String, OTransactionIndexChanges> indexOperations){
+    List<OIndexEngine> indexes = null;
     for (OTransactionIndexChanges transactionIndexChanges : indexOperations.values()){
       OIndexInternal<?> associatedIndex = transactionIndexChanges.getAssociatedIndex();
       int indexId = associatedIndex.getIndexId();
@@ -2231,14 +2233,14 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       if (indexEngine.isLuceneIndexEngine()){
         Long backendWriterId = indexEngine.getBackEndWriterId();
         if (backendWriterId != null){
-          if (writersIds == null){
-            writersIds = new ArrayList<>();
+          if (indexes == null){
+            indexes = new ArrayList<>();
           }
-          writersIds.add(backendWriterId);
+          indexes.add(indexEngine);
         }
       }
     }
-    return writersIds;
+    return indexes;
   }
   
   private static void commitIndexes(final Map<String, OTransactionIndexChanges> indexesToCommit,

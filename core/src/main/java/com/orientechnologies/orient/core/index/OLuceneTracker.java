@@ -15,6 +15,7 @@
  */
 package com.orientechnologies.orient.core.index;
 
+import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import java.util.ArrayList;
@@ -25,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -35,7 +38,8 @@ public class OLuceneTracker {
   private static OLuceneTracker instance = null;
   private final Map<Long, PerIndexWriterTRracker> mappedTrackers = new HashMap<>();
   private final Long[] locks = new Long[128];  
-  private final Map<OLogSequenceNumber, List<Long>> involvedWriterIdsInLSN = new HashMap<>();
+//  private final Map<OLogSequenceNumber, Collection<Long>> involvedWriterIdsInLSN = new HashMap<>();
+  private final Map<OLogSequenceNumber, Collection<OIndexEngine>> involvedWritersInLSN = new HashMap<>();
   
   public static OLuceneTracker instance() {
     if (instance == null) {
@@ -54,8 +58,8 @@ public class OLuceneTracker {
   }
   
   
-  public synchronized void mapWriterIdsToSpecificLSN(OLogSequenceNumber lsn, List<Long> writerIds){
-    involvedWriterIdsInLSN.put(lsn, writerIds);
+  public synchronized void mapWritersToSpecificLSN(OLogSequenceNumber lsn, Collection<OIndexEngine> indexes){
+    involvedWritersInLSN.put(lsn, indexes);
   }
   
   /**
@@ -63,7 +67,7 @@ public class OLuceneTracker {
    */
   public synchronized Collection<OLogSequenceNumber> getPreviousLSNsTill(OLogSequenceNumber referent){
     List<OLogSequenceNumber> ret = new ArrayList<>();
-    for (OLogSequenceNumber lsn : involvedWriterIdsInLSN.keySet()){
+    for (OLogSequenceNumber lsn : involvedWritersInLSN.keySet()){
       if (lsn.compareTo(referent) <= 0){
         ret.add(lsn);
       }
@@ -74,7 +78,8 @@ public class OLuceneTracker {
   public synchronized Collection<Long> getMappedIndexWritersIds(Collection<OLogSequenceNumber> referentLSNs){
     Set<Long> ret = new HashSet<>();
     for (OLogSequenceNumber lsn : referentLSNs){
-      Collection<Long> writerIds = involvedWriterIdsInLSN.get(lsn);
+      Collection<OIndexEngine> indexes = involvedWritersInLSN.get(lsn);
+      List<Long> writerIds = indexes.stream().map(OIndexEngine::getBackEndWriterId).collect(Collectors.toList());
       if (writerIds != null){
         ret.addAll(writerIds);
       }
@@ -82,10 +87,26 @@ public class OLuceneTracker {
     return ret;
   }
   
+  public synchronized void flushMappedIndexes(Collection<OLogSequenceNumber> referentLSNs){
+    Set<Long> ret = new HashSet<>();
+    for (OLogSequenceNumber lsn : referentLSNs){
+      Collection<OIndexEngine> indexes = involvedWritersInLSN.get(lsn);
+      for (OIndexEngine index : indexes){
+        try {
+          if (index != null)
+            index.flush();
+        } catch (Throwable t) {
+          OLogManager.instance().error(this, "Error while flushing index via index engine of class %s.", t,
+              index.getClass().getSimpleName());
+        }
+      }
+    }
+  }
+  
   public synchronized void clearInvolvedWriterIdsInLSN(OLogSequenceNumber referent){
     Collection<OLogSequenceNumber> allTill = getPreviousLSNsTill(referent);
     for (OLogSequenceNumber lsn : allTill){
-      involvedWriterIdsInLSN.remove(lsn);
+      involvedWritersInLSN.remove(lsn);
     }
   }
   
