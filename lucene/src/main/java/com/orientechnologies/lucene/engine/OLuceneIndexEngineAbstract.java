@@ -77,6 +77,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.INDEX;
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.QUERY;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 
 public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptiveExternal implements OLuceneIndexEngine {
 
@@ -122,13 +124,19 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     lastAccess.set(System.currentTimeMillis());
   }
 
-  protected void addDocument(Document doc) {
+  protected void addDocument(Document doc, OWriteAheadLog writeAheadLog) {
     try {
-
-      reopenToken = indexWriter.addDocument(doc);
+      OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
+      long seqNo = reopenToken = indexWriter.addDocument(doc);
+      OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc);
+      writeAheadLog.log(walRecord);
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);
     }
+  }
+  
+  private byte[] serializeLuceneDocument(Document doc){
+    
   }
 
   @Override
