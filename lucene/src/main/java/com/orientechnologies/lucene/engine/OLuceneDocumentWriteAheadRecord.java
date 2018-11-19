@@ -15,6 +15,7 @@
  */
 package com.orientechnologies.lucene.engine;
 
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecord;
 import java.nio.ByteBuffer;
 import org.apache.lucene.document.Document;
@@ -28,7 +29,8 @@ public class OLuceneDocumentWriteAheadRecord extends OLuceneEntryWALRecord{
   private final Document document;
   private final long sequenceNumber;
   
-  public OLuceneDocumentWriteAheadRecord(Document document, long sequenceNumber){
+  public OLuceneDocumentWriteAheadRecord(Document document, long sequenceNumber, OLogSequenceNumber previousCheckPoint){
+    super(previousCheckPoint);
     this.document = document;
     this.sequenceNumber = sequenceNumber;
   }
@@ -70,6 +72,11 @@ public class OLuceneDocumentWriteAheadRecord extends OLuceneEntryWALRecord{
 
   @Override
   public void addToIndex() {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public long getLuceneWriterIndex() {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
   }
   

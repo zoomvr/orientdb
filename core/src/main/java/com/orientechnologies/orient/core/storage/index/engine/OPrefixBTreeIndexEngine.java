@@ -35,6 +35,7 @@ import com.orientechnologies.orient.core.iterator.OEmptyIterator;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OPrefixBTree;
 
 import java.io.IOException;
@@ -198,7 +199,7 @@ public class OPrefixBTreeIndexEngine implements OIndexEngine {
   }
 
   @Override
-  public void put(Object key, Object value) {
+  public void put(Object key, Object value, OWriteAheadLog wal) {
     try {
       if (key == null) {
         prefixTree.put(null, value);
@@ -211,7 +212,7 @@ public class OPrefixBTreeIndexEngine implements OIndexEngine {
   }
 
   @Override
-  public void update(Object key, OIndexKeyUpdater<Object> updater) {
+  public void update(Object key, OIndexKeyUpdater<Object> updater, OWriteAheadLog wal) {
     try {
       if (key == null) {
         prefixTree.update(null, updater, null);

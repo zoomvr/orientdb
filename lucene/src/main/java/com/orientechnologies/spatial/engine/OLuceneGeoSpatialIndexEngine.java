@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.orientechnologies.lucene.builder.OLuceneQueryBuilder.EMPTY_METADATA;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 
 public class OLuceneGeoSpatialIndexEngine extends OLuceneSpatialIndexEngineAbstract {
 
@@ -105,7 +106,7 @@ public class OLuceneGeoSpatialIndexEngine extends OLuceneSpatialIndexEngineAbstr
   }
 
   @Override
-  public void put(Object key, Object value) {
+  public void put(Object key, Object value, OWriteAheadLog wal) {
 
     if (key instanceof OIdentifiable) {
       openIfClosed();
@@ -113,7 +114,7 @@ public class OLuceneGeoSpatialIndexEngine extends OLuceneSpatialIndexEngineAbstr
       Collection<OIdentifiable> container = (Collection<OIdentifiable>) value;
       for (OIdentifiable oIdentifiable : container) {
         updateLastAccess();
-        addDocument(newGeoDocument(oIdentifiable, factory.fromDoc(location)));
+        addDocument(newGeoDocument(oIdentifiable, factory.fromDoc(location)), wal);
       }
     } else {
 
@@ -121,7 +122,7 @@ public class OLuceneGeoSpatialIndexEngine extends OLuceneSpatialIndexEngineAbstr
   }
 
   @Override
-  public void update(Object key, OIndexKeyUpdater<Object> updater) {
+  public void update(Object key, OIndexKeyUpdater<Object> updater, OWriteAheadLog wal) {
     throw new UnsupportedOperationException();
   }
 

@@ -35,6 +35,7 @@ import com.orientechnologies.orient.core.iterator.OEmptyIterator;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OSBTree;
 
 import java.io.IOException;
@@ -184,7 +185,7 @@ public class OSBTreeIndexEngine implements OIndexEngine {
   }
 
   @Override
-  public void put(Object key, Object value) {
+  public void put(Object key, Object value, OWriteAheadLog wal) {
     try {
       sbTree.put(key, value);
     } catch (IOException e) {
@@ -193,7 +194,7 @@ public class OSBTreeIndexEngine implements OIndexEngine {
   }
 
   @Override
-  public void update(Object key, OIndexKeyUpdater<Object> updater) {
+  public void update(Object key, OIndexKeyUpdater<Object> updater, OWriteAheadLog wal) {
     try {
       sbTree.update(key, updater, null);
     } catch (IOException e) {

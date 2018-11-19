@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.util.*;
 
 import static com.orientechnologies.lucene.builder.OLuceneQueryBuilder.EMPTY_METADATA;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 
 /**
  * Created by Enrico Risa on 26/09/15.
@@ -161,7 +162,7 @@ public class OLuceneLegacySpatialIndexEngine extends OLuceneSpatialIndexEngineAb
   }
 
   @Override
-  public void put(Object key, Object value) {
+  public void put(Object key, Object value, OWriteAheadLog wal) {
 
     if (key instanceof OCompositeKey) {
       updateLastAccess();
@@ -169,7 +170,7 @@ public class OLuceneLegacySpatialIndexEngine extends OLuceneSpatialIndexEngineAb
       OCompositeKey compositeKey = (OCompositeKey) key;
       Collection<OIdentifiable> container = (Collection<OIdentifiable>) value;
       for (OIdentifiable oIdentifiable : container) {
-        addDocument(newGeoDocument(oIdentifiable, legacyBuilder.makeShape(compositeKey, ctx)));
+        addDocument(newGeoDocument(oIdentifiable, legacyBuilder.makeShape(compositeKey, ctx)), null);
       }
     } else {
 
@@ -178,7 +179,7 @@ public class OLuceneLegacySpatialIndexEngine extends OLuceneSpatialIndexEngineAb
   }
 
   @Override
-  public void update(Object key, OIndexKeyUpdater<Object> updater) {
+  public void update(Object key, OIndexKeyUpdater<Object> updater, OWriteAheadLog wal) {
     throw new UnsupportedOperationException();
   }
 

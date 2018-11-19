@@ -21,6 +21,10 @@ package com.orientechnologies.orient.core.storage.impl.local.paginated.wal;
  */
 public abstract class OLuceneEntryWALRecord extends OAbstractWALRecord{
   
+  public OLuceneEntryWALRecord(OLogSequenceNumber previousCheckPoint){
+    super(previousCheckPoint);
+  }
+  
   public abstract long getSequenceNumber();
   public abstract String getIndexName();
   //intention is to use it in restore

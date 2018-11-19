@@ -53,6 +53,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.orientechnologies.lucene.builder.OLuceneQueryBuilder.EMPTY_METADATA;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 
 public class OLuceneFullTextIndexEngine extends OLuceneIndexEngineAbstract {
 
@@ -136,12 +137,12 @@ public class OLuceneFullTextIndexEngine extends OLuceneIndexEngineAbstract {
   }
 
   @Override
-  public void update(Object key, OIndexKeyUpdater<Object> updater) {
-    put(key, updater.update(null, bonsayFileId).getValue());
+  public void update(Object key, OIndexKeyUpdater<Object> updater, OWriteAheadLog wal) {
+    put(key, updater.update(null, bonsayFileId).getValue(), wal);
   }
 
   @Override
-  public void put(Object key, Object value) {
+  public void put(Object key, Object value, OWriteAheadLog wal) {
 
     updateLastAccess();
     openIfClosed();
@@ -151,7 +152,7 @@ public class OLuceneFullTextIndexEngine extends OLuceneIndexEngineAbstract {
 
       Document doc = buildDocument(key, oIdentifiable);
 
-      addDocument(doc);
+      addDocument(doc, wal);
 
     }
   }

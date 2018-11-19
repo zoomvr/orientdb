@@ -25,6 +25,7 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -61,9 +62,9 @@ public interface OIndexEngine {
 
   Object get(Object key);
 
-  void put(Object key, Object value) throws IOException;
+  void put(Object key, Object value, OWriteAheadLog wal) throws IOException;
 
-  void update(Object key, OIndexKeyUpdater<Object> updater) throws IOException;
+  void update(Object key, OIndexKeyUpdater<Object> updater, OWriteAheadLog wal) throws IOException;
 
   /**
    * Puts the given value under the given key into this index engine. Validates the operation using the provided validator.

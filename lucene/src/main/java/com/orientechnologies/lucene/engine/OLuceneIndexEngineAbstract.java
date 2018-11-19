@@ -128,17 +128,15 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     try {
       OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
       long seqNo = reopenToken = indexWriter.addDocument(doc);
-      OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc);
-      writeAheadLog.log(walRecord);
+      if (writeAheadLog != null){
+        OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, seqNo, previousCheckPoint);
+        writeAheadLog.log(walRecord);
+      }
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);
     }
   }
   
-  private byte[] serializeLuceneDocument(Document doc){
-    
-  }
-
   @Override
   public void init(String indexName, String indexType, OIndexDefinition indexDefinition, boolean isAutomatic, ODocument metadata) {
 
@@ -275,7 +273,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
         metaDoc.add(new StringField("_DEF_JSON", defAsJson, Field.Store.YES));
         metaDoc.add(new StringField("_DEF_CLASS_NAME", indexDefinition.getClass().getCanonicalName(), Field.Store.YES));
         metaDoc.add(new StringField("_CLASS", "JSON_METADATA", Field.Store.YES));
-        addDocument(metaDoc);
+        addDocument(metaDoc, null);
       }
 
     } catch (IOException e) {

@@ -34,6 +34,7 @@ import com.orientechnologies.orient.core.iterator.OEmptyIterator;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.index.hashindex.local.OHashFunction;
 import com.orientechnologies.orient.core.storage.index.hashindex.local.OHashIndexBucket;
 import com.orientechnologies.orient.core.storage.index.hashindex.local.OHashTable;
@@ -167,16 +168,16 @@ public final class OHashTableIndexEngine implements OIndexEngine {
   }
 
   @Override
-  public void put(Object key, Object value) throws IOException {
+  public void put(Object key, Object value, OWriteAheadLog wal) throws IOException {
     hashTable.put(key, value);
   }
 
   @Override
-  public void update(Object key, OIndexKeyUpdater<Object> updater) throws IOException {
+  public void update(Object key, OIndexKeyUpdater<Object> updater, OWriteAheadLog wal) throws IOException {
     Object value = get(key);
     OIndexUpdateAction<Object> updated = updater.update(value, bonsayFileId);
     if (updated.isChange()) {
-      put(key, updated.getValue());
+      put(key, updated.getValue(), wal);
     } else if (updated.isRemove()) {
       remove(key);
     } else if (updated.isNothing()) {

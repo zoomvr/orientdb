@@ -34,6 +34,7 @@ import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.storage.OStorage;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.spatial.shape.OShapeFactory;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -141,19 +142,19 @@ public class OLuceneSpatialIndexEngineDelegator implements OLuceneIndexEngine, O
   }
 
   @Override
-  public void put(Object key, Object value) {
+  public void put(Object key, Object value, OWriteAheadLog wal) {
 
     try {
-      delegate.put(key, value);
+      delegate.put(key, value, wal);
     } catch (IOException e) {
       throw OException.wrapException(new OIndexException("Error during insertion of key " + key + " in index " + indexName), e);
     }
   }
 
   @Override
-  public void update(Object key, OIndexKeyUpdater<Object> updater) {
+  public void update(Object key, OIndexKeyUpdater<Object> updater, OWriteAheadLog wal) {
     try {
-      delegate.update(key, updater);
+      delegate.update(key, updater, wal);
     } catch (IOException e) {
       throw OException.wrapException(new OIndexException("Error during update of key " + key + " in index " + indexName), e);
     }

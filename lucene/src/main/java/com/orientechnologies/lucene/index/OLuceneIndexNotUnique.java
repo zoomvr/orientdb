@@ -38,6 +38,7 @@ import com.orientechnologies.orient.core.serialization.serializer.stream.OStream
 import com.orientechnologies.orient.core.storage.OBasicTransaction;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OIndexEngineCallback;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey;
 import org.apache.lucene.document.Document;
@@ -126,7 +127,7 @@ public class OLuceneIndexNotUnique extends OIndexAbstract<Set<OIdentifiable>> im
   }
 
   @Override
-  protected void commitSnapshot(final Map<Object, Object> snapshot) {
+  protected void commitSnapshot(final Map<Object, Object> snapshot, OWriteAheadLog wal) {
     while (true)
       try {
         storage.callIndexEngine(false, false, indexId, engine -> {
@@ -146,7 +147,7 @@ public class OLuceneIndexNotUnique extends OIndexAbstract<Set<OIdentifiable>> im
               Object key = snapshotEntry.getKey();
               OLuceneTxOperations operations = (OLuceneTxOperations) snapshotEntry.getValue();
 
-              indexEngine.put(decodeKey(key), operations.added);
+              indexEngine.put(decodeKey(key), operations.added, wal);
 
             }
             OBasicTransaction transaction = getDatabase().getMicroOrRegularTransaction();

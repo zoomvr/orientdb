@@ -21,6 +21,7 @@ package com.orientechnologies.orient.core.index;
 
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 
 import java.util.Collection;
@@ -101,7 +102,7 @@ public interface OIndexInternal<T> extends OIndex<T> {
 
   void addTxOperation(OIndexAbstract.IndexTxSnapshot snapshots, final OTransactionIndexChanges changes);
 
-  void commit(OIndexAbstract.IndexTxSnapshot snapshots);
+  void commit(OIndexAbstract.IndexTxSnapshot snapshots, OWriteAheadLog wal);
 
   void postCommit(OIndexAbstract.IndexTxSnapshot snapshots);
 

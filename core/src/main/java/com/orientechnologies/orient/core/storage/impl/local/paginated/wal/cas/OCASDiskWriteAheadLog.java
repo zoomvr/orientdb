@@ -15,6 +15,7 @@ import com.orientechnologies.common.types.OModifiableLong;
 import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.common.util.OUncaughtExceptionHandler;
 import com.orientechnologies.orient.core.exception.OStorageException;
+import com.orientechnologies.orient.core.index.OLuceneTracker;
 import com.orientechnologies.orient.core.storage.OStorageAbstract;
 import com.orientechnologies.orient.core.storage.impl.local.OCheckpointRequestListener;
 import com.orientechnologies.orient.core.storage.impl.local.OLowDiskSpaceInformation;
@@ -27,6 +28,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OFullC
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OFuzzyCheckpointEndRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OFuzzyCheckpointStartRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALRecordsFactory;
@@ -1947,6 +1949,14 @@ public final class OCASDiskWriteAheadLog implements OWriteAheadLog {
                   queueSize.addAndGet(-writeableRecord.getDiskSize());
                   writeableRecord.written();
                   writeableRecord.freeBinaryContent();
+                  
+                  if (writeableRecord instanceof OLuceneEntryWALRecord){
+                    //here we want to signal Lucene that record with this seqNo is safe for flush
+                    OLuceneEntryWALRecord luceneWALRecord = (OLuceneEntryWALRecord)writeableRecord;
+                    long writerId = luceneWALRecord.getLuceneWriterIndex();
+                    long sequenceNumber = luceneWALRecord.getSequenceNumber();
+                    OLuceneTracker.instance().mapHighestSequenceNumberCanBeFLushed(writerId, sequenceNumber);
+                  }
                 }
 
                 if (lastRecord != record) {

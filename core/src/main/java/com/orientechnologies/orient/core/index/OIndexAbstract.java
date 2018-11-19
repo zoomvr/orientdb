@@ -45,6 +45,7 @@ import com.orientechnologies.orient.core.storage.cache.OWriteCache;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperationsManager;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OIndexRIDContainer;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey;
@@ -717,13 +718,13 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
     }
   }
 
-  public void commit(IndexTxSnapshot snapshots) {
+  public void commit(IndexTxSnapshot snapshots, OWriteAheadLog wal) {
     acquireSharedLock();
     try {
       if (snapshots.clear)
         clear();
 
-      commitSnapshot(snapshots.indexSnapshot);
+      commitSnapshot(snapshots.indexSnapshot, wal);
     } finally {
       releaseSharedLock();
     }
@@ -852,7 +853,7 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
     return key;
   }
 
-  protected void commitSnapshot(Map<Object, Object> snapshot) {
+  protected void commitSnapshot(Map<Object, Object> snapshot, OWriteAheadLog wal) {
     // do nothing by default
     // storage will delay real operations till the end of tx
   }

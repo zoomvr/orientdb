@@ -2195,7 +2195,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  private static void commitIndexes(final Map<String, OTransactionIndexChanges> indexesToCommit,
+  private void commitIndexes(final Map<String, OTransactionIndexChanges> indexesToCommit,
       final OAtomicOperation atomicOperation) {
     final Map<OIndex, OIndexAbstract.IndexTxSnapshot> snapshots = new IdentityHashMap<>();
 
@@ -2224,7 +2224,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         final OIndexAbstract.IndexTxSnapshot snapshot = snapshots.get(index);
 
         assert atomicOperation.getCounter() == 1;
-        index.commit(snapshot);
+        index.commit(snapshot, writeAheadLog);
         assert atomicOperation.getCounter() == 1;
       }
     } finally {
@@ -2744,7 +2744,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       final OIndexEngine engine = indexEngines.get(indexId);
       makeStorageDirty();
 
-      engine.update(key, valueCreator);
+      engine.update(key, valueCreator, writeAheadLog);
     } catch (Exception e) {
       rollback = true;
       throw e;
@@ -2756,7 +2756,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   public void putIndexValue(int indexId, Object key, Object value) throws OInvalidIndexEngineIdException {
     try {
       if (transaction.get() != null) {
-        doPutIndexValue(indexId, key, value);
+        doPutIndexValue(indexId, key, value, writeAheadLog);
         return;
       }
 
@@ -2768,7 +2768,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         checkLowDiskSpaceRequestsAndReadOnlyConditions();
 
-        doPutIndexValue(indexId, key, value);
+        doPutIndexValue(indexId, key, value, writeAheadLog);
       } finally {
         stateLock.releaseReadLock();
       }
@@ -2783,14 +2783,14 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  private void doPutIndexValue(int indexId, Object key, Object value) throws OInvalidIndexEngineIdException {
+  private void doPutIndexValue(int indexId, Object key, Object value, OWriteAheadLog wal) throws OInvalidIndexEngineIdException {
     try {
       checkIndexId(indexId);
 
       final OIndexEngine engine = indexEngines.get(indexId);
       makeStorageDirty();
 
-      engine.put(key, value);
+      engine.put(key, value, wal);
     } catch (IOException e) {
       throw OException.wrapException(new OStorageException("Cannot put key " + key + " value " + value + " entry to the index"), e);
     }
