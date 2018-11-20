@@ -89,7 +89,7 @@ public class HelperClasses {
     public OType  keyType;
   }
 
-  protected static OType readOType(final BytesContainer bytes, boolean justRunThrough) {
+  public static OType readOType(final BytesContainer bytes, boolean justRunThrough) {
     if (justRunThrough) {
       bytes.offset++;
       return null;
@@ -97,7 +97,7 @@ public class HelperClasses {
     return OType.getById(readByte(bytes));
   }
 
-  protected static void writeOType(BytesContainer bytes, int pos, OType type) {
+  public static void writeOType(BytesContainer bytes, int pos, OType type) {
     bytes.bytes[pos] = (byte) type.getId();
   }
 
@@ -141,7 +141,7 @@ public class HelperClasses {
       return new ORecordId(clusterId, clusterPos);
   }
 
-  protected static String stringFromBytes(final byte[] bytes, final int offset, final int len) {
+  public static String stringFromBytes(final byte[] bytes, final int offset, final int len) {
     try {
       return new String(bytes, offset, len, CHARSET_UTF_8);
     } catch (UnsupportedEncodingException e) {

@@ -1141,7 +1141,7 @@ public class ORecordSerializerBinaryV0 implements ODocumentSerializer {
     return type;
   }
 
-  protected int writeEmptyString(final BytesContainer bytes) {
+  public int writeEmptyString(final BytesContainer bytes) {
     return OVarIntSerializer.write(bytes, 0);
   }
 

@@ -20,6 +20,7 @@ import com.orientechnologies.common.concur.resource.OSharedResourceAdaptiveExter
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
+import com.orientechnologies.lucene.OLuceneBlockingCallback;
 import com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory;
 import com.orientechnologies.lucene.builder.OLuceneIndexType;
 import com.orientechnologies.lucene.exception.OLuceneIndexException;
@@ -79,6 +80,7 @@ import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.Analy
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.QUERY;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
+import org.apache.lucene.index.IndexableField;
 
 public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptiveExternal implements OLuceneIndexEngine {
 
@@ -125,12 +127,14 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   }
 
   protected void addDocument(Document doc, OWriteAheadLog writeAheadLog) {
-    try {
-      OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
+    try {      
       long seqNo = reopenToken = indexWriter.addDocument(doc);
       if (writeAheadLog != null){
+        OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
         OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, seqNo, previousCheckPoint);
-        writeAheadLog.log(walRecord);
+        OLogSequenceNumber lsn = writeAheadLog.log(walRecord);
+        OLuceneBlockingCallback.OOnFlushEvenet event = new OLuceneBlockingCallback.OOnFlushEvenet(walRecord);
+        writeAheadLog.addEventAt(lsn, nrt);
       }
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);

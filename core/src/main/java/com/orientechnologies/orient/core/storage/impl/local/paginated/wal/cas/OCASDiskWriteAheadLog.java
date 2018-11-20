@@ -921,6 +921,7 @@ public final class OCASDiskWriteAheadLog implements OWriteAheadLog {
     }
   }
 
+  @Override
   public void addEventAt(final OLogSequenceNumber lsn, final Runnable event) {
     // may be executed by multiple threads simultaneously
 
@@ -938,6 +939,7 @@ public final class OCASDiskWriteAheadLog implements OWriteAheadLog {
     }
   }
 
+  @Override
   public void delete() throws IOException {
     final List<Long> segmentsToDelete = new ArrayList<>(this.segments.size());
     segmentsToDelete.addAll(segments);
@@ -1948,15 +1950,7 @@ public final class OCASDiskWriteAheadLog implements OWriteAheadLog {
 
                   queueSize.addAndGet(-writeableRecord.getDiskSize());
                   writeableRecord.written();
-                  writeableRecord.freeBinaryContent();
-                  
-                  if (writeableRecord instanceof OLuceneEntryWALRecord){
-                    //here we want to signal Lucene that record with this seqNo is safe for flush
-                    OLuceneEntryWALRecord luceneWALRecord = (OLuceneEntryWALRecord)writeableRecord;
-                    long writerId = luceneWALRecord.getLuceneWriterIndex();
-                    long sequenceNumber = luceneWALRecord.getSequenceNumber();
-                    OLuceneTracker.instance().mapHighestSequenceNumberCanBeFLushed(writerId, sequenceNumber);
-                  }
+                  writeableRecord.freeBinaryContent();                                    
                 }
 
                 if (lastRecord != record) {

@@ -16,6 +16,8 @@
 package com.orientechnologies.lucene;
 
 import com.orientechnologies.orient.core.index.OLuceneTracker;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecord;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.lucene.index.IndexWriter;
@@ -80,6 +82,24 @@ public class OLuceneBlockingCallback {
       return getSequenceNumber();
     }
     
-  }  
+  }
+
+  public static class OOnFlushEvenet implements Runnable{
+
+    private OLuceneEntryWALRecord walRecord;
+    
+    public OOnFlushEvenet(OLuceneEntryWALRecord walRecord){
+      this.walRecord = walRecord;
+    }
+    
+    @Override
+    public void run() {      
+      //here we want to signal Lucene that record with this seqNo is safe for flush
+      long writerId = walRecord.getLuceneWriterIndex();
+      long sequenceNumber = walRecord.getSequenceNumber();
+      OLuceneTracker.instance().mapHighestSequenceNumberCanBeFLushed(writerId, sequenceNumber);      
+    }
+    
+  }
   
 }

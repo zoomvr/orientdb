@@ -37,7 +37,7 @@ public class OLuceneDocumentWriteAheadRecord extends OLuceneEntryWALRecord{
   
   @Override
   public int toStream(byte[] content, int offset) {
-    
+    return -1;
   }
 
   @Override
