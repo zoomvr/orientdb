@@ -15,8 +15,15 @@
  */
 package com.orientechnologies.lucene.engine;
 
+import com.orientechnologies.lucene.builder.OLuceneDocumentBuilder;
+import com.orientechnologies.orient.core.index.OIndexEngine;
+import com.orientechnologies.orient.core.metadata.schema.OType;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.ORecordSerializerBinaryV1;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecord;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import java.nio.ByteBuffer;
 import org.apache.lucene.document.Document;
 
@@ -26,38 +33,74 @@ import org.apache.lucene.document.Document;
  */
 public class OLuceneDocumentWriteAheadRecord extends OLuceneEntryWALRecord{
 
-  private final Document document;
-  private final long sequenceNumber;
+  private Document document;
+  private long sequenceNumber;
+  private String indexName;
+  private long luceneWriterIndex;
+  private ORecordSerializerBinaryV1 serializer = new ORecordSerializerBinaryV1();
   
-  public OLuceneDocumentWriteAheadRecord(Document document, long sequenceNumber, OLogSequenceNumber previousCheckPoint){
+  public OLuceneDocumentWriteAheadRecord(OLogSequenceNumber previousCheckPoint){
+    super(previousCheckPoint);
+  }
+  
+  public OLuceneDocumentWriteAheadRecord(Document document, long sequenceNumber, 
+          String indexName, long luceneWriterIndex, 
+          OLogSequenceNumber previousCheckPoint){
     super(previousCheckPoint);
     this.document = document;
     this.sequenceNumber = sequenceNumber;
+    this.indexName = indexName;
+    this.luceneWriterIndex = luceneWriterIndex;
+  }
+  
+  private byte[] internalSerialization(){
+    //serialize document
+    byte[] stream = OLuceneDocumentBuilder.serializeDocument(document);
+    BytesContainer bytes = new BytesContainer(stream);
+    bytes.offset = stream.length;
+    //serialize sequence number
+    serializer.serializeValue(bytes, sequenceNumber, OType.LONG, null);
+    //serialize indexName
+    serializer.serializeValue(bytes, indexName, OType.STRING, null);
+    //serialize lucene writer index
+    serializer.serializeValue(bytes, luceneWriterIndex, OType.LONG, null);
+    return bytes.fitBytes();
   }
   
   @Override
   public int toStream(byte[] content, int offset) {
-    return -1;
+    byte[] serialized = internalSerialization();
+    System.arraycopy(serialized, 0, content, offset, serialized.length);
+    return offset + serialized.length;
   }
 
   @Override
   public void toStream(ByteBuffer buffer) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    byte[] stream = internalSerialization();
+    buffer.put(stream);
   }
 
   @Override
   public int fromStream(byte[] content, int offset) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    HelperClasses.Tuple<Integer, Document> ret = null;
+    ret = OLuceneDocumentBuilder.deserializeDocument(content, offset);
+    BytesContainer bytes = new BytesContainer(content);
+    bytes.offset = ret.getFirstVal();
+    document = ret.getSecondVal();
+    sequenceNumber = (long)serializer.deserializeValue(bytes, OType.LONG, null);
+    indexName = (String)serializer.deserializeValue(bytes, OType.STRING, null);
+    luceneWriterIndex = (long)serializer.deserializeValue(bytes, OType.LONG, null);
+    return bytes.offset;
   }
 
   @Override
   public int serializedSize() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return internalSerialization().length;
   }
 
   @Override
   public boolean isUpdateMasterRecord() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return false;
   }
 
   @Override
@@ -67,17 +110,21 @@ public class OLuceneDocumentWriteAheadRecord extends OLuceneEntryWALRecord{
 
   @Override
   public String getIndexName() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return indexName;
   }
 
   @Override
-  public void addToIndex() {
+  public void addToIndex(OIndexEngine index, OWriteAheadLog wal) {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
   }
 
   @Override
   public long getLuceneWriterIndex() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return luceneWriterIndex;
+  }
+
+  public Document getDocument() {
+    return document;
   }
   
 }

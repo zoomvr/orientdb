@@ -15,6 +15,8 @@
  */
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal;
 
+import com.orientechnologies.orient.core.index.OIndexEngine;
+
 /**
  *
  * @author marko
@@ -28,7 +30,7 @@ public abstract class OLuceneEntryWALRecord extends OAbstractWALRecord{
   public abstract long getSequenceNumber();
   public abstract String getIndexName();
   //intention is to use it in restore
-  public abstract void addToIndex();
+  public abstract void addToIndex(OIndexEngine index, OWriteAheadLog wal);
   public abstract long getLuceneWriterIndex();
   
   @Override

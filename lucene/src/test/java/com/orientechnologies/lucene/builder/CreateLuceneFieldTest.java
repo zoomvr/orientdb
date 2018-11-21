@@ -41,139 +41,101 @@ public class CreateLuceneFieldTest {
   public void testCreateLuceneStringField(){
     String className  = StringField.class.getCanonicalName();
     String testVal = "testVal";
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.STRING, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.STRING, testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(testVal, field.stringValue());
   }
   
   @Test
   public void testCreateLuceneTextField(){
     String className  = TextField.class.getCanonicalName();
     String testVal = "testVal";
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.STRING, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.STRING, testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(testVal, field.stringValue());
   }
   
   @Test
   public void testCreateNumericDocValuesField(){
     String className  = NumericDocValuesField.class.getCanonicalName();
     long testVal = 1l;
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.LONG, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.LONG, testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(testVal, field.numericValue());
   }
   
   @Test
   public void testCreateFloatDocValuesField(){
+    FloatDocValuesField dp = new FloatDocValuesField("kk", 1.0f);
+    Object testVal = dp.numericValue();
+    
     String className  = FloatDocValuesField.class.getCanonicalName();
-    float testVal = 1.0f;
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.FLOAT, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.getTypeByValue(testVal), testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(1.0f, Float.intBitsToFloat(field.numericValue().intValue()), 0.001f);
   }
   
   @Test
   public void testCreateDoubleDocValuesField(){
+    DoubleDocValuesField dp = new DoubleDocValuesField("kk", 1.0);
+    Object testVal = dp.numericValue();
+    
     String className  = DoubleDocValuesField.class.getCanonicalName();
-    double testVal = 1.0;
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.DOUBLE, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.getTypeByValue(testVal), testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(1.0, Double.longBitsToDouble(field.numericValue().longValue()), 0.001);
   }
   
   @Test
   public void testCreateFloatPoint(){
+    FloatPoint fp = new FloatPoint("kk", 1.0f);
+    Number testVal = fp.numericValue();
+    
     String className  = FloatPoint.class.getCanonicalName();
-    float testVal = 1.0f;
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.FLOAT, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.getTypeByValue(testVal), testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(1.0, field.numericValue().floatValue(), 0.001f);
   }
   
   @Test
   public void testCreateLongPoint(){
+    LongPoint lp = new LongPoint("kk", 1l);
+    Number testVal = lp.numericValue();
+    
     String className  = LongPoint.class.getCanonicalName();
-    long testVal = 1l;
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.LONG, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.getTypeByValue(testVal), testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(1l, field.numericValue().longValue());
   }
   
   @Test
   public void testCreateDoublePoint(){
+    DoublePoint dp = new DoublePoint("kk", 1.0);
+    Number testVal = dp.numericValue();
+    
     String className  = DoublePoint.class.getCanonicalName();
-    double testVal = 1.0;
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.DOUBLE, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.getTypeByValue(testVal), testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(1.0, field.numericValue().doubleValue(), 0.001);
   }
   
   @Test
   public void testCreateIntPoint(){
+    IntPoint ip = new IntPoint("kk", 1);
+    Number testVal = ip.numericValue();
+    
     String className  = IntPoint.class.getCanonicalName();
-    int testVal = 1;
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.INTEGER, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.getTypeByValue(testVal), testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertEquals(1, field.numericValue().intValue());
   }
   
   @Test
   public void testCreateSortedDocValuesField(){
     String className  = SortedDocValuesField.class.getCanonicalName();
     byte[] testVal = new byte[1];
-    try{
-      IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.BINARY, testVal);
-      Assert.assertNotNull("Field not created", field);
-    }
-    catch (ClassNotFoundException | InstantiationException exc){
-      exc.printStackTrace();
-      Assert.assertTrue(exc.getMessage(), false);
-    }
+    IndexableField field = OLuceneDocumentBuilder.createFieldBasedOnClassNameAndValue(className, "testFiled", OType.BINARY, testVal);
+    Assert.assertNotNull("Field not created", field);
+    Assert.assertArrayEquals(testVal, field.binaryValue().bytes);
   }
 }

@@ -18,6 +18,7 @@
 
 package com.orientechnologies.lucene.builder;
 
+import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.index.OCompositeKey;
 import com.orientechnologies.orient.core.index.OIndexDefinition;
@@ -43,7 +44,18 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import org.apache.lucene.document.DoubleDocValuesField;
+import org.apache.lucene.document.DoublePoint;
+import org.apache.lucene.document.FloatDocValuesField;
+import org.apache.lucene.document.FloatPoint;
+import org.apache.lucene.document.IntPoint;
+import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.document.NumericDocValuesField;
+import org.apache.lucene.document.SortedDocValuesField;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.util.BytesRef;
 
 /**
@@ -150,15 +162,7 @@ public class OLuceneDocumentBuilder {
         byte[] bytes = Arrays.copyOfRange(byteRef.bytes, byteRef.offset, byteRef.offset + byteRef.length);
         int pos = container.alloc(1);
         HelperClasses.writeOType(container, pos, OType.BINARY);
-        ++container.offset;
         serializer.serializeValue(container, bytes, OType.BINARY, null);
-      }
-      else if (field.stringValue() != null){
-        String val = field.stringValue();
-        int pos = container.alloc(1);
-        HelperClasses.writeOType(container, pos, OType.STRING);
-        ++container.offset;
-        serializer.serializeValue(container, val, OType.STRING, null);
       }
       else if (field.numericValue() != null){
         Number number = field.numericValue();
@@ -186,9 +190,14 @@ public class OLuceneDocumentBuilder {
           val = (BigDecimal)number;
         }
         HelperClasses.writeOType(container, pos, valType);
-        ++container.offset;
         serializer.serializeValue(container, val, valType, null);
       }
+      else if (field.stringValue() != null){
+        String val = field.stringValue();
+        int pos = container.alloc(1);
+        HelperClasses.writeOType(container, pos, OType.STRING);
+        serializer.serializeValue(container, val, OType.STRING, null);
+      }      
       else{
         //this value can't handle for now
         
@@ -198,10 +207,11 @@ public class OLuceneDocumentBuilder {
     return container.fitBytes();
   }
   
-  public static Document deserializeDocument(byte[] bytes) throws ClassNotFoundException, InstantiationException{
+  public static HelperClasses.Tuple<Integer, Document> deserializeDocument(byte[] bytes, int offset) {
     Document doc = new Document();
     ORecordSerializerBinaryV1 serializer = new ORecordSerializerBinaryV1();
     BytesContainer container = new BytesContainer(bytes);
+    container.offset = offset;
     int fieldsSize = (int)serializer.deserializeValue(container, OType.INTEGER, null);
     for (int i = 0; i < fieldsSize; i++){
       String name = "";
@@ -218,159 +228,76 @@ public class OLuceneDocumentBuilder {
       
       IndexableField field = createFieldBasedOnClassNameAndValue(fieldClass, name, type, val);
       doc.add(field);
-      
+               
     }
     
-    return doc;
+    return new HelperClasses.Tuple<>(container.offset, doc);
   }
   
-  protected static IndexableField createFieldBasedOnClassNameAndValue(final String className, final String name, final OType type, Object val) 
-          throws ClassNotFoundException, InstantiationException{
-    boolean requiresStoreParameter = className.contains("StringField") || className.contains("TextField");
-    Class<?> targetClass = Class.forName(className);
-    Constructor<?> ctor = null;
-    
-    if (type == OType.BINARY){
-      val = new BytesRef((byte[])val);
+  protected static IndexableField createFieldBasedOnClassNameAndValue(final String className, String name, final OType type, Object val){
+    //can't do with refelection, because stored types are different than actaul types 
+    //(double is stored as long, and when get numeric value long is returned not double)
+    if (className == null){
+      return null;
     }
-    
-    try{
-      if (requiresStoreParameter){
-        ctor = targetClass.getConstructor(String.class, val.getClass(), Field.Store.class);
-        return (IndexableField)ctor.newInstance(name, val, Field.Store.YES);
+    if (className.equals(StringField.class.getCanonicalName())){
+      if (type == OType.STRING){
+        return new StringField(name, (String)val, Field.Store.YES);
       }
-      else{
-        ctor = targetClass.getConstructor(String.class, val.getClass());
-        return (IndexableField)ctor.newInstance(name, val);
-      }      
     }
-    catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exc){    
-      Object varargsClass = Array.newInstance(val.getClass(), 0);
-      try{
-        //check if there is var args constructor
-        ctor = targetClass.getConstructor(String.class, varargsClass.getClass());
-        return (IndexableField)ctor.newInstance(name, val);
+    else if (className.equals(TextField.class.getCanonicalName())){
+      if (type == OType.STRING){
+        return new TextField(name, (String)val, Field.Store.YES);
       }
-      catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e){
-        if (type == OType.DOUBLE){
-          double[] refArr = new double[1];
-          refArr[0] = (Double)val;
-          try{
-            ctor = targetClass.getConstructor(String.class, refArr.getClass());
-            return (IndexableField)ctor.newInstance(name, (Object)refArr);
-          }
-          catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e2){
-            try{
-              ctor = targetClass.getConstructor(String.class, double.class);
-              return (IndexableField)ctor.newInstance(name, refArr[0]);
-            }
-            catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e3){
-            }
-          }
-        }
-        else if (type == OType.FLOAT){
-          float[] refArr = new float[1];
-          refArr[0] = (Float)val;
-          try{
-            ctor = targetClass.getConstructor(String.class, refArr.getClass());
-            return (IndexableField)ctor.newInstance(name, (Object)refArr);
-          }
-          catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e2){
-            try{
-              ctor = targetClass.getConstructor(String.class, float.class);
-              return (IndexableField)ctor.newInstance(name, refArr[0]);
-            }
-            catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e3){
-            }
-          }
-        }
-        else if (type == OType.LONG){
-          long[] refArr = new long[1];
-          refArr[0] = (Long)val;
-          try{
-            ctor = targetClass.getConstructor(String.class, refArr.getClass());
-            return (IndexableField)ctor.newInstance(name, (Object)refArr);
-          }
-          catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e2){
-            try{
-              ctor = targetClass.getConstructor(String.class, long.class);
-              return (IndexableField)ctor.newInstance(name, refArr[0]);
-            }
-            catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e3){
-            }
-          }
-        }
-        else if (type == OType.INTEGER){
-          int[] refArr = new int[1];
-          refArr[0] = (Integer)val;
-          try{
-            ctor = targetClass.getConstructor(String.class, refArr.getClass());
-            return (IndexableField)ctor.newInstance(name, (Object)refArr);
-          }
-          catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e2){
-            e2.printStackTrace();
-          }
-        }
-        else if (type == OType.SHORT){
-          short[] refArr = new short[1];
-          refArr[0] = (Short)val;
-          try{
-            ctor = targetClass.getConstructor(String.class, refArr.getClass());
-            return (IndexableField)ctor.newInstance(name, (Object)refArr);
-          }
-          catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e2){
-            e2.printStackTrace();
-          }
-        }
-        else if (type == OType.BYTE){
-          byte[] refArr = new byte[1];
-          refArr[1] = (Byte)val;
-          try{
-            ctor = targetClass.getConstructor(String.class, refArr.getClass());
-            return (IndexableField)ctor.newInstance(name, (Object)refArr);
-          }
-          catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e2){
-            e2.printStackTrace();
-          }
-        }
+    }
+    else if (className.equals(NumericDocValuesField.class.getCanonicalName())){
+      if (type == OType.LONG){
+        return new NumericDocValuesField(name, (Long)val);
+      }
+    }
+    else if (className.equals(FloatDocValuesField.class.getCanonicalName())){
+      if (type == OType.LONG){
+        return new FloatDocValuesField(name, Float.intBitsToFloat(((Long)val).intValue()));
+      }
+      else if (type == OType.DOUBLE){
+        return new FloatDocValuesField(name, (Float)val);
+      }
+    }
+    else if (className.equals(DoubleDocValuesField.class.getCanonicalName())){
+      if (type == OType.LONG){
+        return new DoubleDocValuesField(name, Double.longBitsToDouble((Long)val));
+      }
+      else if (type == OType.DOUBLE){
+        return new DoubleDocValuesField(name, (Double)val);
+      }
+    }
+    else if (className.equals(FloatPoint.class.getCanonicalName())){
+      if (type == OType.FLOAT){
+        return new FloatPoint(name, (Float)val);
+      }
+    }
+    else if (className.equals(LongPoint.class.getCanonicalName())){
+      if (type == OType.LONG){
+        return new LongPoint(name, (Long)val);
+      }
+    }
+    else if (className.equals(DoublePoint.class.getCanonicalName())){
+      if (type == OType.DOUBLE){
+        return new DoublePoint(name, (Double)val);
+      }
+    }
+    else if (className.equals(IntPoint.class.getCanonicalName())){
+      if (type == OType.INTEGER){
+        return new IntPoint(name, (Integer)val);
+      }
+    }
+    else if (className.equals(SortedDocValuesField.class.getCanonicalName())){
+      if (type == OType.BINARY){
+        BytesRef byteRef = new BytesRef((byte[])val);
+        return new SortedDocValuesField(name, byteRef);
       }
     }
     
     return null;
-    
-//    if (type == OType.BINARY){
-//      byte[] fieldVal = (byte[])val;
-//      targetClass.getConstructor(String.class, fieldVal.getClass());
-//      if (ctor != null){
-//        return (IndexableField)ctor.newInstance(name, fieldVal);
-//      }
-//    }
-//    else if (type == OType.STRING){
-//      String fieldVal = (String)val;
-//    }
-//    else if (type == OType.BYTE){
-//      Byte fieldVal = (Byte)val;
-//    }
-//    else if (type == OType.SHORT){
-//      short fieldVal = (Short)val;
-//    }
-//    else if (type == OType.INTEGER){
-//      int fieldVal = (Integer)val;
-//    }
-//    else if (type == OType.LONG){
-//      long fieldVal = (Long)val;
-//    }
-//    else if (type == OType.FLOAT){
-//      float fieldVal = (Float)val;
-//    }
-//    else if (type == OType.DOUBLE){
-//      double fieldVal = (Double)val;
-//    }
-//    else{ //this means it is big decimal
-//      BigDecimal fieldVal = (BigDecimal)val;
-//      
-//    }
-    
-    
   }
 }

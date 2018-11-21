@@ -131,7 +131,8 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
       long seqNo = reopenToken = indexWriter.addDocument(doc);
       if (writeAheadLog != null){
         OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
-        OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, seqNo, previousCheckPoint);
+        OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, seqNo, getName(), 
+                indexWriter.getUniqueIndex(), previousCheckPoint);
         OLogSequenceNumber lsn = writeAheadLog.log(walRecord);
         OLuceneBlockingCallback.OOnFlushEvenet event = new OLuceneBlockingCallback.OOnFlushEvenet(walRecord);
         writeAheadLog.addEventAt(lsn, nrt);

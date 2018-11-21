@@ -40,7 +40,7 @@ public class HelperClasses {
     private final T1 firstVal;
     private final T2 secondVal;
 
-    Tuple(T1 firstVal, T2 secondVal) {
+    public Tuple(T1 firstVal, T2 secondVal) {
       this.firstVal = firstVal;
       this.secondVal = secondVal;
     }
