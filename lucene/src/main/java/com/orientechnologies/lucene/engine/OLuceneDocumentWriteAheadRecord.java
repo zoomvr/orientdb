@@ -15,6 +15,7 @@
  */
 package com.orientechnologies.lucene.engine;
 
+import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.lucene.builder.OLuceneDocumentBuilder;
 import com.orientechnologies.orient.core.index.OIndexEngine;
 import com.orientechnologies.orient.core.metadata.schema.OType;
@@ -115,7 +116,24 @@ public class OLuceneDocumentWriteAheadRecord extends OLuceneEntryWALRecord{
 
   @Override
   public void addToIndex(OIndexEngine index, OWriteAheadLog wal) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    if (index == null){
+      OLogManager.instance().warn(this, "Passed null index engine", (Object[])null);
+      return;
+    }
+    if (!index.isLuceneIndex()){
+      OLogManager.instance().warn(this, "Lucene WAL record can be added only to lucene index", (Object[])null);
+      return;
+    }
+    
+    OLuceneIndexEngine luceneIndexEngine = (OLuceneIndexEngine)index;
+    if (luceneIndexEngine.isDelegator()){
+      OLuceneIndexEngineDelegatorAbstract delegator = (OLuceneIndexEngineDelegatorAbstract)index;
+      delegator.addDocument(document, wal);
+    }
+    else{
+      OLuceneIndexEngineAbstract abstractLuceneIndexEngine = (OLuceneIndexEngineAbstract)index;
+      abstractLuceneIndexEngine.addDocument(document, wal);
+    }
   }
 
   @Override

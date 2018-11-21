@@ -67,4 +67,5 @@ public interface OLuceneIndexEngine extends OIndexEngine, OFreezableStorageCompo
 
   boolean isCollectionIndex();
 
+  boolean isDelegator();
 }

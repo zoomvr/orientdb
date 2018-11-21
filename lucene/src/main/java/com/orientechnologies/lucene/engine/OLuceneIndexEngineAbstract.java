@@ -135,7 +135,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
                 indexWriter.getUniqueIndex(), previousCheckPoint);
         OLogSequenceNumber lsn = writeAheadLog.log(walRecord);
         OLuceneBlockingCallback.OOnFlushEvenet event = new OLuceneBlockingCallback.OOnFlushEvenet(walRecord);
-        writeAheadLog.addEventAt(lsn, nrt);
+        writeAheadLog.addEventAt(lsn, event);
       }
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);
@@ -627,5 +627,15 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on releasing Lucene index:: " + indexName(), e);
     }
+  }
+  
+  @Override
+  public boolean isLuceneIndex(){
+    return true;
+  }
+  
+  @Override
+  public boolean isDelegator(){
+    return false;
   }
 }

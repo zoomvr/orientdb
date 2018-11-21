@@ -119,6 +119,10 @@ public interface OIndexEngine {
   boolean acquireAtomicExclusiveLock(Object key);
 
   String getIndexNameByKey(Object key);
+  
+  default boolean isLuceneIndex(){
+    return false;
+  }
 
   interface ValuesTransformer {
     Collection<OIdentifiable> transformFromValue(Object value);

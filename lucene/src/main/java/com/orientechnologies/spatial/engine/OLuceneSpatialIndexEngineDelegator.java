@@ -20,6 +20,7 @@ package com.orientechnologies.spatial.engine;
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
 import com.orientechnologies.lucene.engine.OLuceneIndexEngine;
+import com.orientechnologies.lucene.engine.OLuceneIndexEngineDelegatorAbstract;
 import com.orientechnologies.lucene.query.OLuceneQueryContext;
 import com.orientechnologies.lucene.tx.OLuceneTxChanges;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
@@ -50,13 +51,12 @@ import java.util.Set;
 /**
  * Created by Enrico Risa on 04/09/15.
  */
-public class OLuceneSpatialIndexEngineDelegator implements OLuceneIndexEngine, OLuceneSpatialIndexContainer {
+public class OLuceneSpatialIndexEngineDelegator extends OLuceneIndexEngineDelegatorAbstract implements OLuceneSpatialIndexContainer {
 
   private final Boolean                           durableInNonTxMode;
   private final OStorage                          storage;
   private final int                               version;
   private final String                            indexName;
-  private       OLuceneSpatialIndexEngineAbstract delegate;
 
   public OLuceneSpatialIndexEngineDelegator(String name, Boolean durableInNonTxMode, OStorage storage, int version) {
 

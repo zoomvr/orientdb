@@ -19,8 +19,10 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DoubleDocValuesField;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.NumericDocValuesField;
+import org.apache.lucene.document.SortedDocValuesField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.util.BytesRef;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -37,6 +39,7 @@ public class OLuceneDocumentWriteAheadLogTest {
     doc.add(new TextField("txtField", "testValue2", Field.Store.YES));
     doc.add(new NumericDocValuesField("numericField", 1l));
     doc.add(new DoubleDocValuesField("doubleValuesField", 2.33));
+    doc.add(new SortedDocValuesField("sortedDoc", new BytesRef("testValue3".getBytes())));
     
     OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, 1, "testName", 0, null);
     byte[] stream = new byte[walRecord.serializedSize()];
@@ -47,6 +50,8 @@ public class OLuceneDocumentWriteAheadLogTest {
     Assert.assertEquals(walRecord.getLuceneWriterIndex(), deserialized.getLuceneWriterIndex());
     Assert.assertEquals(walRecord.getSequenceNumber(), deserialized.getSequenceNumber());
     Assert.assertEquals(walRecord.getDocument().getFields().size(), deserialized.getDocument().getFields().size());
+    Assert.assertArrayEquals(walRecord.getDocument().getField("sortedDoc").binaryValue().bytes, 
+            deserialized.getDocument().getField("sortedDoc").binaryValue().bytes);
   }
   
 }

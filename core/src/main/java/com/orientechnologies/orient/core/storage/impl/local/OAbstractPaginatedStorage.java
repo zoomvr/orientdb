@@ -136,6 +136,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OFullC
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OFuzzyCheckpointEndRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OFuzzyCheckpointStartRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.ONonTxOperationPerformedWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitRecord;
@@ -188,6 +189,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TimeZone;
@@ -5194,8 +5196,22 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
                   .warnNoDb(this, "Non tx operation was used during data modification we will need index rebuild.");
               wereNonTxOperationsPerformedInPreviousOpen = true;
             }
-          } else
+          } else if (walRecord instanceof OLuceneEntryWALRecord){
+            OLuceneEntryWALRecord luceneWalRecord = (OLuceneEntryWALRecord)walRecord;
+            String indexName = luceneWalRecord.getIndexName();
+            OIndexEngine indexEngine = findIndexEngineByName(indexName);
+            //TODO rethink if here we don't need to use wal
+            if (indexEngine != null){
+              luceneWalRecord.addToIndex(indexEngine, null);
+            }
+            else{
+              ODatabaseException dbExc = new ODatabaseException("Index engine: " + indexName + " not found");
+              OLogManager.instance().error(this, dbExc.getMessage(), dbExc, (Object[])null);
+            }
+          } 
+          else{
             OLogManager.instance().warnNoDb(this, "Record %s will be skipped during data restore", walRecord);
+          }
 
           recordsProcessed++;
 
@@ -5472,6 +5488,16 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     } finally {
       stateLock.releaseWriteLock();
     }
+  }
+
+  private OIndexEngine findIndexEngineByName(String indexName) {
+    for (OIndexEngine indexEngine : indexEngines){
+      if (indexEngine.getName().equals(indexName)){
+        return indexEngine;
+      }
+    }
+    
+    return null;
   }
 
   private static class ORIDOLockManager extends OComparableLockManager<ORID> {
