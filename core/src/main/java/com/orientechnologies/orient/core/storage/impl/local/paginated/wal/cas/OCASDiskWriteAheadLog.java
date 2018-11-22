@@ -1742,6 +1742,7 @@ public final class OCASDiskWriteAheadLog implements OWriteAheadLog {
 
     final Iterator<Runnable> eventsToFire = events.headMap(lsn, true).values().iterator();
     while (eventsToFire.hasNext()) {
+      System.out.println("FIRED EVENT FOR: " + lsn);
       eventsToFire.next().run();
       eventsToFire.remove();
     }

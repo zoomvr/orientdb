@@ -40,13 +40,14 @@ public class OLuceneTracker {
   
   private final Map<Long, Long> highestSequenceNumberCanBeFlushed = new HashMap<>();
   private final Map<Long, Long> highestSequenceNumberFlushed = new HashMap<>();
-  private final Map<Long, Boolean> hasUnflushed = new HashMap<>();
+  private final Map<Long, Long> largestCommitedToFlush = new HashMap<>();
   
   public synchronized Long getHighestSequenceNumberCanBeFlushed(long writerIndex){
     return highestSequenceNumberCanBeFlushed.get(writerIndex);
   }
   
   public synchronized long mapHighestSequenceNumberCanBeFLushed(long writerIndex, long sequenceNumber){
+    System.out.println("HIGHEST SEQNO CAN BE FLUSHED FOR: " + writerIndex + " IS: " + sequenceNumber);
     Long currVal = highestSequenceNumberCanBeFlushed.get(writerIndex);
     if (currVal == null || currVal < sequenceNumber){
       highestSequenceNumberCanBeFlushed.put(writerIndex, sequenceNumber);
@@ -73,14 +74,26 @@ public class OLuceneTracker {
   }
   
   public synchronized boolean hasUnflushed(long writerIndex){
-    Boolean val = hasUnflushed.get(writerIndex);
+    Long val = largestCommitedToFlush.get(writerIndex);
     if (val == null){
-      val = false;
+      return false;
     }
-    return val;
+    else{
+      return true;
+    }
   }
   
-  public synchronized void clearHasUnflushed(long writerIndex){
-    hasUnflushed.remove(writerIndex);
+  public synchronized void clearHasUnflushed(long writerIndex, long lastFlushedSeqNo){
+    Long val = largestCommitedToFlush.get(writerIndex);
+    if (val == null){
+      return;
+    }
+    if (val <= lastFlushedSeqNo){
+      largestCommitedToFlush.remove(writerIndex);
+    }
+  }
+  
+  public synchronized void setHasUnflushed(long writerIndex, long seqNo){
+    largestCommitedToFlush.put(writerIndex, seqNo);
   }
 }

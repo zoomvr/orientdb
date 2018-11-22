@@ -16,10 +16,7 @@
 package com.orientechnologies.lucene;
 
 import com.orientechnologies.orient.core.index.OLuceneTracker;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecord;
-import java.util.LinkedList;
-import java.util.List;
 import org.apache.lucene.index.IndexWriter;
 
 /**
@@ -62,7 +59,7 @@ public class OLuceneBlockingCallback {
         }
         System.out.println("RELEASED LUCENE LOCK for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
         cycleNo = 0;
-        OLuceneTracker.instance().clearHasUnflushed(getWriterIndex());        
+        OLuceneTracker.instance().clearHasUnflushed(getWriterIndex(), getSequenceNumber());        
       }
       else{
         System.out.println("NOTHING TO FLUSH FOR INDEX WRITER: " + getWriterIndex() +  ", " + System.currentTimeMillis());
@@ -97,7 +94,8 @@ public class OLuceneBlockingCallback {
       //here we want to signal Lucene that record with this seqNo is safe for flush
       long writerId = walRecord.getLuceneWriterIndex();
       long sequenceNumber = walRecord.getSequenceNumber();
-      OLuceneTracker.instance().mapHighestSequenceNumberCanBeFLushed(writerId, sequenceNumber);      
+      OLuceneTracker.instance().mapHighestSequenceNumberCanBeFLushed(writerId, sequenceNumber);
+      System.out.println("FLUSHED SEQ NO FOR: " + writerId + " IS: " + sequenceNumber);
     }
     
   }

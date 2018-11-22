@@ -78,8 +78,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.INDEX;
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.QUERY;
+import com.orientechnologies.orient.core.index.OLuceneTracker;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
+import com.orientechnologies.orient.core.storage.impl.memory.ODirectMemoryStorage;
 import org.apache.lucene.index.IndexableField;
 
 public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptiveExternal implements OLuceneIndexEngine {
@@ -127,15 +129,24 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   }
 
   protected void addDocument(Document doc, OWriteAheadLog writeAheadLog) {
-    try {      
-      long seqNo = reopenToken = indexWriter.addDocument(doc);
+    try {
+      long seqNo = reopenToken = indexWriter.addDocument(doc);      
+      if (writeAheadLog == null){
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.out.println("NO WAL ASSOCIATED WITH: " + indexWriter.getUniqueIndex());
+        Exception exc = new Exception("NO WAL");
+        exc.printStackTrace();
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      }
       if (writeAheadLog != null){
+        OLuceneTracker.instance().setHasUnflushed(indexWriter.getUniqueIndex(), seqNo);
         OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
         OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, seqNo, getName(), 
                 indexWriter.getUniqueIndex(), previousCheckPoint);
         OLogSequenceNumber lsn = writeAheadLog.log(walRecord);
         OLuceneBlockingCallback.OOnFlushEvenet event = new OLuceneBlockingCallback.OOnFlushEvenet(walRecord);
         writeAheadLog.addEventAt(lsn, event);
+        System.out.println("FOR WRITER: " + indexWriter.getUniqueIndex() + " LSN IS: " + lsn);
       }
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);
@@ -193,7 +204,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
       }
     };
 
-    Orient.instance().scheduleTask(commitTask, firstFlushAfter, flushIndexInterval);
+//    Orient.instance().scheduleTask(commitTask, firstFlushAfter, flushIndexInterval);
   }
 
   private boolean shouldClose() {
@@ -244,15 +255,17 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
       directory = directoryFactory.createDirectory(getDatabase(), name, metadata);
 
       indexWriter = createIndexWriter(directory);
+      indexWriter.setFlushTaskBefore(new OLuceneBlockingCallback.OLuceneSynchCallbackBefore());
+      indexWriter.setFlushTaskAfter(new OLuceneBlockingCallback.OLuceneSynchCallbackAfter());
       searcherManager = new SearcherManager(indexWriter, true, true, null);
 
       reopenToken = 0;
 
-      startNRT();
+//      startNRT();
 
       closed.set(false);
 
-      flush();
+      synchWithStorage();
 
       scheduleCommitTask();
 
@@ -439,9 +452,13 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   @Override
   public IndexSearcher searcher() {
     try {
+      System.out.println("SEARCHER FOR: " + indexWriter.getUniqueIndex());
+      startNRT();
+      synchWithStorage();
       updateLastAccess();
       openIfClosed();
       nrt.waitForGeneration(reopenToken);
+      closeNRT();
       return searcherManager.acquire();
     } catch (Exception e) {
       OLogManager.instance().error(this, "Error on get searcher from Lucene index", e);
@@ -637,5 +654,13 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   @Override
   public boolean isDelegator(){
     return false;
+  }
+  
+  private void synchWithStorage(){    
+    if (storage instanceof ODirectMemoryStorage){
+      flush();
+      return;
+    }
+    storage.synch();
   }
 }
