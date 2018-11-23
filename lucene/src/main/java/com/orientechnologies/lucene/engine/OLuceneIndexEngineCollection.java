@@ -17,6 +17,7 @@ package com.orientechnologies.lucene.engine;
 
 import java.lang.ref.WeakReference;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.lucene.store.AlreadyClosedException;
@@ -87,7 +88,9 @@ public class OLuceneIndexEngineCollection {
   
   public synchronized long getOverallRamSize(){
     long retVal = 0l;
-    for (WeakRefToLuceneIndexEngine refToIndexEngine : collection){
+    Iterator<WeakRefToLuceneIndexEngine> iter = collection.iterator();
+    while(iter.hasNext()){
+      WeakRefToLuceneIndexEngine refToIndexEngine = iter.next();
       OLuceneIndexEngineAbstract indexEngine = refToIndexEngine.get();
       if (indexEngine != null){
         try{
@@ -95,7 +98,13 @@ public class OLuceneIndexEngineCollection {
         }
         catch (AlreadyClosedException exc){
           System.out.println("INDEX ENGINE CLOSED: " + indexEngine.indexWriter.getUniqueIndex());
+          //cleanup non valid refs, on reopen it will be added to collection again
+          iter.remove();
         }
+      }
+      else{
+        //cleanup non valid refs
+        iter.remove();
       }
     }
     System.out.println("$$LUCENE RAM SIZE: " + retVal);

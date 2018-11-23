@@ -54,7 +54,7 @@ public class OLuceneBlockingCallback {
           System.out.println("WAITING for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
           waitSomeTime(1000l);
           highestSequnceCanBeFlushed = OLuceneTracker.instance().getHighestSequenceNumberCanBeFlushed(getWriterIndex());          
-          System.out.println("DETECTED HIGHEST CAN BE FLUSHED: " + highestSequnceCanBeFlushed + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
+          System.out.println("DETECTED HIGHEST CAN BE FLUSHED: " + (highestSequnceCanBeFlushed + (cycleNo * getLuceneMagicNumber())) + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());
           counter++;
         }
         System.out.println("RELEASED LUCENE LOCK for: " + getSequenceNumber() + ", " + System.currentTimeMillis() + " Writer id: " + getWriterIndex());

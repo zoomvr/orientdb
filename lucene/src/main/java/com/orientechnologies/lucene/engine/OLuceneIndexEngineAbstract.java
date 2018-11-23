@@ -81,7 +81,9 @@ import com.orientechnologies.orient.core.index.OLuceneTracker;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.impl.memory.ODirectMemoryStorage;
+import java.lang.ref.WeakReference;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptiveExternal implements OLuceneIndexEngine {
 
@@ -111,8 +113,10 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   private Lock openCloseLock;
   
   private static final Object getLuceneRamSizeLock = new Object();
-  private static final long maxAllowedLuceneRamSize = 500 * 1024 * 1024;
+  private static final long maxAllowedLuceneRamSize = Runtime.getRuntime().totalMemory() / 60;
   private static final long sleepTimeWhenWaitToFlushLuceneIndexs = 10;
+  
+  private AtomicReference<WeakReference<OWriteAheadLog>> associatedWAL = null;
 
   public OLuceneIndexEngineAbstract(OStorage storage, String name) {
     super(true, 0, true);
@@ -132,6 +136,12 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   }
 
   protected void addDocument(Document doc, OWriteAheadLog writeAheadLog) {
+    synchronized(this){
+      if (associatedWAL == null){
+        associatedWAL = new AtomicReference<>();
+      }
+      associatedWAL.set(new WeakReference<>(writeAheadLog));
+    }
     try {
       long seqNo = reopenToken = indexWriter.addDocument(doc);      
       if (writeAheadLog == null){
@@ -142,6 +152,17 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
         System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
       }
       if (writeAheadLog != null){
+        OLuceneTracker.instance().setHasUnflushed(indexWriter.getUniqueIndex(), seqNo);
+        OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
+        OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, seqNo, getName(), 
+                indexWriter.getUniqueIndex(), previousCheckPoint);
+        OLogSequenceNumber lsn = writeAheadLog.log(walRecord);
+        OLuceneBlockingCallback.OOnFlushEvenet event = new OLuceneBlockingCallback.OOnFlushEvenet(walRecord);
+        writeAheadLog.addEventAt(lsn, event);
+        System.out.println("FOR WRITER: " + indexWriter.getUniqueIndex() + " LSN IS: " + lsn);
+        
+        //check for lucene memory consuption, stop the world as current solution
+        System.out.println("MAX LUCENE MEMORY SIZE: " + maxAllowedLuceneRamSize);
         if (OLuceneIndexEngineCollection.instance().getOverallRamSize() > maxAllowedLuceneRamSize){
           synchronized(getLuceneRamSizeLock){
             long luceneOverAllRamSize = OLuceneIndexEngineCollection.instance().getOverallRamSize();
@@ -157,16 +178,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
               luceneOverAllRamSize = OLuceneIndexEngineCollection.instance().getOverallRamSize();
             }
           }
-        }
-        
-        OLuceneTracker.instance().setHasUnflushed(indexWriter.getUniqueIndex(), seqNo);
-        OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
-        OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, seqNo, getName(), 
-                indexWriter.getUniqueIndex(), previousCheckPoint);
-        OLogSequenceNumber lsn = writeAheadLog.log(walRecord);
-        OLuceneBlockingCallback.OOnFlushEvenet event = new OLuceneBlockingCallback.OOnFlushEvenet(walRecord);
-        writeAheadLog.addEventAt(lsn, event);
-        System.out.println("FOR WRITER: " + indexWriter.getUniqueIndex() + " LSN IS: " + lsn);
+        }               
       }
     } catch (IOException e) {
       OLogManager.instance().error(this, "Error on adding new document '%s' to Lucene index", e, doc);
@@ -678,12 +690,15 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     return false;
   }
   
-  private void synchWithStorage(){    
-    if (storage instanceof ODirectMemoryStorage){
-      flush();
-      return;
+  private void synchWithStorage(){
+    flush();
+    if (associatedWAL != null){
+      WeakReference<OWriteAheadLog> wrWAL = associatedWAL.get();
+      if (wrWAL.get() != null){
+        wrWAL.get().flush();
+      }
     }
-    storage.synch();
+    
   }
 
   //mainly use in OLuceneIndexEngineCollection not safe for other
