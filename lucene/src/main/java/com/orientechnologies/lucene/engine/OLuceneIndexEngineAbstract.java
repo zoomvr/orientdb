@@ -113,7 +113,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   private Lock openCloseLock;
   
   private static final Object getLuceneRamSizeLock = new Object();
-  private static final long maxAllowedLuceneRamSize = Runtime.getRuntime().totalMemory() / 60;
+  private static final long maxAllowedLuceneRamSize = Runtime.getRuntime().totalMemory() / 6;
   private static final long sleepTimeWhenWaitToFlushLuceneIndexs = 10;
   
   private AtomicReference<WeakReference<OWriteAheadLog>> associatedWAL = null;
