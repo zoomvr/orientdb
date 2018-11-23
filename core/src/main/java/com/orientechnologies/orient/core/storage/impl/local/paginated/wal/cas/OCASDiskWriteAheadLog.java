@@ -1056,6 +1056,7 @@ public final class OCASDiskWriteAheadLog implements OWriteAheadLog {
     return lastCheckpoint;
   }
 
+  @Override
   public OLogSequenceNumber log(final OWriteableWALRecord writeableRecord) {
     final long segSize;
     final long size;

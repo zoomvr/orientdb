@@ -21,6 +21,7 @@ public class OLiveQueryMessagesTests {
 
   @Test
   public void testRequestWriteRead() throws IOException {
+    try{
     Map<String, Object> params = new HashMap<>();
     params.put("par", "value");
     OSubscribeLiveQueryRequest request = new OSubscribeLiveQueryRequest("select from Some", params);
@@ -31,6 +32,11 @@ public class OLiveQueryMessagesTests {
     requestRead.read(channel, -1, new ORecordSerializerNetworkV37());
     assertEquals(requestRead.getQuery(), "select from Some");
     assertEquals(requestRead.getParams(), params);
+    }
+    catch (Exception exc){
+      exc.printStackTrace();
+      throw exc;
+    }
   }
 
   @Test

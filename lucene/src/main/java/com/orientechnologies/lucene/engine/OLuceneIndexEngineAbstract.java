@@ -28,7 +28,6 @@ import com.orientechnologies.lucene.query.OLuceneQueryContext;
 import com.orientechnologies.lucene.tx.OLuceneTxChanges;
 import com.orientechnologies.lucene.tx.OLuceneTxChangesMultiRid;
 import com.orientechnologies.lucene.tx.OLuceneTxChangesSingleRid;
-import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
@@ -82,7 +81,7 @@ import com.orientechnologies.orient.core.index.OLuceneTracker;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.impl.memory.ODirectMemoryStorage;
-import org.apache.lucene.index.IndexableField;
+import java.util.Objects;
 
 public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptiveExternal implements OLuceneIndexEngine {
 
@@ -104,12 +103,16 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   private          Analyzer      indexAnalyzer;
   private          Analyzer      queryAnalyzer;
   private volatile Directory     directory;
-  private          IndexWriter   indexWriter;
+  IndexWriter   indexWriter;
   private          long          flushIndexInterval;
   private          long          closeAfterInterval;
   private          long          firstFlushAfter;
 
   private Lock openCloseLock;
+  
+  private static final Object getLuceneRamSizeLock = new Object();
+  private static final long maxAllowedLuceneRamSize = 500 * 1024 * 1024;
+  private static final long sleepTimeWhenWaitToFlushLuceneIndexs = 10;
 
   public OLuceneIndexEngineAbstract(OStorage storage, String name) {
     super(true, 0, true);
@@ -139,6 +142,23 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
         System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
       }
       if (writeAheadLog != null){
+        if (OLuceneIndexEngineCollection.instance().getOverallRamSize() > maxAllowedLuceneRamSize){
+          synchronized(getLuceneRamSizeLock){
+            long luceneOverAllRamSize = OLuceneIndexEngineCollection.instance().getOverallRamSize();
+            while (luceneOverAllRamSize > maxAllowedLuceneRamSize){
+              System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+              System.out.println("FLUSHING ALL TO DISK TO MUCH IN RAM");
+              System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+              synchWithStorage();
+              try{
+                Thread.sleep(sleepTimeWhenWaitToFlushLuceneIndexs);
+              }
+              catch (InterruptedException ignore){}
+              luceneOverAllRamSize = OLuceneIndexEngineCollection.instance().getOverallRamSize();
+            }
+          }
+        }
+        
         OLuceneTracker.instance().setHasUnflushed(indexWriter.getUniqueIndex(), seqNo);
         OLogSequenceNumber previousCheckPoint = writeAheadLog.getLastCheckpoint();
         OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, seqNo, getName(), 
@@ -270,6 +290,8 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
       scheduleCommitTask();
 
       addMetadataDocumentIfNotPresent();
+      
+      OLuceneIndexEngineCollection.instance().trackLuceneIndexEngine(this);
     } finally {
 
       openCloseLock.unlock();
@@ -663,4 +685,33 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     }
     storage.synch();
   }
+
+  //mainly use in OLuceneIndexEngineCollection not safe for other
+  @Override
+  public int hashCode() {
+    int hash = 3;
+    hash = 89 * hash + Objects.hashCode(this.indexWriter.getUniqueIndex());
+    return hash;
+  }
+
+  //mainly use in OLuceneIndexEngineCollection not safe for other
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null) {
+      return false;
+    }
+    if (getClass() != obj.getClass()) {
+      return false;
+    }
+    final OLuceneIndexEngineAbstract other = (OLuceneIndexEngineAbstract) obj;
+    if (this.indexWriter.getUniqueIndex() != other.indexWriter.getUniqueIndex()) {
+      return false;
+    }
+    return true;
+  }
+  
+  
 }
