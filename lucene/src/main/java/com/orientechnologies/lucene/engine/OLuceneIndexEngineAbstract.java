@@ -77,8 +77,12 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.INDEX;
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.QUERY;
+import com.orientechnologies.lucene.builder.OLuceneDocumentBuilder;
 import com.orientechnologies.orient.core.index.OLuceneTracker;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OAbstractWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecordDummy;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.impl.memory.ODirectMemoryStorage;
 import java.lang.ref.WeakReference;
@@ -728,5 +732,13 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     return true;
   }
   
-  
+  @Override
+  public void addWalRecordToIndex(OAbstractWALRecord record) throws IOException{
+    if (record instanceof OLuceneEntryWALRecordDummy){
+      OLuceneEntryWALRecordDummy dummyWalRecord = (OLuceneEntryWALRecordDummy)record;
+      HelperClasses.Tuple<Integer, Document> deserialized = OLuceneDocumentBuilder.deserializeDocument(dummyWalRecord.getDocumentBytes(), 0);
+      openIfClosed();
+      indexWriter.addDocument(deserialized.getSecondVal());
+    }
+  }
 }

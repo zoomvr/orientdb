@@ -54,17 +54,15 @@ public class OLuceneDocumentWriteAheadRecord extends OLuceneEntryWALRecord{
     this.luceneWriterIndex = luceneWriterIndex;
   }
   
-  private byte[] internalSerialization(){
-    //serialize document
-    byte[] stream = OLuceneDocumentBuilder.serializeDocument(document);
-    BytesContainer bytes = new BytesContainer(stream);
-    bytes.offset = stream.length;
+  protected byte[] internalSerialization(){
+    BytesContainer bytes = new BytesContainer();
     //serialize sequence number
     serializer.serializeValue(bytes, sequenceNumber, OType.LONG, null);
     //serialize indexName
     serializer.serializeValue(bytes, indexName, OType.STRING, null);
     //serialize lucene writer index
     serializer.serializeValue(bytes, luceneWriterIndex, OType.LONG, null);
+    OLuceneDocumentBuilder.serializeDocument(document, bytes);
     return bytes.fitBytes();
   }
   
@@ -83,14 +81,15 @@ public class OLuceneDocumentWriteAheadRecord extends OLuceneEntryWALRecord{
 
   @Override
   public int fromStream(byte[] content, int offset) {
-    HelperClasses.Tuple<Integer, Document> ret = null;
-    ret = OLuceneDocumentBuilder.deserializeDocument(content, offset);
     BytesContainer bytes = new BytesContainer(content);
-    bytes.offset = ret.getFirstVal();
-    document = ret.getSecondVal();
+    bytes.offset = offset;
     sequenceNumber = (long)serializer.deserializeValue(bytes, OType.LONG, null);
     indexName = (String)serializer.deserializeValue(bytes, OType.STRING, null);
     luceneWriterIndex = (long)serializer.deserializeValue(bytes, OType.LONG, null);
+    HelperClasses.Tuple<Integer, Document> ret = null;
+    ret = OLuceneDocumentBuilder.deserializeDocument(content, bytes.offset);
+    bytes.offset = ret.getFirstVal();
+    document = ret.getSecondVal();
     return bytes.offset;
   }
 

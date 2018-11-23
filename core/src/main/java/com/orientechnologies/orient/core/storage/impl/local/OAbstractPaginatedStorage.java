@@ -137,6 +137,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OFuzzy
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OFuzzyCheckpointStartRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecord;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecordDummy;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.ONonTxOperationPerformedWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitRecord;
@@ -189,7 +190,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TimeZone;
@@ -335,6 +335,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   private final AtomicLong txBegun        = new AtomicLong(0);
   private final AtomicLong txCommit       = new AtomicLong(0);
   private final AtomicLong txRollback     = new AtomicLong(0);
+  
+  private final List<OLuceneEntryWALRecordDummy> luceneWalRecords = new ArrayList<>();
 
   public OAbstractPaginatedStorage(String name, String filePath, String mode, int id) {
     super(name, filePath, mode);
@@ -438,6 +440,21 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
     OLogManager.instance()
         .infoNoDb(this, "Storage '%s' is opened under OrientDB distribution : %s", getURL(), OConstants.getVersion());
+  }
+  
+  public void restoreLuceneWalRecords(){
+    for (OLuceneEntryWALRecordDummy luceneWalRecord : luceneWalRecords){
+      String indexName = luceneWalRecord.getIndexName();
+      OIndexEngine indexEngine = findIndexEngineByName(indexName);
+      //TODO rethink if here we don't need to use wal
+      if (indexEngine != null){
+        luceneWalRecord.addToIndex(indexEngine, null);
+      }
+      else{
+        ODatabaseException dbExc = new ODatabaseException("Index engine: " + indexName + " not found");
+        OLogManager.instance().error(this, dbExc.getMessage(), dbExc, (Object[])null);
+      }
+    }
   }
 
   /**
@@ -5142,6 +5159,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
   @SuppressWarnings("WeakerAccess")
   protected OLogSequenceNumber restoreFrom(OLogSequenceNumber lsn, OWriteAheadLog writeAheadLog) throws IOException {
+    System.out.println("///////////////////////////////////////////////////////////////////////");
+    System.out.println("RESTORE");
+    System.out.println("///////////////////////////////////////////////////////////////////////");
     OLogSequenceNumber logSequenceNumber = null;
     OModifiableBoolean atLeastOnePageUpdate = new OModifiableBoolean();
 
@@ -5196,18 +5216,10 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
                   .warnNoDb(this, "Non tx operation was used during data modification we will need index rebuild.");
               wereNonTxOperationsPerformedInPreviousOpen = true;
             }
-          } else if (walRecord instanceof OLuceneEntryWALRecord){
-            OLuceneEntryWALRecord luceneWalRecord = (OLuceneEntryWALRecord)walRecord;
-            String indexName = luceneWalRecord.getIndexName();
-            OIndexEngine indexEngine = findIndexEngineByName(indexName);
-            //TODO rethink if here we don't need to use wal
-            if (indexEngine != null){
-              luceneWalRecord.addToIndex(indexEngine, null);
-            }
-            else{
-              ODatabaseException dbExc = new ODatabaseException("Index engine: " + indexName + " not found");
-              OLogManager.instance().error(this, dbExc.getMessage(), dbExc, (Object[])null);
-            }
+          } else if (walRecord instanceof OLuceneEntryWALRecordDummy){
+            //just rember lsn
+            System.out.println("FOUND LUCENE WAL RECORD");
+            luceneWalRecords.add((OLuceneEntryWALRecordDummy)walRecord);
           } 
           else{
             OLogManager.instance().warnNoDb(this, "Record %s will be skipped during data restore", walRecord);

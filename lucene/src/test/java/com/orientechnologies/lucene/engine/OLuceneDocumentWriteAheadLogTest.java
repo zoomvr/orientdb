@@ -15,6 +15,9 @@
  */
 package com.orientechnologies.lucene.engine;
 
+import com.orientechnologies.lucene.builder.OLuceneDocumentBuilder;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLuceneEntryWALRecordDummy;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DoubleDocValuesField;
 import org.apache.lucene.document.Field;
@@ -52,6 +55,31 @@ public class OLuceneDocumentWriteAheadLogTest {
     Assert.assertEquals(walRecord.getDocument().getFields().size(), deserialized.getDocument().getFields().size());
     Assert.assertArrayEquals(walRecord.getDocument().getField("sortedDoc").binaryValue().bytes, 
             deserialized.getDocument().getField("sortedDoc").binaryValue().bytes);
+  }
+  
+  @Test
+  public void testSerializeDeserializeFromDummy(){
+    Document doc = new Document();
+    doc.add(new StringField("strField", "testValue", Field.Store.YES));
+    doc.add(new TextField("txtField", "testValue2", Field.Store.YES));
+    doc.add(new NumericDocValuesField("numericField", 1l));
+    doc.add(new DoubleDocValuesField("doubleValuesField", 2.33));
+    doc.add(new SortedDocValuesField("sortedDoc", new BytesRef("testValue3".getBytes())));
+    
+    OLuceneDocumentWriteAheadRecord walRecord = new OLuceneDocumentWriteAheadRecord(doc, 1, "testName", 0, null);
+    byte[] stream = new byte[walRecord.serializedSize()];
+    walRecord.toStream(stream, 0);
+    OLuceneEntryWALRecordDummy deserializedDummy = new OLuceneEntryWALRecordDummy();
+    deserializedDummy.fromStream(stream, 0);
+    Assert.assertEquals(walRecord.getIndexName(), deserializedDummy.getIndexName());
+    Assert.assertEquals(walRecord.getLuceneWriterIndex(), deserializedDummy.getLuceneWriterIndex());
+    Assert.assertEquals(walRecord.getSequenceNumber(), deserializedDummy.getSequenceNumber());
+    
+    HelperClasses.Tuple<Integer, Document> tuple = OLuceneDocumentBuilder.deserializeDocument(deserializedDummy.getDocumentBytes(), 0);
+    Document newDoc = tuple.getSecondVal();
+    Assert.assertEquals(walRecord.getDocument().getFields().size(), newDoc.getFields().size());
+    Assert.assertArrayEquals(walRecord.getDocument().getField("sortedDoc").binaryValue().bytes, 
+            newDoc.getField("sortedDoc").binaryValue().bytes);
   }
   
 }

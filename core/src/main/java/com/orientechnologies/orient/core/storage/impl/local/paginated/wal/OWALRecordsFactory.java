@@ -47,6 +47,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_START_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.NON_TX_OPERATION_PERFORMED_WAL_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.UPDATE_PAGE_RECORD;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.LUCENE_DOCUMENT_RECORD;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -153,6 +154,13 @@ public final class OWALRecordsFactory {
     case EMPTY_WAL_RECORD:
       walRecord = new OEmptyWALRecord();
       break;
+    case LUCENE_DOCUMENT_RECORD:
+      //skip lucene wal records they will be processed later
+      System.out.println("*****************************************************");
+      System.out.println("LUCENE WAL RECORD");
+      walRecord = new OLuceneEntryWALRecordDummy();
+      System.out.println("*****************************************************");      
+      break;
     default:
       if (idToTypeMap.containsKey(content[0]))
         try {
@@ -164,8 +172,16 @@ public final class OWALRecordsFactory {
         throw new IllegalStateException("Cannot deserialize passed in wal record.");
     }
 
-    walRecord.fromStream(content, 1);
+    if (walRecord != null){
+      walRecord.fromStream(content, 1);
+    }
 
+    if (walRecord instanceof OLuceneEntryWALRecord){
+      OLuceneEntryWALRecord lwr = (OLuceneEntryWALRecord)walRecord;
+      System.out.println("IN NAME: " + lwr.getIndexName());
+      System.out.println("SQ NO: " + lwr.getSequenceNumber());
+    }
+    
     return walRecord;
   }
 

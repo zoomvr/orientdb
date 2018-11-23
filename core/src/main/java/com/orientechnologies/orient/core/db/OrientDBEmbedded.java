@@ -251,6 +251,8 @@ public class OrientDBEmbedded implements OrientDBInternal {
         storage.open(config.getConfigurations());
         embedded = factory.newInstance(storage);
         embedded.init(config);
+        ODatabaseRecordThreadLocal.instance().set(embedded);
+        storage.restoreLuceneWalRecords();
       }
       embedded.rebuildIndexes();
       embedded.internalOpen(user, password);

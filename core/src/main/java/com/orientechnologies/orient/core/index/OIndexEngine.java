@@ -25,6 +25,8 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OAbstractWALRecord;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 
 import java.io.IOException;
@@ -122,6 +124,10 @@ public interface OIndexEngine {
   
   default boolean isLuceneIndex(){
     return false;
+  }
+  
+  default void addWalRecordToIndex(OAbstractWALRecord record) throws IOException{
+    
   }
 
   interface ValuesTransformer {

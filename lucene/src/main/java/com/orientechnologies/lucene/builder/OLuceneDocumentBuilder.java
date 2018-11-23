@@ -135,8 +135,7 @@ public class OLuceneDocumentBuilder {
     return collectionFields.get(f) ? Field.Store.YES : Field.Store.NO;
   }
   
-  public static byte[] serializeDocument(final Document doc){
-    final BytesContainer container = new BytesContainer();
+  public static byte[] serializeDocument(final Document doc, BytesContainer container){
     final ORecordSerializerBinaryV1 serializer = new ORecordSerializerBinaryV1();
     
     final List<IndexableField> fields = doc.getFields();
