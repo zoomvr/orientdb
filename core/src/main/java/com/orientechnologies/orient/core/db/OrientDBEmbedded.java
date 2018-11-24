@@ -204,8 +204,9 @@ public class OrientDBEmbedded implements OrientDBInternal {
     try {
       final ODatabaseDocumentEmbedded embedded;
       OrientDBConfig config = solveConfig(null);
+      OAbstractPaginatedStorage storage;
       synchronized (this) {
-        OAbstractPaginatedStorage storage = getOrInitStorage(name);
+        storage = getOrInitStorage(name);
         // THIS OPEN THE STORAGE ONLY THE FIRST TIME
         storage.open(config.getConfigurations());
         embedded = factory.newInstance(storage);
@@ -214,6 +215,8 @@ public class OrientDBEmbedded implements OrientDBInternal {
       embedded.rebuildIndexes();
       embedded.internalOpen(user, "nopwd", false);
       embedded.callOnOpenListeners();
+      ODatabaseRecordThreadLocal.instance().set(embedded);
+      storage.restoreLuceneWalRecords();
       return embedded;
     } catch (Exception e) {
       throw OException.wrapException(new ODatabaseException("Cannot open database '" + name + "'"), e);
@@ -224,8 +227,9 @@ public class OrientDBEmbedded implements OrientDBInternal {
     try {
       final ODatabaseDocumentEmbedded embedded;
       OrientDBConfig config = solveConfig(null);
+      OAbstractPaginatedStorage storage;
       synchronized (this) {
-        OAbstractPaginatedStorage storage = getOrInitStorage(name);
+        storage = getOrInitStorage(name);
         // THIS OPEN THE STORAGE ONLY THE FIRST TIME
         storage.open(config.getConfigurations());
         embedded = factory.newInstance(storage);
@@ -233,6 +237,8 @@ public class OrientDBEmbedded implements OrientDBInternal {
       }
       embedded.rebuildIndexes();
       embedded.callOnOpenListeners();
+      ODatabaseRecordThreadLocal.instance().set(embedded);
+      storage.restoreLuceneWalRecords();
       return embedded;
     } catch (Exception e) {
       throw OException.wrapException(new ODatabaseException("Cannot open database '" + name + "'"), e);
@@ -243,20 +249,21 @@ public class OrientDBEmbedded implements OrientDBInternal {
   public ODatabaseDocumentInternal open(String name, String user, String password, OrientDBConfig config) {
     try {
       final ODatabaseDocumentEmbedded embedded;
+      OAbstractPaginatedStorage storage = null;
       synchronized (this) {
         checkOpen();
         config = solveConfig(config);
-        OAbstractPaginatedStorage storage = getOrInitStorage(name);
+        storage = getOrInitStorage(name);
         // THIS OPEN THE STORAGE ONLY THE FIRST TIME
         storage.open(config.getConfigurations());
         embedded = factory.newInstance(storage);
         embedded.init(config);
-        ODatabaseRecordThreadLocal.instance().set(embedded);
-        storage.restoreLuceneWalRecords();
       }
       embedded.rebuildIndexes();
       embedded.internalOpen(user, password);
       embedded.callOnOpenListeners();
+      ODatabaseRecordThreadLocal.instance().set(embedded);
+      storage.restoreLuceneWalRecords();
       return embedded;
     } catch (Exception e) {
       throw OException.wrapException(new ODatabaseException("Cannot open database '" + name + "'"), e);

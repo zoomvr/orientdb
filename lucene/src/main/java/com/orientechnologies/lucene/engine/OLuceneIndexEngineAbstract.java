@@ -193,6 +193,12 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   public void init(String indexName, String indexType, OIndexDefinition indexDefinition, boolean isAutomatic, ODocument metadata) {
 
     this.indexDefinition = indexDefinition;
+    
+    if (metadata == null){
+      int a = 0;
+      ++a;
+    }
+    
     this.metadata = metadata;
 
     OLuceneAnalyzerFactory fc = new OLuceneAnalyzerFactory();

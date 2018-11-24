@@ -29,6 +29,11 @@ public class OLuceneDirectoryFactory {
 
   public Directory createDirectory(ODatabaseDocumentInternal database, String indexName, ODocument metadata) {
 
+    if (metadata == null){
+      int a = 0;
+      ++a;
+    }
+    
     String luceneType = metadata.containsField(DIRECTORY_TYPE) ? metadata.<String>field(DIRECTORY_TYPE) : DIRECTORY_MMAP;
 
     if (database.getStorage().getType().equals("memory") || DIRECTORY_RAM.equals(luceneType)) {

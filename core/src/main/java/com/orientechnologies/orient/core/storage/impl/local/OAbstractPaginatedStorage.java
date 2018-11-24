@@ -5504,7 +5504,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
   private OIndexEngine findIndexEngineByName(String indexName) {
     for (OIndexEngine indexEngine : indexEngines){
-      if (indexEngine.getName().equals(indexName)){
+      if (indexEngine != null && indexEngine.getName() != null && indexEngine.getName().equals(indexName)){
         return indexEngine;
       }
     }
