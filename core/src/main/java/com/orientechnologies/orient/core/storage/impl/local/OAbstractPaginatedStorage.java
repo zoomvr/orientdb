@@ -457,11 +457,14 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         throw dbExc;
       }
     }
-    for (OIndexEngine indexEngine : indexEngines){
-      if (indexEngine != null && indexEngine.isLuceneIndex()){
-        indexEngine.flush();
+    if (luceneWalRecords.size() > 0){
+      for (OIndexEngine indexEngine : indexEngines){
+        if (indexEngine != null && indexEngine.isLuceneIndex()){
+          indexEngine.flush();
+        }
       }
     }
+    luceneWalRecords.clear();
   }
 
   /**
