@@ -651,8 +651,10 @@ public class OIndexManagerShared extends OIndexManagerAbstract {
           try {
             final OIndexFactory indexFactory = it.next();
             final OIndexEngine engine = indexFactory.createIndexEngine(null, index.getName(), false, storage, 0, null);
-
-            engine.deleteWithoutLoad(index.getName());
+            //to check just in case, for now here we have only lucene indexes
+            if (!engine.isLuceneIndex()){
+              engine.deleteWithoutLoad(index.getName());
+            }
           } catch (Exception e2) {
             OLogManager.instance().error(this, "Error during deletion of index engine %s", e2, index.getName());
           }
