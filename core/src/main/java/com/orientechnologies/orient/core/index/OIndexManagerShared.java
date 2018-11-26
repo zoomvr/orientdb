@@ -326,6 +326,10 @@ public class OIndexManagerShared extends OIndexManagerAbstract {
       recreateIndexesThread = new Thread(recreateIndexesTask, "OrientDB rebuild indexes");
       recreateIndexesThread.setUncaughtExceptionHandler(new OUncaughtExceptionHandler());
       recreateIndexesThread.start();
+//      try{
+//        recreateIndexesThread.join();
+//      }
+//      catch (InterruptedException exc){}
     } finally {
       releaseExclusiveLock();
     }
@@ -576,6 +580,7 @@ public class OIndexManagerShared extends OIndexManagerAbstract {
     }
 
     private void recreateIndexes(Collection<ODocument> indexesToRebuild, ODatabaseDocumentEmbedded db) {
+      System.out.println("RECREATE INDEXES STARTED"); 
       ok = 0;
       errors = 0;
       for (ODocument index : indexesToRebuild) {
@@ -586,6 +591,7 @@ public class OIndexManagerShared extends OIndexManagerAbstract {
           errors++;
         }
       }
+      System.out.println("RECREATE INDEXES FINISHED"); 
 
       db.getMetadata().getIndexManager().save();
 
@@ -666,8 +672,8 @@ public class OIndexManagerShared extends OIndexManagerAbstract {
 
         OLogManager.instance().info(this, "Index '%s' was successfully created and rebuild is going to be started", indexName);
 
-        index.rebuild(new OIndexRebuildOutputListener(index));
-        index.flush();
+//        index.rebuild(new OIndexRebuildOutputListener(index));
+//        index.flush();
 
         setDirty();
 

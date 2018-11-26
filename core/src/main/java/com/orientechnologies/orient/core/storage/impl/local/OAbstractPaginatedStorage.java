@@ -443,6 +443,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   }
   
   public void restoreLuceneWalRecords(){
+    System.out.println("FOUND: " + luceneWalRecords.size() + " LUCENE WAL RECORDS");
     for (OLuceneEntryWALRecordDummy luceneWalRecord : luceneWalRecords){
       String indexName = luceneWalRecord.getIndexName();
       OIndexEngine indexEngine = findIndexEngineByName(indexName);
@@ -453,6 +454,12 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       else{
         ODatabaseException dbExc = new ODatabaseException("Index engine: " + indexName + " not found");
         OLogManager.instance().error(this, dbExc.getMessage(), dbExc, (Object[])null);
+        throw dbExc;
+      }
+    }
+    for (OIndexEngine indexEngine : indexEngines){
+      if (indexEngine != null && indexEngine.isLuceneIndex()){
+        indexEngine.flush();
       }
     }
   }

@@ -744,6 +744,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
       OLuceneEntryWALRecordDummy dummyWalRecord = (OLuceneEntryWALRecordDummy)record;
       HelperClasses.Tuple<Integer, Document> deserialized = OLuceneDocumentBuilder.deserializeDocument(dummyWalRecord.getDocumentBytes(), 0);
       openIfClosed();
+//      System.out.println("ADDING LUCENE WAL RECORD SEQ NO: " + dummyWalRecord.getSequenceNumber() + " TO INDEX ENGINE: " + getName());
       indexWriter.addDocument(deserialized.getSecondVal());
     }
   }
