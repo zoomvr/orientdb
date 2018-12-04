@@ -746,11 +746,13 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
       OLuceneEntryWALRecordDummy dummyWalRecord = (OLuceneEntryWALRecordDummy)record;
       HelperClasses.Tuple<Integer, Document> deserialized = OLuceneDocumentBuilder.deserializeDocument(dummyWalRecord.getDocumentBytes(), 0);
       openIfClosed();
-//      System.out.println("ADDING LUCENE WAL RECORD SEQ NO: " + dummyWalRecord.getSequenceNumber() + " TO INDEX ENGINE: " + getName());
+      System.out.println("ADDING LUCENE WAL RECORD SEQ NO: " + dummyWalRecord.getSequenceNumber() + " TO INDEX ENGINE: " + getName());
+      //----remove all previous entries associated with this record
       Document doc = deserialized.getSecondVal();
       String targetRidStr = doc.get(RID);
       OIdentifiable targetRid = new ORecordId(targetRidStr);
       remove((Object)null, targetRid);
+      //----
       indexWriter.addDocument(doc);
     }
   }
