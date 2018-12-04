@@ -78,6 +78,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.INDEX;
 import static com.orientechnologies.lucene.analyzer.OLuceneAnalyzerFactory.AnalyzerKind.QUERY;
 import com.orientechnologies.lucene.builder.OLuceneDocumentBuilder;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.index.OLuceneTracker;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OAbstractWALRecord;
@@ -496,7 +497,7 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   @Override
   public IndexSearcher searcher() {
     try {
-      System.out.println("SEARCHER FOR: " + indexWriter.getUniqueIndex());
+//      System.out.println("SEARCHER FOR: " + indexWriter.getUniqueIndex());
       startNRT();
       synchWithStorage();
       updateLastAccess();
@@ -740,12 +741,17 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
   
   @Override
   public void addWalRecordToIndex(OAbstractWALRecord record) throws IOException{
-    if (record instanceof OLuceneEntryWALRecordDummy){
+    if (record instanceof OLuceneEntryWALRecordDummy){      
+      
       OLuceneEntryWALRecordDummy dummyWalRecord = (OLuceneEntryWALRecordDummy)record;
       HelperClasses.Tuple<Integer, Document> deserialized = OLuceneDocumentBuilder.deserializeDocument(dummyWalRecord.getDocumentBytes(), 0);
       openIfClosed();
 //      System.out.println("ADDING LUCENE WAL RECORD SEQ NO: " + dummyWalRecord.getSequenceNumber() + " TO INDEX ENGINE: " + getName());
-      indexWriter.addDocument(deserialized.getSecondVal());
+      Document doc = deserialized.getSecondVal();
+      String targetRidStr = doc.get(RID);
+      OIdentifiable targetRid = new ORecordId(targetRidStr);
+      remove((Object)null, targetRid);
+      indexWriter.addDocument(doc);
     }
   }
 }
