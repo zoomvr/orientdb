@@ -221,6 +221,7 @@ public class OFastRidBag implements ORidBagDelegate{
     while (iter.hasNext()){
       ORidBagNode node = iter.next();
       if (node.isTailNode()){
+        //TODO mark in cluster that it is removed
         iter.remove();
       }
     }
