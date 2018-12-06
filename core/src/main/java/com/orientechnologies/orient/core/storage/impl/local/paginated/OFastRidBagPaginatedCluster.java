@@ -17,14 +17,17 @@ package com.orientechnologies.orient.core.storage.impl.local.paginated;
 
 import com.orientechnologies.orient.core.config.OStorageClusterConfiguration;
 import com.orientechnologies.orient.core.conflict.ORecordConflictStrategy;
+import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.ORecordNotFoundException;
 import com.orientechnologies.orient.core.storage.OCluster;
-import com.orientechnologies.orient.core.storage.OClusterEntryIterator;
 import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.ORawBuffer;
 import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OClusterBrowsePage;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -32,6 +35,29 @@ import java.io.IOException;
  */
 public class OFastRidBagPaginatedCluster implements OCluster{
 
+  private class ORidBagNode{
+    public ORidBagNode(){
+      rids = new OIdentifiable[1];
+    }
+    
+    public ORidBagNode(int initialCapacity){
+      rids = new OIdentifiable[initialCapacity];
+    }
+    
+    private OIdentifiable ridBagNodeRid;
+    private OIdentifiable[] rids;
+    private int currentIndex = 0;
+    private int capacity = 1;
+    private final int maxNodeSize = 600;
+    private int currentSize = 0;
+  };   
+  
+  private Map<OIdentifiable, List<ORidBagNode>> mappedRidbagsDataStructure = new HashMap<>();
+  
+  public OIdentifiable addItem(OIdentifiable ridbagRid, OIdentifiable itemRid){
+    
+  }
+  
   @Override
   public void configure(OStorage iStorage, int iId, String iClusterName, Object... iParameters) throws IOException {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
@@ -190,22 +216,12 @@ public class OFastRidBagPaginatedCluster implements OCluster{
   @Override
   public float recordOverflowGrowFactor() {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
-
-  @Override
-  public boolean isHashBased() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
+  }  
 
   @Override
   public boolean isSystemCluster() {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
-
-  @Override
-  public OClusterEntryIterator absoluteIterator() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
+  }  
 
   @Override
   public OPhysicalPosition[] higherPositions(OPhysicalPosition position) throws IOException {
@@ -244,6 +260,19 @@ public class OFastRidBagPaginatedCluster implements OCluster{
 
   @Override
   public OClusterBrowsePage nextPage(long lastPosition) throws IOException {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public int getBinaryVersion() {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  public OIdentifiable preAllocateRidBagNode(int size) {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  public void linkNode(OIdentifiable ridbagRid, OIdentifiable newRidBagNodeRid, OIdentifiable value) {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
   }
   
