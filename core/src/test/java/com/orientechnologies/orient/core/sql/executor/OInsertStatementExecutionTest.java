@@ -232,6 +232,38 @@ public class OInsertStatementExecutionTest {
   }
 
   @Test
+  public void testContentWithParam() {
+    String className = "testContentWithParam";
+    db.getMetadata().getSchema().createClass(className);
+
+    Map<String, Object> theContent = new HashMap<>();
+    theContent.put("name", "name1");
+    theContent.put("surname", "surname1");
+    Map<String, Object> params = new HashMap<>();
+    params.put("theContent", theContent);
+    OResultSet result = db.command("insert into " + className + " content :theContent", params);
+    printExecutionPlan(result);
+    for (int i = 0; i < 1; i++) {
+      Assert.assertTrue(result.hasNext());
+      OResult item = result.next();
+      Assert.assertNotNull(item);
+      Assert.assertEquals("name1", item.getProperty("name"));
+    }
+    Assert.assertFalse(result.hasNext());
+
+    result = db.query("select from " + className);
+    for (int i = 0; i < 1; i++) {
+      Assert.assertTrue(result.hasNext());
+      OResult item = result.next();
+      Assert.assertNotNull(item);
+      Assert.assertEquals("name1", item.getProperty("name"));
+      Assert.assertEquals("surname1", item.getProperty("surname"));
+    }
+    Assert.assertFalse(result.hasNext());
+    result.close();
+  }
+
+  @Test
   public void testLinkConversion() {
     String className1 = "testLinkConversion1";
     String className2 = "testLinkConversion2";
@@ -384,6 +416,24 @@ public class OInsertStatementExecutionTest {
     Map theMap = item.getProperty("mymap");
     Assert.assertEquals(1, theMap.size());
     Assert.assertNotNull(theMap.get("A-1"));
+
+    Assert.assertFalse(result.hasNext());
+    result.close();
+  }
+
+  @Test
+  public void testQuotedCharactersInJson() {
+    String className = "testQuotedCharactersInJson";
+
+    db.command("CREATE CLASS " + className);
+
+    db.command("INSERT INTO " + className + " CONTENT { name: \"jack\", memo: \"this is a \\n multi line text\" }");
+
+    OResultSet result = db.query("SELECT FROM " + className);
+
+    OResult item = result.next();
+    String memo = item.getProperty("memo");
+    Assert.assertEquals("this is a \n multi line text", memo);
 
     Assert.assertFalse(result.hasNext());
     result.close();

@@ -102,14 +102,14 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
   public static final String EXPORT_IMPORT_MAP_NAME          = "___exportImportRIDMap";
   public static final int    IMPORT_RECORD_DUMP_LAP_EVERY_MS = 5000;
 
-  private Map<OPropertyImpl, String> linkedClasses = new HashMap<>();
-  private Map<OClass, List<String>>  superClasses  = new HashMap<>();
-  private final OJSONReader jsonReader;
-  private       ORecord     record;
-  private boolean schemaImported  = false;
-  private int     exporterVersion = -1;
-  private ORID schemaRecordId;
-  private ORID indexMgrRecordId;
+  private       Map<OPropertyImpl, String> linkedClasses   = new HashMap<>();
+  private       Map<OClass, List<String>>  superClasses    = new HashMap<>();
+  private final OJSONReader                jsonReader;
+  private       ORecord                    record;
+  private       boolean                    schemaImported  = false;
+  private       int                        exporterVersion = -1;
+  private       ORID                       schemaRecordId;
+  private       ORID                       indexMgrRecordId;
 
   private boolean deleteRIDMapping = true;
 
@@ -1096,28 +1096,29 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
     while (jsonReader.lastChar() != ']') {
       rid = importRecord();
 
+      total++;
       if (rid != null) {
         ++lastLapRecords;
         ++totalRecords;
 
         if (rid.getClusterId() != lastRid.getClusterId() || involvedClusters.isEmpty())
           involvedClusters.add(database.getClusterNameById(rid.getClusterId()));
-
-        final long now = System.currentTimeMillis();
-        if (now - last > IMPORT_RECORD_DUMP_LAP_EVERY_MS) {
-          final List<String> sortedClusters = new ArrayList<>(involvedClusters);
-          Collections.sort(sortedClusters);
-
-          listener.onMessage(String
-              .format("\n- Imported %,d records into clusters: %s. Total records imported so far: %,d (%,.2f/sec)", lastLapRecords,
-                  sortedClusters, totalRecords, (float) lastLapRecords * 1000 / (float) IMPORT_RECORD_DUMP_LAP_EVERY_MS));
-
-          // RESET LAP COUNTERS
-          last = now;
-          lastLapRecords = 0;
-          involvedClusters.clear();
-        }
         lastRid = rid;
+      }
+
+      final long now = System.currentTimeMillis();
+      if (now - last > IMPORT_RECORD_DUMP_LAP_EVERY_MS) {
+        final List<String> sortedClusters = new ArrayList<>(involvedClusters);
+        Collections.sort(sortedClusters);
+
+        listener.onMessage(String.format("\n- Imported %,d records into clusters: %s. "
+                + "Total JSON records imported so for %,d .Total records imported so far: %,d (%,.2f/sec)", lastLapRecords, total,
+            sortedClusters, totalRecords, (float) lastLapRecords * 1000 / (float) IMPORT_RECORD_DUMP_LAP_EVERY_MS));
+
+        // RESET LAP COUNTERS
+        last = now;
+        lastLapRecords = 0;
+        involvedClusters.clear();
       }
 
       record = null;
@@ -1190,6 +1191,12 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
       } else if (excludeClusters != null) {
         if (excludeClusters.contains(database.getClusterNameById(record.getIdentity().getClusterId())))
           return null;
+      }
+
+      if (record instanceof ODocument && excludeClasses != null) {
+        if (excludeClasses.contains(((ODocument) record).getClassName())) {
+          return null;
+        }
       }
 
       if (record.getIdentity().getClusterId() == 0 && record.getIdentity().getClusterPosition() == 1)

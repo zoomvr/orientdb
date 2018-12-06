@@ -32,6 +32,7 @@ import com.orientechnologies.orient.server.distributed.*;
 import com.orientechnologies.orient.server.distributed.ODistributedServerLog.DIRECTION;
 import com.orientechnologies.orient.server.distributed.impl.ODistributedDatabaseChunk;
 import com.orientechnologies.orient.server.distributed.impl.ODistributedStorage;
+import com.sun.jna.platform.FileUtils;
 
 import java.io.*;
 import java.util.Arrays;
@@ -88,15 +89,17 @@ public class OSyncDatabaseTask extends OAbstractSyncDatabaseTask {
         OBackgroundBackup backup = ((ODistributedStorage) database.getStorage()).getLastValidBackup();
         if (backup == null || !backup.getResultedBackupFile().exists()) {
           // CREATE A BACKUP OF DATABASE FROM SCRATCH
-          int nameRandom = new Random().nextInt(1000);
-          File backupFile = new File(Orient.getTempPath() + "/backup_" + database.getName() + nameRandom + ".zip");
+          File backupFile = new File(Orient.getTempPath() + "/backup_" + database.getName() + ".zip");
           String backupPath = backupFile.getAbsolutePath();
 
           final int compressionRate = OGlobalConfiguration.DISTRIBUTED_DEPLOYDB_TASK_COMPRESSION.getValueAsInteger();
 
-          if (backupFile.exists())
+          if (backupFile.exists()) {
+            if (backupFile.isDirectory()) {
+              OFileUtils.deleteRecursively(backupFile);
+            }
             backupFile.delete();
-          else
+          } else
             backupFile.getParentFile().mkdirs();
           backupFile.createNewFile();
 
@@ -133,6 +136,7 @@ public class OSyncDatabaseTask extends OAbstractSyncDatabaseTask {
 
         File backupFile = new File(backup.getFinalBackupPath());
         if (backup.getIncremental().get()) {
+          iManager.setDatabaseStatus(getNodeSource(), databaseName, ODistributedServerManager.DB_STATUS.ONLINE);
           backupFile = backupFile.listFiles(pathname -> pathname.getName().endsWith(".ibu"))[0];
         }
 
