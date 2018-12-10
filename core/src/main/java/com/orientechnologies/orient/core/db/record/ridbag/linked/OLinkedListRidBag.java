@@ -22,9 +22,7 @@ import com.orientechnologies.orient.core.db.record.ridbag.ORidBagDelegate;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.ORecordSerializerBinaryV0;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
-import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.util.Collection;
@@ -54,13 +52,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   //this is internal ridbag list of free nodes already allocated. Differs from cluster free space
   private final Queue<ORidbagNode> freeNodes = new LinkedList<>();
   
-  private static final int MAX_RIDBAG_NODE_SIZE = 600;
-  private static final int ADDITIONAL_ALLOCATION_SIZE = 20;  
+  protected static final int MAX_RIDBAG_NODE_SIZE = 600;
+  private static final int ADDITIONAL_ALLOCATION_SIZE = 20;
+  public static final byte RECORD_TYPE = 'l';
+  private static boolean hardRelaxPolicy = false;
   
   //if some node is made by merging, until its capacity is fullfillled it should be active node
-  private ORidbagNode activeNode = null;
-  
-  private ORecordSerializerBinaryV0 serializer = new ORecordSerializerBinaryV0();
+  private ORidbagNode activeNode = null; 
   
   public OLinkedListRidBag(){
     
@@ -79,71 +77,120 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void add(OIdentifiable value) {    
+    
+    //check for megaMerge
+    if (size % MAX_RIDBAG_NODE_SIZE == 0){
+      nodesMegaMerge(hardRelaxPolicy);
+    }
+    
+    //check if there is active node with free space
     if (activeNode != null){
       if (activeNode.currentIndex() >= activeNode.capacity()){
-        activeNode = freeNodes.poll();
-      }
-      else{
-        activeNode.add(value);
-        if (activeNode.isTailNode()){
-          tailSize++;
-        }
-      }
+        activeNode = freeNodes.poll();        
+      }      
     }
     
     if (activeNode == null){
       //handle add to tail
-      OPhysicalPosition physicalPosition = cluster.allocatePosition((byte)0);
-      OIdentifiable ridBagNodeRid = cluster.createRecord(content, size, 0, physicalPosition);//(ridbagRid, value);
-      if (ridBagNodeRid == null){                
+      boolean canFitInPage = ifOneMoreFitsToPage();
+      if (!canFitInPage){
         int allocateSize = Math.min(tailSize * 2, tailSize + ADDITIONAL_ALLOCATION_SIZE);
-        allocateSize = Math.min(allocateSize, 600);
+        allocateSize = Math.min(allocateSize, MAX_RIDBAG_NODE_SIZE);
         
         int extraSlots = 1;
         if (allocateSize == MAX_RIDBAG_NODE_SIZE){
           extraSlots = 0;
         }
         //created merged node
-        ridBagNodeRid = cluster.preAllocateRidBagNode(allocateSize + extraSlots);
+        allocateSize += extraSlots;
+        ORidbagNode ridBagNode = getOrCreateNodeOfSpecificSize(allocateSize);
         
         OIdentifiable[] mergedTail = mergeTail(extraSlots);
         if (extraSlots == 1){
           //here we are dealing with node size less than max node size
           mergedTail[mergedTail.length - 1] = value;
-          activeNode = new ORidbagNode(ridBagNodeRid, allocateSize);
-          activeNode.addAll(mergedTail);
-          ridbagNodes.add(activeNode);
-          relaxTail();
+          activeNode = ridBagNode;
+          activeNode.addAll(mergedTail);          
+          relaxTail(hardRelaxPolicy);
+          //no increment of tailSize bacuse no way that this node is tail node
         }
         else{
-          //here we deal with node which size is equal to max node size
-          ORidbagNode mergedMaxNode = new ORidbagNode(ridBagNodeRid, MAX_RIDBAG_NODE_SIZE);
-          mergedMaxNode.addAll(mergedTail);
-          ridbagNodes.add(mergedMaxNode);
-          relaxTail();
+          //here we deal with node which size is equal to max node size          
+          ridBagNode.addAll(mergedTail);          
+          relaxTail(hardRelaxPolicy);
           //add new rid
-          OIdentifiable newNodeRid = cluster.addItem(ridbagRid, value);
-          ORidbagNode newNode = new ORidbagNode(newNodeRid, true);
-          ridbagNodes.add(newNode);
-          ++tailSize;
+          //first check for some free space in existing, now, empty nodes
+          activeNode = getOrCreateNodeOfSpecificSize(1);
+          if (activeNode.isTailNode()){
+            ++tailSize;
+          }
         }                
       }
-      else{
-        ORidbagNode currentNode = new ORidbagNode(ridBagNodeRid, true);
-        currentNode.add(value);
-        ridbagNodes.add(currentNode);
-        ++tailSize;
+      else{        
+        activeNode = getOrCreateNodeOfSpecificSize(1);
+        activeNode.add(value);        
+        if (activeNode.isTailNode()){
+          ++tailSize;
+        }
       }
-    }    
+    }
+    else{
+      if (!activeNode.isLoaded()){
+        activeNode.load();
+      }
+      activeNode.add(value);
+      if (activeNode.isTailNode()){
+        tailSize++;
+      }
+    }
     
     ++size;
     //TODO add it to index
+  }
+  
+  /**
+   * 
+   */
+  private void nodesMegaMerge(boolean hardRelax){
+    OIdentifiable[] mergedRids = new OIdentifiable[MAX_RIDBAG_NODE_SIZE];
+    int currentOffset = 0;
+    Iterator<ORidbagNode> iter = ridbagNodes.iterator();
+    while (iter.hasNext()){
+      ORidbagNode node = iter.next();
+      if (!node.isMaxSizeNodeFullNode()){
+        if (!node.isLoaded()){
+          node.load();
+        }
+        if (node.currentIndex() > 0){
+          OIdentifiable[] nodeRids = node.getAllRids();
+          System.arraycopy(nodeRids, 0, mergedRids, currentOffset, node.currentIndex());
+          iter.remove();
+          if (node.isTailNode()){
+            --tailSize;
+          }
+          if (hardRelax){
+            //release it in cluster
+          }
+          else{            
+            node.reset();
+            freeNodes.add(node);
+          }
+        }
+      }
+    }
+    
+    ORidbagNode megaNode = getOrCreateNodeOfSpecificSize(mergedRids.length);
+    megaNode.addAll(mergedRids);
+    ridbagNodes.add(megaNode);
   }
   
   private OIdentifiable[] mergeTail(int extraSlots) {
     OIdentifiable[] ret = new OIdentifiable[tailSize + extraSlots];
     int i = 0;
     for (ORidbagNode ridbagNode : ridbagNodes){
+      if (!ridbagNode.isLoaded()){
+        ridbagNode.load();
+      }
       if (ridbagNode.isTailNode()){
         ret[i++] = ridbagNode.getAt(0);
       }
@@ -152,13 +199,20 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     return ret;
   }
   
-  private void relaxTail(){
+  private void relaxTail(boolean hardRelax){
     Iterator<ORidbagNode> iter = ridbagNodes.iterator();
     while (iter.hasNext()){
       ORidbagNode node = iter.next();
-      if (node.isTailNode()){
-        //TODO mark in cluster that it is removed
+      //no need to check if node is loaded because it is loaded in mergeTail
+      if (node.isTailNode()){        
         iter.remove();
+        if (hardRelax){
+          //TODO mark in cluster that it is removed
+        }
+        else{
+          node.reset();
+          freeNodes.add(node);
+        }
       }
     }
     tailSize = 0;
@@ -169,7 +223,10 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     boolean removed = false;    
     if (indexedRidsNodes == null){
       ORidbagNode node = indexedRidsNodes.get(value);
-      if (node != null){        
+      if (node != null){
+        if (!node.isLoaded()){
+          node.load();
+        }
         boolean isTail = node.isTailNode();
         if (node.remove(value)){
           if (activeNode == null){
@@ -186,9 +243,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       }
     }
     else{
-//    if (!removed && !found){
       //go through all
       for (ORidbagNode ridbagNode : ridbagNodes){
+        if (!ridbagNode.isLoaded()){
+          ridbagNode.load();
+        }
         boolean isTail = ridbagNode.isTailNode();
         if (ridbagNode.remove(value)){
           if (activeNode == null){
@@ -317,13 +376,19 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   public boolean contains(OIdentifiable value) {    
     if (indexedRidsNodes == null){
       ORidbagNode node = indexedRidsNodes.get(value);
-      if (node != null){             
+      if (node != null){
+        if (!node.isLoaded()){
+          node.load();
+        }
         return node.contains(value);
       }
     }
     else{    
       //go through all
       for (ORidbagNode ridbagNode : ridbagNodes){
+        if (ridbagNode.isLoaded()){
+          ridbagNode.load();
+        }
         if (ridbagNode.contains(value)){
           return true;
         }
@@ -433,6 +498,48 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   public void setCluster(OPaginatedCluster cluster) {
     this.cluster = cluster;
+  }
+  
+  protected ORidbagNode getAtIndex(int index){
+    if (index < 0 || index >= ridbagNodes.size()){
+      return null;
+    }
+    return ridbagNodes.get(index);
+  }
+  
+  /**
+   * search for free node of specific size, and create new one is none can recycle
+   * @param numberOfRids
+   * @return 
+   */
+  private ORidbagNode getOrCreateNodeOfSpecificSize(int numberOfRids){
+    Iterator<ORidbagNode> iter = freeNodes.iterator();
+    ORidbagNode ret = null;
+    while (iter.hasNext() && ret == null){
+      ORidbagNode freeNode  = iter.next();
+      if (freeNode.isLoaded()){
+        freeNode.load();
+      }
+      if (freeNode.getFreeSpace() >= numberOfRids){
+        ret = freeNode;
+        iter.remove();
+      }
+    }
+    
+    if (ret == null){
+      OIdentifiable newNodeRid = allocateNodeInCluster(numberOfRids);
+      ret = new ORidbagNode(newNodeRid, numberOfRids);
+    }
+    
+    return ret;
+  }
+  
+  private OIdentifiable allocateNodeInCluster(int numberOfRids){
+    
+  }
+  
+  private boolean ifOneMoreFitsToPage(){
+    
   }
     
 }

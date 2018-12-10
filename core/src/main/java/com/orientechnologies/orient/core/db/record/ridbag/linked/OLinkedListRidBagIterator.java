@@ -24,7 +24,13 @@ import java.util.Iterator;
  */
 public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
 
+  private static final int iteratingIndexInitialvalue = -1;
+  
   private final OLinkedListRidBag ridbag;
+  private int currentNodeIndex = -1;
+  private ORidbagNode currentNode = null;
+  private int currentNodeIteratingIndex = iteratingIndexInitialvalue;
+  private boolean calledNext = true;
   
   public OLinkedListRidBagIterator(OLinkedListRidBag ridbag){
     this.ridbag = ridbag;
@@ -32,12 +38,53 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
   
   @Override
   public boolean hasNext() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    try{
+      if (currentNode == null){
+        getNextNode();
+      }
+      if (currentNode == null){
+        return false;
+      }
+      boolean found = false;
+      while (!found){
+        if (!calledNext){
+          --currentNodeIteratingIndex;
+        }
+        if (currentNode.currentIndex() > 0 && currentNodeIteratingIndex < currentNode.capacity() - 1){
+          ++currentNodeIteratingIndex;
+          found = true;
+          break;
+        }
+        //go for next node
+        getNextNode();
+        if (currentNode == null){
+          break;
+        }
+      }
+      return found;
+    }
+    finally{
+      calledNext = false;
+    }
   }
 
   @Override
   public OIdentifiable next() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    calledNext = true;
+    return currentNode.getAt(currentNodeIteratingIndex);
+  }
+  
+  private void getNextNode(){
+    currentNode = ridbag.getAtIndex(++currentNodeIndex);
+    currentNodeIteratingIndex = iteratingIndexInitialvalue;
+    if (currentNode != null && !currentNode.isLoaded()){
+      currentNode.load();
+    }
+  }
+  
+  @Override
+  public void remove(){
+    
   }
   
 }

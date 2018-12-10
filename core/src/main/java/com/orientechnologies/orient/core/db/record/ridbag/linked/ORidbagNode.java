@@ -21,7 +21,7 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
  *
  * @author marko
  */
-public class ORidbagNode{
+class ORidbagNode{
     public ORidbagNode(OIdentifiable rid, boolean initContainer){
       ridBagNodeRid = rid;
       if (initContainer){
@@ -37,7 +37,7 @@ public class ORidbagNode{
     private final OIdentifiable ridBagNodeRid;
     private OIdentifiable[] rids;
     private int currentIndex = 0;
-    private boolean loaded = false;
+    private boolean loaded = false;    
     
     public int capacity(){
       return rids.length;
@@ -57,9 +57,7 @@ public class ORidbagNode{
     
     public boolean addAll(OIdentifiable[] values){
       if (currentIndex + values.length <= rids.length){
-        for (int i = 0; i < values.length; i++){
-          rids[currentIndex + i] = values[i];
-        }
+        System.arraycopy(values, 0, rids, currentIndex, values.length);        
         currentIndex += values.length;
         return true;
       }
@@ -106,12 +104,31 @@ public class ORidbagNode{
       return ridBagNodeRid;
     }
     
-    public void load(){
-      throw new UnsupportedOperationException("Not implemented");
+    public void load(){      
+      if (!loaded){
+        throw new UnsupportedOperationException("Not implemented");
+      }
+      loaded = true;
     }
 
     public boolean isLoaded() {
       return loaded;
+    }
+    
+    public boolean isMaxSizeNodeFullNode(){
+      return rids.length == OLinkedListRidBag.MAX_RIDBAG_NODE_SIZE && currentIndex == OLinkedListRidBag.MAX_RIDBAG_NODE_SIZE;
+    }
+    
+    public void reset(){
+      currentIndex = 0;
+    }
+    
+    protected OIdentifiable[] getAllRids(){
+      return rids;
+    }
+    
+    protected int getFreeSpace(){
+      return rids.length - currentIndex;
     }
         
   };
