@@ -20,22 +20,19 @@
 
 package com.orientechnologies.orient.core.db.record.ridbag;
 
+import com.orientechnologies.orient.core.db.record.ridbag.linked.OLinkedListRidBag;
 import com.orientechnologies.common.collection.OCollection;
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OUUIDSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.db.ODatabase;
 import com.orientechnologies.orient.core.db.ODatabaseInternal;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.record.*;
 import com.orientechnologies.orient.core.db.record.ridbag.embedded.OEmbeddedRidBag;
-import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.exception.OSerializationException;
 import com.orientechnologies.orient.core.record.ORecord;
-import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
 import com.orientechnologies.orient.core.serialization.serializer.string.OStringBuilderSerializable;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.ORecordSerializationContext;
 import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OSBTreeBonsai;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OBonsaiCollectionPointer;
@@ -206,8 +203,8 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
     return delegate instanceof OEmbeddedRidBag;
   }
   
-  public boolean isFastRidBag(){
-    return delegate instanceof OFastRidBag;
+  public boolean isLinkedListRidBag(){
+    return delegate instanceof OLinkedListRidBag;
   }
 
   public int toStream(BytesContainer bytesContainer) throws OSerializationException {
@@ -231,7 +228,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
     final byte[] stream = bytesContainer.bytes;
 
     byte configByte = 0;
-    if (isFastRidBag()){
+    if (isLinkedListRidBag()){
       configByte |= 4;
     }
     else if (isEmbedded()){
@@ -329,7 +326,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
   public void fromStream(BytesContainer stream) {
     final byte first = stream.bytes[stream.offset++];
     if ((first & 4) == 4){
-      delegate = new OFastRidBag();
+      delegate = new OLinkedListRidBag();
     }
     else{
       if ((first & 1) == 1){

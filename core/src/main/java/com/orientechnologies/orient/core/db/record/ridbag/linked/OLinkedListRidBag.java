@@ -13,126 +13,61 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.orientechnologies.orient.core.db.record.ridbag;
+package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeEvent;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeListener;
+import com.orientechnologies.orient.core.db.record.ridbag.ORidBagDelegate;
 import com.orientechnologies.orient.core.record.ORecord;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.OFastRidBagPaginatedCluster;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.ORecordSerializerBinaryV0;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
+import com.orientechnologies.orient.core.storage.OPhysicalPosition;
+import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Queue;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  *
  * @author marko
  */
-public class OFastRidBag implements ORidBagDelegate{    
-  
-  public static class ORidBagNode{
-    public ORidBagNode(OIdentifiable rid){
-      ridBagNodeRid = rid;
-      rids = new OIdentifiable[1];
-    }
-    
-    public ORidBagNode(OIdentifiable rid, int initialCapacity){
-      ridBagNodeRid = rid;
-      rids = new OIdentifiable[initialCapacity];
-    }
-    
-    private final OIdentifiable ridBagNodeRid;
-    private final OIdentifiable[] rids;
-    private int currentIndex = 0;
-    private boolean loaded = false;
-    
-    public int capacity(){
-      return rids.length;
-    }
-    
-    public int currentIndex(){
-      return currentIndex;
-    }
-    
-    public boolean add(OIdentifiable value){
-      if (currentIndex < rids.length){
-        rids[currentIndex++] = value;
-        return true;
-      }
-      return false;
-    }
-    
-    public boolean addAll(OIdentifiable[] values){
-      if (currentIndex + values.length <= rids.length){
-        for (int i = 0; i < values.length; i++){
-          rids[currentIndex + i] = values[i];
-        }
-        currentIndex += values.length;
-        return true;
-      }
-      return false;
-    }
-    
-    public OIdentifiable getAt(int index){
-      return rids[index];
-    }
-    
-    public boolean isTailNode(){
-      return capacity() == 1 && currentIndex == 1;
-    }
-    
-    public boolean remove(OIdentifiable value){      
-      for (int i = 0; i < rids.length; i++){
-        OIdentifiable val = rids[i];
-        if (val.equals(value)){
-          //found so remove it
-          //first shift all
-          for (int j = i + 1; j < rids.length; j++){
-            rids[j - 1] = rids[j];
-          }
-          --currentIndex;
-          return true;
-        }
-      }
-      
-      return false;
-    }
-    
-    public boolean contains(OIdentifiable value){      
-      for (int i = 0; i < rids.length; i++){
-        OIdentifiable val = rids[i];
-        if (val.equals(value)){
-          return true;
-        }
-      }
-      
-      return false;
-    }
-  };   
+public class OLinkedListRidBag implements ORidBagDelegate{           
   
   private OIdentifiable ridbagRid;  
-  private Map<OIdentifiable, ORidBagNode> indexedRidsNodes;
-  private OFastRidBagPaginatedCluster cluster;
+  private Map<OIdentifiable, ORidbagNode> indexedRidsNodes;
+  private OPaginatedCluster cluster = null;
   private int size = 0;
-  private List<ORidBagNode> ridbagNodes = new LinkedList<>();
+  private final List<ORidbagNode> ridbagNodes = new LinkedList<>();
   //tail is composed of nodes of size 1
   private int tailSize = 0;
   //this is internal ridbag list of free nodes already allocated. Differs from cluster free space
-  private Queue<ORidBagNode> freeNodes = new LinkedList<>();
+  private final Queue<ORidbagNode> freeNodes = new LinkedList<>();
   
   private static final int MAX_RIDBAG_NODE_SIZE = 600;
   private static final int ADDITIONAL_ALLOCATION_SIZE = 20;  
   
   //if some node is made by merging, until its capacity is fullfillled it should be active node
-  private ORidBagNode activeNode = null;
+  private ORidbagNode activeNode = null;
   
-  public OFastRidBag(){    
+  private ORecordSerializerBinaryV0 serializer = new ORecordSerializerBinaryV0();
+  
+  public OLinkedListRidBag(){
+    
+  }
+  
+  public OLinkedListRidBag(OPaginatedCluster cluster){    
+    this.cluster = cluster;
   }
   
   @Override
@@ -158,7 +93,8 @@ public class OFastRidBag implements ORidBagDelegate{
     
     if (activeNode == null){
       //handle add to tail
-      OIdentifiable ridBagNodeRid = cluster.addItem(ridbagRid, value);
+      OPhysicalPosition physicalPosition = cluster.allocatePosition((byte)0);
+      OIdentifiable ridBagNodeRid = cluster.createRecord(content, size, 0, physicalPosition);//(ridbagRid, value);
       if (ridBagNodeRid == null){                
         int allocateSize = Math.min(tailSize * 2, tailSize + ADDITIONAL_ALLOCATION_SIZE);
         allocateSize = Math.min(allocateSize, 600);
@@ -174,26 +110,26 @@ public class OFastRidBag implements ORidBagDelegate{
         if (extraSlots == 1){
           //here we are dealing with node size less than max node size
           mergedTail[mergedTail.length - 1] = value;
-          activeNode = new ORidBagNode(ridBagNodeRid, allocateSize);
+          activeNode = new ORidbagNode(ridBagNodeRid, allocateSize);
           activeNode.addAll(mergedTail);
           ridbagNodes.add(activeNode);
           relaxTail();
         }
         else{
           //here we deal with node which size is equal to max node size
-          ORidBagNode mergedMaxNode = new ORidBagNode(ridBagNodeRid, MAX_RIDBAG_NODE_SIZE);
+          ORidbagNode mergedMaxNode = new ORidbagNode(ridBagNodeRid, MAX_RIDBAG_NODE_SIZE);
           mergedMaxNode.addAll(mergedTail);
           ridbagNodes.add(mergedMaxNode);
           relaxTail();
           //add new rid
           OIdentifiable newNodeRid = cluster.addItem(ridbagRid, value);
-          ORidBagNode newNode = new ORidBagNode(newNodeRid);
+          ORidbagNode newNode = new ORidbagNode(newNodeRid, true);
           ridbagNodes.add(newNode);
           ++tailSize;
         }                
       }
       else{
-        ORidBagNode currentNode = new ORidBagNode(ridBagNodeRid);
+        ORidbagNode currentNode = new ORidbagNode(ridBagNodeRid, true);
         currentNode.add(value);
         ridbagNodes.add(currentNode);
         ++tailSize;
@@ -207,7 +143,7 @@ public class OFastRidBag implements ORidBagDelegate{
   private OIdentifiable[] mergeTail(int extraSlots) {
     OIdentifiable[] ret = new OIdentifiable[tailSize + extraSlots];
     int i = 0;
-    for (ORidBagNode ridbagNode : ridbagNodes){
+    for (ORidbagNode ridbagNode : ridbagNodes){
       if (ridbagNode.isTailNode()){
         ret[i++] = ridbagNode.getAt(0);
       }
@@ -217,9 +153,9 @@ public class OFastRidBag implements ORidBagDelegate{
   }
   
   private void relaxTail(){
-    Iterator<ORidBagNode> iter = ridbagNodes.iterator();
+    Iterator<ORidbagNode> iter = ridbagNodes.iterator();
     while (iter.hasNext()){
-      ORidBagNode node = iter.next();
+      ORidbagNode node = iter.next();
       if (node.isTailNode()){
         //TODO mark in cluster that it is removed
         iter.remove();
@@ -232,7 +168,7 @@ public class OFastRidBag implements ORidBagDelegate{
   public void remove(OIdentifiable value) {
     boolean removed = false;    
     if (indexedRidsNodes == null){
-      ORidBagNode node = indexedRidsNodes.get(value);
+      ORidbagNode node = indexedRidsNodes.get(value);
       if (node != null){        
         boolean isTail = node.isTailNode();
         if (node.remove(value)){
@@ -252,7 +188,7 @@ public class OFastRidBag implements ORidBagDelegate{
     else{
 //    if (!removed && !found){
       //go through all
-      for (ORidBagNode ridbagNode : ridbagNodes){
+      for (ORidbagNode ridbagNode : ridbagNodes){
         boolean isTail = ridbagNode.isTailNode();
         if (ridbagNode.remove(value)){
           if (activeNode == null){
@@ -285,17 +221,92 @@ public class OFastRidBag implements ORidBagDelegate{
 
   @Override
   public int getSerializedSize(byte[] stream, int offset) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    BytesContainer container = new BytesContainer();
+    serializeInternal(container);
+    return container.offset;
   }
 
+  private void serializeInternal(BytesContainer container){
+    //serialize currentSize
+    OVarIntSerializer.write(container, size);
+    
+    //serialize active node
+    if (activeNode != null){
+      HelperClasses.writeLinkOptimized(container, activeNode.getRid());
+    }
+    else{
+      OVarIntSerializer.write(container, -1l);
+    }
+    
+    //serailize free nodes queue size
+    OVarIntSerializer.write(container, freeNodes.size());
+    
+    //serialize free nodes queue
+    for (ORidbagNode node : freeNodes){      
+      HelperClasses.writeLinkOptimized(container, node.getRid());
+    }
+    
+    //serialize size of associated ridbag nodes
+    OVarIntSerializer.write(container, ridbagNodes.size());
+    
+    //serialize nodes associated with this ridbag    
+    for (ORidbagNode node : ridbagNodes){      
+      HelperClasses.writeLinkOptimized(container, node.getRid());
+    }        
+  }
+  
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
-    
+    BytesContainer container = new BytesContainer(stream, offset);
+    serializeInternal(container);
+    return container.offset;
   }
 
   @Override
   public int deserialize(byte[] stream, int offset) {
+    BytesContainer container = new BytesContainer(stream, offset);
+    //deserialize size
+    size = OVarIntSerializer.readAsInteger(container);
     
+    //deserialize activeNode
+    int currentOffset = container.offset;
+    int checkValue = OVarIntSerializer.readAsInteger(container);
+    OIdentifiable activeNodeRid = null;
+    if (checkValue == -1){
+      activeNodeRid = null;
+    }
+    else{
+      container.offset = currentOffset;
+      activeNodeRid = HelperClasses.readOptimizedLink(container, false);
+    }
+    
+    //deserialize free nodes queue size
+    int nodesSize = OVarIntSerializer.readAsInteger(container);
+    
+    //deserialize free nodes queue rids
+    Set<OIdentifiable> freeNodesRids = new HashSet<>();
+    for (int i = 0; i < nodesSize; i++){
+      OIdentifiable nodeRid = HelperClasses.readOptimizedLink(container, false);
+      freeNodesRids.add(nodeRid);      
+    }
+    
+    //deserialize associated nodes size
+    nodesSize = OVarIntSerializer.readAsInteger(container);
+    for (int i = 0; i < nodesSize; i++){
+      OIdentifiable nodeRid = HelperClasses.readOptimizedLink(container, false);
+      ORidbagNode node = new ORidbagNode(nodeRid, false);
+      //setup active node
+      if (nodeRid.equals(activeNodeRid)){
+        activeNode = node;
+      }
+      //if it is free node add it to free nodes queue
+      if (freeNodesRids.contains(nodeRid)){
+        freeNodes.add(node);
+      }
+      ridbagNodes.add(node);
+    }
+    
+    return container.offset;
   }
 
   @Override
@@ -305,14 +316,14 @@ public class OFastRidBag implements ORidBagDelegate{
   @Override
   public boolean contains(OIdentifiable value) {    
     if (indexedRidsNodes == null){
-      ORidBagNode node = indexedRidsNodes.get(value);
+      ORidbagNode node = indexedRidsNodes.get(value);
       if (node != null){             
         return node.contains(value);
       }
     }
     else{    
       //go through all
-      for (ORidBagNode ridbagNode : ridbagNodes){
+      for (ORidbagNode ridbagNode : ridbagNodes){
         if (ridbagNode.contains(value)){
           return true;
         }
@@ -348,12 +359,12 @@ public class OFastRidBag implements ORidBagDelegate{
 
   @Override
   public Iterator<OIdentifiable> iterator() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return new OLinkedListRidBagIterator(this);
   }
 
   @Override
   public Iterator<OIdentifiable> rawIterator() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return new OLinkedListRidBagIterator(this);
   }
 
   @Override
@@ -415,6 +426,13 @@ public class OFastRidBag implements ORidBagDelegate{
   public void replace(OMultiValueChangeEvent<Object, Object> event, Object newValue) {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
   }
-  
-  
+
+  public OPaginatedCluster getCluster() {
+    return cluster;
+  }
+
+  public void setCluster(OPaginatedCluster cluster) {
+    this.cluster = cluster;
+  }
+    
 }
