@@ -21,114 +21,80 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
  *
  * @author marko
  */
-class ORidbagNode{
-    public ORidbagNode(OIdentifiable rid, boolean initContainer){
-      ridBagNodeRid = rid;
-      if (initContainer){
-        rids = new OIdentifiable[1];
-      }
-    }
+abstract class ORidbagNode{    
     
-    public ORidbagNode(OIdentifiable rid, int initialCapacity){
-      ridBagNodeRid = rid;
-      rids = new OIdentifiable[initialCapacity];
-    }
-    
-    private final OIdentifiable ridBagNodeRid;
-    private OIdentifiable[] rids;
-    private int currentIndex = 0;
-    private boolean loaded = false;    
-    
-    public int capacity(){
-      return rids.length;
-    }
-    
-    public int currentIndex(){
-      return currentIndex;
-    }
-    
-    public boolean add(OIdentifiable value){
-      if (currentIndex < rids.length){
-        rids[currentIndex++] = value;
-        return true;
-      }
-      return false;
-    }
-    
-    public boolean addAll(OIdentifiable[] values){
-      if (currentIndex + values.length <= rids.length){
-        System.arraycopy(values, 0, rids, currentIndex, values.length);        
-        currentIndex += values.length;
-        return true;
-      }
-      return false;
-    }
-    
-    public OIdentifiable getAt(int index){
-      return rids[index];
-    }
-    
-    public boolean isTailNode(){
-      return capacity() == 1 && currentIndex == 1;
-    }
-    
-    public boolean remove(OIdentifiable value){      
-      for (int i = 0; i < rids.length; i++){
-        OIdentifiable val = rids[i];
-        if (val.equals(value)){
-          //found so remove it
-          //first shift all
-          for (int j = i + 1; j < rids.length; j++){
-            rids[j - 1] = rids[j];
-          }
-          --currentIndex;
-          return true;
-        }
-      }
-      
-      return false;
-    }
-    
-    public boolean contains(OIdentifiable value){      
-      for (int i = 0; i < rids.length; i++){
-        OIdentifiable val = rids[i];
-        if (val.equals(value)){
-          return true;
-        }
-      }
-      
-      return false;
-    }
-    
-    public OIdentifiable getRid(){
-      return ridBagNodeRid;
-    }
-    
-    public void load(){      
-      if (!loaded){
-        throw new UnsupportedOperationException("Not implemented");
-      }
-      loaded = true;
-    }
+  public ORidbagNode(OIdentifiable rid){
+    ridBagNodeRid = rid;
+  }
+  
+  private final OIdentifiable ridBagNodeRid;  
+  
+  private boolean loaded = false;    
+  int currentIndex = 0;
 
-    public boolean isLoaded() {
-      return loaded;
+  protected abstract int capacity();
+  protected abstract void addInternal(OIdentifiable value);
+  protected abstract void addAllInternal(OIdentifiable[] values);
+  protected abstract OIdentifiable getAt(int index);
+  protected abstract boolean remove(OIdentifiable value);
+  protected abstract boolean contains(OIdentifiable value);
+  protected abstract void loadInternal();
+  protected abstract boolean isTailNode();
+  protected abstract OIdentifiable[] getAllRids();
+  protected abstract byte getNodeType();
+  /**
+   * for internal use, caller have to take care of index bounds
+   * @param value
+   * @param index 
+   */
+  protected abstract void setAt(OIdentifiable value, int index);
+  
+  protected int currentIndex(){
+    return currentIndex;
+  }    
+  
+  protected boolean add(OIdentifiable value){
+    if (currentIndex() < capacity()){
+      addInternal(value);
+      return true;
     }
-    
-    public boolean isMaxSizeNodeFullNode(){
-      return rids.length == OLinkedListRidBag.MAX_RIDBAG_NODE_SIZE && currentIndex == OLinkedListRidBag.MAX_RIDBAG_NODE_SIZE;
+    return false;
+  }
+
+  protected boolean addAll(OIdentifiable[] values){
+    if (currentIndex + values.length <= capacity()){
+      addAllInternal(values);              
+      currentIndex += values.length;
+      return true;
     }
-    
-    public void reset(){
-      currentIndex = 0;
+    return false;
+  }  
+
+  protected OIdentifiable getRid(){
+    return ridBagNodeRid;
+  }
+
+  protected void load(){      
+    if (!loaded){
+      loadInternal();
     }
-    
-    protected OIdentifiable[] getAllRids(){
-      return rids;
-    }
-    
-    protected int getFreeSpace(){
-      return rids.length - currentIndex;
-    }
-        
-  };
+    loaded = true;
+  }
+
+  protected boolean isLoaded() {
+    return loaded;
+  }
+
+  protected boolean isMaxSizeNodeFullNode(){
+    return capacity() == OLinkedListRidBag.MAX_RIDBAG_NODE_SIZE && currentIndex == OLinkedListRidBag.MAX_RIDBAG_NODE_SIZE;
+  }
+
+  protected void reset(){
+    currentIndex = 0;
+  }  
+
+  protected int getFreeSpace(){
+    return capacity() - currentIndex;
+  }   
+
+};

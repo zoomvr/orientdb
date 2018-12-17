@@ -15,25 +15,27 @@
  */
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
+import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeEvent;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeListener;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBagDelegate;
 import com.orientechnologies.orient.core.record.ORecord;
+import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
 import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Queue;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -58,7 +60,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private static boolean hardRelaxPolicy = false;
   
   //if some node is made by merging, until its capacity is fullfillled it should be active node
-  private ORidbagNode activeNode = null; 
+  private ORidbagNode activeNode = null;
+  
+  private boolean autoConvertToRecord = true;
+  private List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> changeListeners;
+  private ORecord owner = null;
   
   public OLinkedListRidBag(){
     
@@ -70,13 +76,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   @Override
   public void addAll(Collection<OIdentifiable> values) {    
-    for (OIdentifiable rid : values){
-      add(rid);
-    }
+    values.forEach(this::add);
   }
 
   @Override
   public void add(OIdentifiable value) {    
+    if (value == null)
+      throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
     
     //check for megaMerge
     if (size % MAX_RIDBAG_NODE_SIZE == 0){
@@ -166,7 +172,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           System.arraycopy(nodeRids, 0, mergedRids, currentOffset, node.currentIndex());
           iter.remove();
           if (node.isTailNode()){
-            --tailSize;
+            tailSize -= nodeRids.length;
           }
           if (hardRelax){
             //release it in cluster
@@ -192,7 +198,9 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         ridbagNode.load();
       }
       if (ridbagNode.isTailNode()){
-        ret[i++] = ridbagNode.getAt(0);
+        for (int j = 0; j < ridbagNode.currentIndex; j++){
+          ret[i++] = ridbagNode.getAt(j);          
+        }
       }
     }
     
@@ -285,6 +293,31 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     return container.offset;
   }
 
+  private void serializeRidbagNodeMetadata(BytesContainer container, ORidbagNode node){
+    int pos = container.alloc(1);
+    OByteSerializer.INSTANCE.serializeNative(node.getNodeType(), container.bytes, pos);
+    HelperClasses.writeLinkOptimized(container, node.getRid());
+    OVarIntSerializer.write(container, node.currentIndex());
+    OVarIntSerializer.write(container, node.capacity());
+  }
+  
+  private ORidbagNode deserializeRidbagNodeMetaadata(BytesContainer container){
+    byte type = OByteSerializer.INSTANCE.deserialize(container.bytes, container.offset++);
+    OIdentifiable nodeRid = HelperClasses.readOptimizedLink(container, false);
+    int currentIndex = OVarIntSerializer.readAsInteger(container);
+    int capacity = OVarIntSerializer.readAsInteger(container);
+    ORidbagNode node;
+    if (type == ORidBagArrayNode.RIDBAG_ARRAY_NODE_TYPE){
+      node = new ORidBagArrayNode(nodeRid, capacity);      
+    }
+    else{
+      //list based ridbag node has to be loaded
+      node = new ORidbagListNode(nodeRid);      
+    }
+    node.currentIndex = currentIndex;
+    return node;
+  }
+  
   private void serializeInternal(BytesContainer container){
     //serialize currentSize
     OVarIntSerializer.write(container, size);
@@ -301,16 +334,16 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     OVarIntSerializer.write(container, freeNodes.size());
     
     //serialize free nodes queue
-    for (ORidbagNode node : freeNodes){      
-      HelperClasses.writeLinkOptimized(container, node.getRid());
+    for (ORidbagNode node : freeNodes){
+      serializeRidbagNodeMetadata(container, node);
     }
     
     //serialize size of associated ridbag nodes
     OVarIntSerializer.write(container, ridbagNodes.size());
     
     //serialize nodes associated with this ridbag    
-    for (ORidbagNode node : ridbagNodes){      
-      HelperClasses.writeLinkOptimized(container, node.getRid());
+    for (ORidbagNode node : ridbagNodes){
+      serializeRidbagNodeMetadata(container, node);
     }        
   }
   
@@ -342,26 +375,21 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     //deserialize free nodes queue size
     int nodesSize = OVarIntSerializer.readAsInteger(container);
     
-    //deserialize free nodes queue rids
-    Set<OIdentifiable> freeNodesRids = new HashSet<>();
+    //deserialize free nodes queue rids    
     for (int i = 0; i < nodesSize; i++){
-      OIdentifiable nodeRid = HelperClasses.readOptimizedLink(container, false);
-      freeNodesRids.add(nodeRid);      
+      ORidbagNode node = deserializeRidbagNodeMetaadata(container);
+      freeNodes.add(node);
     }
     
     //deserialize associated nodes size
     nodesSize = OVarIntSerializer.readAsInteger(container);
     for (int i = 0; i < nodesSize; i++){
-      OIdentifiable nodeRid = HelperClasses.readOptimizedLink(container, false);
-      ORidbagNode node = new ORidbagNode(nodeRid, false);
+      ORidbagNode node = deserializeRidbagNodeMetaadata(container);
       //setup active node
-      if (nodeRid.equals(activeNodeRid)){
+      if (node.getRid().equals(activeNodeRid)){
         activeNode = node;
       }
-      //if it is free node add it to free nodes queue
-      if (freeNodesRids.contains(nodeRid)){
-        freeNodes.add(node);
-      }
+      
       ridbagNodes.add(node);
     }
     
@@ -369,7 +397,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
 
   @Override
-  public void requestDelete() {   
+  public void requestDelete() {
+    //nothing to do
   }
 
   @Override
@@ -399,22 +428,53 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void setOwner(ORecord owner) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    if (owner != null && this.owner != null && !this.owner.equals(owner)) {
+      throw new IllegalStateException("This data structure is owned by document " + owner
+          + " if you want to use it in other document create new rid bag instance and copy content of current one.");
+    }
+    if (this.owner != null) {
+      Iterator<ORidbagNode> iter = ridbagNodes.iterator();
+      while (iter.hasNext()){
+        ORidbagNode ridbagNode = iter.next();
+        if (!ridbagNode.isLoaded()){
+          ridbagNode.load();
+        }
+        for (int i = 0; i < ridbagNode.currentIndex(); i++){          
+          ORecordInternal.unTrack(this.owner, ridbagNode.getAt(i));
+        }
+      }      
+    }
+
+    this.owner = owner;
+    
+    if (this.owner != null) {
+      Iterator<ORidbagNode> iter = ridbagNodes.iterator();
+      while (iter.hasNext()){
+        ORidbagNode ridbagNode = iter.next();
+        //no need to check if nodes are loaded, they are loaded in loop above
+        for (int i = 0; i < ridbagNode.currentIndex(); i++){          
+          ORecordInternal.track(this.owner, ridbagNode.getAt(i));
+        }
+      }      
+    }
   }
 
   @Override
   public ORecord getOwner() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return owner;
   }
 
   @Override
   public List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> getChangeListeners() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    if (changeListeners == null){
+      return Collections.emptyList();
+    }
+    return Collections.unmodifiableList(changeListeners);
   }
 
   @Override
   public NavigableMap<OIdentifiable, Change> getChanges() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return null;
   }
 
   @Override
@@ -434,27 +494,57 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void convertLinks2Records() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    Iterator<ORidbagNode> iter = ridbagNodes.iterator();
+    while (iter.hasNext()){
+      ORidbagNode ridbagNode = iter.next();
+      if (!ridbagNode.isLoaded()){
+        ridbagNode.load();
+      }
+      for (int i = 0; i < ridbagNode.currentIndex(); i++){
+        OIdentifiable id = ridbagNode.getAt(i);
+        if (id.getRecord() != null){
+          ridbagNode.setAt(id.getRecord(), i);
+        }
+      }
+    }
   }
 
   @Override
   public boolean convertRecords2Links() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    Iterator<ORidbagNode> iter = ridbagNodes.iterator();
+    while (iter.hasNext()){
+      ORidbagNode ridbagNode = iter.next();
+      if (!ridbagNode.isLoaded()){
+        ridbagNode.load();
+      }
+      for (int i = 0; i < ridbagNode.currentIndex(); i++){
+        OIdentifiable id = ridbagNode.getAt(i);
+        if (id instanceof ORecord){
+          ORecord rec = (ORecord)id;
+          ridbagNode.setAt(rec.getIdentity(), i);
+        }
+        else{
+          return false;
+        }
+      }
+    }        
+
+    return true;
   }
 
   @Override
   public boolean isAutoConvertToRecord() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return autoConvertToRecord;
   }
 
   @Override
   public void setAutoConvertToRecord(boolean convertToRecord) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    autoConvertToRecord = convertToRecord;
   }
 
   @Override
   public boolean detach() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return convertRecords2Links();
   }
 
   @Override
@@ -464,22 +554,63 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void addChangeListener(OMultiValueChangeListener<OIdentifiable, OIdentifiable> changeListener) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    if (changeListeners == null){
+      changeListeners = new LinkedList<>();
+    }
+    changeListeners.add(changeListener);
   }
 
   @Override
   public void removeRecordChangeListener(OMultiValueChangeListener<OIdentifiable, OIdentifiable> changeListener) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    if (changeListeners != null){
+      changeListeners.remove(changeListener);
+    }
   }
 
   @Override
   public Object returnOriginalState(List<OMultiValueChangeEvent<OIdentifiable, OIdentifiable>> changeEvents) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    final OLinkedListRidBag reverted = new OLinkedListRidBag();
+    Iterator<ORidbagNode> iter = ridbagNodes.iterator();
+    while (iter.hasNext()){
+      ORidbagNode ridbagNode = iter.next();
+      if (!ridbagNode.isLoaded()){
+        ridbagNode.load();
+      }
+      for (int i = 0; i < ridbagNode.currentIndex(); i++){
+        OIdentifiable id = ridbagNode.getAt(i);
+        reverted.add(id);
+      }
+    }
+
+    final ListIterator<OMultiValueChangeEvent<OIdentifiable, OIdentifiable>> listIterator = changeEvents
+        .listIterator(changeEvents.size());
+
+    while (listIterator.hasPrevious()) {
+      final OMultiValueChangeEvent<OIdentifiable, OIdentifiable> event = listIterator.previous();
+      switch (event.getChangeType()) {
+      case ADD:
+        reverted.remove(event.getKey());
+        break;
+      case REMOVE:
+        reverted.add(event.getOldValue());
+        break;
+      default:
+        throw new IllegalArgumentException("Invalid change type : " + event.getChangeType());
+      }
+    }
+
+    return reverted;
   }
 
   @Override
   public void fireCollectionChangedEvent(OMultiValueChangeEvent<OIdentifiable, OIdentifiable> event) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    if (changeListeners != null) {
+      for (final OMultiValueChangeListener<OIdentifiable, OIdentifiable> changeListener : changeListeners) {
+        if (changeListener != null){
+          changeListener.onAfterRecordChanged(event);
+        }
+      }
+    }
   }
 
   @Override
@@ -489,7 +620,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void replace(OMultiValueChangeEvent<Object, Object> event, Object newValue) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    //do nothing
   }
 
   public OPaginatedCluster getCluster() {
@@ -500,7 +631,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     this.cluster = cluster;
   }
   
-  protected ORidbagNode getAtIndex(int index){
+  ORidbagNode getAtIndex(int index){
     if (index < 0 || index >= ridbagNodes.size()){
       return null;
     }
@@ -516,30 +647,35 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     Iterator<ORidbagNode> iter = freeNodes.iterator();
     ORidbagNode ret = null;
     while (iter.hasNext() && ret == null){
-      ORidbagNode freeNode  = iter.next();
-      if (freeNode.isLoaded()){
-        freeNode.load();
-      }
+      ORidbagNode freeNode  = iter.next();      
       if (freeNode.getFreeSpace() >= numberOfRids){
         ret = freeNode;
+        if (!ret.isLoaded()){
+          ret.load();
+        }
         iter.remove();
       }
     }
     
     if (ret == null){
       OIdentifiable newNodeRid = allocateNodeInCluster(numberOfRids);
-      ret = new ORidbagNode(newNodeRid, numberOfRids);
+      if (numberOfRids > 1){
+        ret = new ORidBagArrayNode(newNodeRid, numberOfRids);
+      }
+      else{
+        ret = new ORidbagListNode(newNodeRid);
+      }
     }
     
     return ret;
   }
   
   private OIdentifiable allocateNodeInCluster(int numberOfRids){
-    
+    throw new UnsupportedOperationException("Not supported yet.");
   }
   
   private boolean ifOneMoreFitsToPage(){
-    
+    throw new UnsupportedOperationException("Not supported yet.");
   }
     
 }

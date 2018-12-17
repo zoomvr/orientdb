@@ -1,0 +1,68 @@
+/*
+ * Copyright 2018 OrientDB.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.orientechnologies.orient.core.storage.cluster.linkedridbags;
+
+import com.orientechnologies.common.serialization.types.OIntegerSerializer;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage.NEXT_FREE_POSITION;
+
+/**
+ *
+ * @author mdjurovi
+ */
+public class OFastRidbagPaginatedClusterState extends ODurablePage{
+  private static final int RECORDS_SIZE_OFFSET = NEXT_FREE_POSITION;
+  private static final int SIZE_OFFSET         = RECORDS_SIZE_OFFSET + OIntegerSerializer.INT_SIZE;
+  private static final int FILE_SIZE_OFFSET    = SIZE_OFFSET + OIntegerSerializer.INT_SIZE;
+  private static final int FREE_LIST_OFFSET    = FILE_SIZE_OFFSET + OIntegerSerializer.INT_SIZE;
+
+  OFastRidbagPaginatedClusterState(OCacheEntry cacheEntry) {
+    super(cacheEntry);
+  }
+
+  public void setSize(int size) {
+    setIntValue(SIZE_OFFSET, size);
+  }
+
+  public int getSize() {
+    return getIntValue(SIZE_OFFSET);
+  }
+
+  void setRecordsSize(int recordsSize) {
+    setIntValue(RECORDS_SIZE_OFFSET, recordsSize);
+  }
+
+  public int getRecordsSize() {
+    return getIntValue(RECORDS_SIZE_OFFSET);
+  }
+
+  void setFileSize(int size) {
+    setIntValue(FILE_SIZE_OFFSET, size);
+  }
+
+  int getFileSize() {
+    return getIntValue(FILE_SIZE_OFFSET);
+  }
+
+  void setFreeListPage(int index, int pageIndex) {
+    setIntValue(FREE_LIST_OFFSET + index * OIntegerSerializer.INT_SIZE, pageIndex);
+  }
+
+  int getFreeListPage(int index) {
+    return getIntValue(FREE_LIST_OFFSET + index * OIntegerSerializer.INT_SIZE);
+  }
+}
