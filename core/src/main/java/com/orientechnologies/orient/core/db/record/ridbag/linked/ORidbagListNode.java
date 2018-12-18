@@ -38,7 +38,7 @@ public class ORidbagListNode extends ORidbagNode{
 
   @Override
   protected void addInternal(OIdentifiable value) {
-    rids.add(value);
+    rids.add(value);    
   }
 
   @Override

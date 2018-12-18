@@ -48,10 +48,9 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private Map<OIdentifiable, ORidbagNode> indexedRidsNodes;
   private OPaginatedCluster cluster = null;
   private int size = 0;
-  private final List<ORidbagNode> ridbagNodes = new LinkedList<>();
-  //tail is composed of nodes of size 1
-  private int tailSize = 0;
+  private final List<ORidbagNode> ridbagNodes = new LinkedList<>();  
   //this is internal ridbag list of free nodes already allocated. Differs from cluster free space
+  //free nodes list should never conatins tailNode
   private final Queue<ORidbagNode> freeNodes = new LinkedList<>();
   
   protected static final int MAX_RIDBAG_NODE_SIZE = 600;
@@ -60,7 +59,9 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private static boolean hardRelaxPolicy = false;
   
   //if some node is made by merging, until its capacity is fullfillled it should be active node
+  //active node never should be tail node
   private ORidbagNode activeNode = null;
+  private ORidbagNode tailNode;
   
   private boolean autoConvertToRecord = true;
   private List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> changeListeners;
@@ -84,6 +85,10 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     if (value == null)
       throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
     
+    if (tailNode == null){
+      tailNode = createNodeOfSpecificSize(1);
+    }
+    
     //check for megaMerge
     if (size % MAX_RIDBAG_NODE_SIZE == 0){
       nodesMegaMerge(hardRelaxPolicy);
@@ -100,6 +105,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       //handle add to tail
       boolean canFitInPage = ifOneMoreFitsToPage();
       if (!canFitInPage){
+        int tailSize = tailNode.currentIndex();
         int allocateSize = Math.min(tailSize * 2, tailSize + ADDITIONAL_ALLOCATION_SIZE);
         allocateSize = Math.min(allocateSize, MAX_RIDBAG_NODE_SIZE);
         
@@ -124,30 +130,20 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           //here we deal with node which size is equal to max node size          
           ridBagNode.addAll(mergedTail);          
           relaxTail(hardRelaxPolicy);
-          //add new rid
-          //first check for some free space in existing, now, empty nodes
-          activeNode = getOrCreateNodeOfSpecificSize(1);
-          if (activeNode.isTailNode()){
-            ++tailSize;
-          }
+          //add new rid to tail
+          tailNode.add(value);          
+          ++tailSize;          
         }                
       }
-      else{        
-        activeNode = getOrCreateNodeOfSpecificSize(1);
-        activeNode.add(value);        
-        if (activeNode.isTailNode()){
-          ++tailSize;
-        }
+      else{                
+        tailNode.add(value);
       }
     }
     else{
       if (!activeNode.isLoaded()){
         activeNode.load();
       }
-      activeNode.add(value);
-      if (activeNode.isTailNode()){
-        tailSize++;
-      }
+      activeNode.add(value);      
     }
     
     ++size;
@@ -170,16 +166,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         if (node.currentIndex() > 0){
           OIdentifiable[] nodeRids = node.getAllRids();
           System.arraycopy(nodeRids, 0, mergedRids, currentOffset, node.currentIndex());
-          iter.remove();
-          if (node.isTailNode()){
-            tailSize -= nodeRids.length;
-          }
+          iter.remove();          
           if (hardRelax){
             //release it in cluster
           }
           else{            
             node.reset();
-            freeNodes.add(node);
+            if (!node.isTailNode()){
+              freeNodes.add(node);
+            }
           }
         }
       }
@@ -191,39 +186,26 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
   
   private OIdentifiable[] mergeTail(int extraSlots) {
-    OIdentifiable[] ret = new OIdentifiable[tailSize + extraSlots];
-    int i = 0;
-    for (ORidbagNode ridbagNode : ridbagNodes){
-      if (!ridbagNode.isLoaded()){
-        ridbagNode.load();
-      }
-      if (ridbagNode.isTailNode()){
-        for (int j = 0; j < ridbagNode.currentIndex; j++){
-          ret[i++] = ridbagNode.getAt(j);          
-        }
-      }
+    int tailSize = tailNode.currentIndex();    
+    OIdentifiable[] tailRids = tailNode.getAllRids();
+    OIdentifiable[] ret;
+    if (extraSlots > 0){
+      ret = new OIdentifiable[tailSize + extraSlots];
+      System.arraycopy(tailRids, 0, ret, 0, tailRids.length);
     }
-    
+    else{
+      ret = tailRids;
+    }
     return ret;
   }
   
-  private void relaxTail(boolean hardRelax){
-    Iterator<ORidbagNode> iter = ridbagNodes.iterator();
-    while (iter.hasNext()){
-      ORidbagNode node = iter.next();
-      //no need to check if node is loaded because it is loaded in mergeTail
-      if (node.isTailNode()){        
-        iter.remove();
-        if (hardRelax){
-          //TODO mark in cluster that it is removed
-        }
-        else{
-          node.reset();
-          freeNodes.add(node);
-        }
-      }
+  private void relaxTail(boolean hardRelax){    
+    if (hardRelax){
+      //TODO mark in cluster that it is removed
     }
-    tailSize = 0;
+    else{
+      tailNode.reset();
+    }        
   }
 
   @Override
@@ -237,15 +219,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         }
         boolean isTail = node.isTailNode();
         if (node.remove(value)){
-          if (activeNode == null){
+          if (activeNode == null && !isTail){
             activeNode = node;
           }
           else{
-            freeNodes.add(node);
-          }
-          if (isTail){
-            --tailSize;
-          }
+            if (!isTail){
+              ridbagNodes.remove(node);
+              freeNodes.add(node);
+            }
+          }          
           removed = true;
         }
       }
@@ -258,16 +240,17 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         }
         boolean isTail = ridbagNode.isTailNode();
         if (ridbagNode.remove(value)){
-          if (activeNode == null){
+          if (activeNode == null && !isTail){
             activeNode = ridbagNode;
           }
           else{
-            freeNodes.add(ridbagNode);
-          }
-          if (isTail){
-            --tailSize;
-          }
+            if (!isTail){
+              ridbagNodes.remove(ridbagNode);
+              freeNodes.add(ridbagNode);
+            }
+          }          
           removed = true;
+          break;
         }
       }
     }
@@ -312,7 +295,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
     else{
       //list based ridbag node has to be loaded
-      node = new ORidbagListNode(nodeRid);      
+      node = new ORidbagListNode(nodeRid);
+      tailNode = node;
     }
     node.currentIndex = currentIndex;
     return node;
@@ -658,13 +642,20 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
     
     if (ret == null){
-      OIdentifiable newNodeRid = allocateNodeInCluster(numberOfRids);
-      if (numberOfRids > 1){
-        ret = new ORidBagArrayNode(newNodeRid, numberOfRids);
-      }
-      else{
-        ret = new ORidbagListNode(newNodeRid);
-      }
+      ret = createNodeOfSpecificSize(numberOfRids);
+    }
+    
+    return ret;
+  }
+  
+  private ORidbagNode createNodeOfSpecificSize(int numberOfRids){
+    OIdentifiable newNodeRid = allocateNodeInCluster(numberOfRids);
+    ORidbagNode ret;
+    if (numberOfRids > 1){
+      ret = new ORidBagArrayNode(newNodeRid, numberOfRids);
+    }
+    else{
+      ret = new ORidbagListNode(newNodeRid);
     }
     
     return ret;

@@ -50,7 +50,7 @@ class ORidBagArrayNode extends ORidbagNode{
     
   @Override
   protected void addInternal(OIdentifiable value){
-    rids[currentIndex++] = value;
+    rids[currentIndex] = value;
   }
   
   @Override

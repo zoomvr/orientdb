@@ -16,6 +16,7 @@
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import java.util.Objects;
 
 /**
  *
@@ -56,6 +57,7 @@ abstract class ORidbagNode{
   protected boolean add(OIdentifiable value){
     if (currentIndex() < capacity()){
       addInternal(value);
+      currentIndex++;
       return true;
     }
     return false;
@@ -95,6 +97,31 @@ abstract class ORidbagNode{
 
   protected int getFreeSpace(){
     return capacity() - currentIndex;
-  }   
+  }
+
+  @Override
+  public int hashCode() {
+    int hash = 7;
+    hash = 97 * hash + Objects.hashCode(this.ridBagNodeRid);
+    return hash;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null) {
+      return false;
+    }
+    if (getClass() != obj.getClass()) {
+      return false;
+    }
+    final ORidbagNode other = (ORidbagNode) obj;
+    if (!Objects.equals(this.ridBagNodeRid, other.ridBagNodeRid)) {
+      return false;
+    }
+    return true;
+  }    
 
 };
