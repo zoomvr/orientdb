@@ -16,6 +16,9 @@
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
+import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 
 /**
  *
@@ -24,22 +27,22 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
 class ORidBagArrayNode extends ORidbagNode{
   
   protected static byte RIDBAG_ARRAY_NODE_TYPE = 'a';
-  private OIdentifiable[] rids;
+  private OIdentifiable[] rids;  
   
   @Override
   protected byte getNodeType(){
     return RIDBAG_ARRAY_NODE_TYPE;
   }
   
-  protected ORidBagArrayNode(OIdentifiable rid, boolean initContainer) {
-    super(rid);
+  protected ORidBagArrayNode(long physicalPosition, boolean initContainer) {
+    super(physicalPosition);
     if (initContainer){
       rids = new OIdentifiable[1];
     }
   }
   
-  protected ORidBagArrayNode(OIdentifiable rid, int initialCapacity){
-    super(rid);
+  protected ORidBagArrayNode(long physicalPosition, int initialCapacity){
+    super(physicalPosition);
     rids = new OIdentifiable[initialCapacity];
   }
   
@@ -112,5 +115,14 @@ class ORidBagArrayNode extends ORidbagNode{
   @Override
   protected void loadInternal() {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+  
+  @Override
+  protected byte[] serialize(){
+    BytesContainer container = new BytesContainer();
+    for (OIdentifiable value : rids){
+      HelperClasses.writeLinkOptimized(container, value);
+    }
+    return container.bytes;
   }
 }

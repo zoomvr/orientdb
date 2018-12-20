@@ -92,7 +92,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   private volatile int                                   id;
   private          long                                  fileId;
   private          OStoragePaginatedClusterConfiguration config;
-  private          ORecordConflictStrategy               recordConflictStrategy;
+  private          ORecordConflictStrategy               recordConflictStrategy;  
 
   private static final class AddEntryResult {
     private final long pageIndex;
@@ -180,6 +180,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }
 
+  @Override
   public void registerInStorageConfig(OStorageConfigurationImpl root) {
     root.addCluster(config);
     root.update();
@@ -197,6 +198,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }
 
+  @Override
   public void replaceFile(File file) throws IOException {
     acquireExclusiveLock();
     try {
@@ -221,6 +223,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }
 
+  @Override
   public void replaceClusterMapFile(File file) throws IOException {
     acquireExclusiveLock();
     try {
@@ -2047,6 +2050,26 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       }
     } finally {
       atomicOperationsManager.releaseReadLock(this);
+    }
+  }
+  
+  public boolean checkIfNewContentFitsInPage(long ppos, int length) throws IOException {
+    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    OPhysicalPosition ridsPPos = new OPhysicalPosition(ppos);
+    //here find records physical position
+    OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+    OClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPhysicalPosition.clusterPosition, 1, atomicOperation);
+    OCacheEntry cacheEntry = null;
+    try{
+      //maybe here should be used load for write, to prevent changes in pages
+      cacheEntry = loadPageForRead(atomicOperation, fileId, positionEntry.getPageIndex(), false);
+      OClusterPage localPage = new OClusterPage(cacheEntry, false);
+      return localPage.getFreeSpace() >= length;
+    }
+    finally{
+      if (cacheEntry != null){
+        releasePageFromRead(atomicOperation, cacheEntry);
+      }
     }
   }
   

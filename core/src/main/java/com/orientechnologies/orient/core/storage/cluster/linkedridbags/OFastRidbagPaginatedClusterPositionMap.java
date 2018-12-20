@@ -257,7 +257,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
   }
 
   public OClusterPositionMapBucket.PositionEntry get(final long clusterPosition, final int pageCount,
-      final OAtomicOperation atomicOperation) throws IOException {
+      final OAtomicOperation atomicOperation) throws IOException {            
     final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
     final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 

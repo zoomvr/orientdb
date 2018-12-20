@@ -24,14 +24,16 @@ import java.util.Objects;
  */
 abstract class ORidbagNode{    
     
-  public ORidbagNode(OIdentifiable rid){
-    ridBagNodeRid = rid;
+  public ORidbagNode(long rid){
+    clusterPosition = rid;
   }
   
-  private final OIdentifiable ridBagNodeRid;  
-  
+  private final long clusterPosition;
+  int pageIndex; 
+  private int version;
   private boolean loaded = false;    
   int currentIndex = 0;
+  static byte RECORD_TYPE = 'l';
 
   protected abstract int capacity();
   protected abstract void addInternal(OIdentifiable value);
@@ -43,6 +45,7 @@ abstract class ORidbagNode{
   protected abstract boolean isTailNode();
   protected abstract OIdentifiable[] getAllRids();
   protected abstract byte getNodeType();
+  protected abstract byte[] serialize();
   /**
    * for internal use, caller have to take care of index bounds
    * @param value
@@ -72,8 +75,8 @@ abstract class ORidbagNode{
     return false;
   }  
 
-  protected OIdentifiable getRid(){
-    return ridBagNodeRid;
+  protected long getClusterPosition(){
+    return clusterPosition;
   }
 
   protected void load(){      
@@ -102,7 +105,7 @@ abstract class ORidbagNode{
   @Override
   public int hashCode() {
     int hash = 7;
-    hash = 97 * hash + Objects.hashCode(this.ridBagNodeRid);
+    hash = 97 * hash + Objects.hashCode(this.clusterPosition);
     return hash;
   }
 
@@ -118,10 +121,14 @@ abstract class ORidbagNode{
       return false;
     }
     final ORidbagNode other = (ORidbagNode) obj;
-    if (!Objects.equals(this.ridBagNodeRid, other.ridBagNodeRid)) {
+    if (!Objects.equals(this.clusterPosition, other.clusterPosition)) {
       return false;
     }
     return true;
   }    
+  
+  int getVersion(){
+    return version;
+  }
 
 };

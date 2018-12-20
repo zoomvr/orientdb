@@ -16,6 +16,8 @@
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -27,8 +29,8 @@ public class ORidbagListNode extends ORidbagNode{
 
   private final List<OIdentifiable> rids = new LinkedList<>();
   
-  protected ORidbagListNode(OIdentifiable rid){
-    super(rid);
+  protected ORidbagListNode(long physicalPosition){
+    super(physicalPosition);
   }
   
   @Override
@@ -92,6 +94,15 @@ public class ORidbagListNode extends ORidbagNode{
   @Override
   protected byte getNodeType(){
     return 'l';
+  }
+  
+  @Override
+  protected byte[] serialize(){
+    BytesContainer container = new BytesContainer();
+    for (OIdentifiable value : rids){
+      HelperClasses.writeLinkOptimized(container, value);
+    }
+    return container.bytes;
   }
   
 }
