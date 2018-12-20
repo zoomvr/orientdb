@@ -188,13 +188,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         if (node.currentIndex() > 0){
           OIdentifiable[] nodeRids = node.getAllRids();
           System.arraycopy(nodeRids, 0, mergedRids, currentOffset, node.currentIndex());
-          iter.remove();          
+          final boolean isTailNode = node.isTailNode();
+          
           if (hardRelax){
             //release it in cluster
           }
           else{            
             node.reset();
-            if (!node.isTailNode()){
+            if (!isTailNode){
+              iter.remove();
               freeNodes.add(node);
             }
           }
