@@ -120,6 +120,7 @@ import com.orientechnologies.orient.core.storage.cache.OWriteCache;
 import com.orientechnologies.orient.core.storage.cache.local.OBackgroundExceptionListener;
 import com.orientechnologies.orient.core.storage.cluster.OOfflineCluster;
 import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
+import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.ORecordOperationMetadata;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.ORecordSerializationContext;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.OStorageTransaction;
@@ -564,6 +565,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         // ADD THE DEFAULT CLUSTER
         defaultClusterId = doAddCluster(CLUSTER_DEFAULT_NAME, null);
+        
+        doAddCluster(OMetadataDefault.CLUSTER_RIDBAGS_NAME, OFastRidBagPaginatedCluster.BINARY_VERSION, null);
 
         if (jvmError.get() == null) {
           clearStorageDirty();
@@ -795,7 +798,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         }
 
         makeStorageDirty();
-        return addClusterInternal(clusterName, requestedId, parameters);
+        return addClusterInternal(clusterName, requestedId, OPaginatedCluster.getLatestBinaryVersion(), parameters);
 
       } catch (IOException e) {
         throw OException.wrapException(new OStorageException("Error in creation of new cluster '" + clusterName + "'"), e);
@@ -4712,7 +4715,11 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     return id;
   }
 
-  private int doAddCluster(String clusterName, Object[] parameters) throws IOException {
+  private int doAddCluster(String clusterName, Object[] parameters) throws IOException{
+    return doAddCluster(clusterName, null, parameters);
+  }
+  
+  private int doAddCluster(String clusterName, Integer binaryVersion, Object[] parameters) throws IOException {
     // FIND THE FIRST AVAILABLE CLUSTER ID
     int clusterPos = clusters.size();
     for (int i = 0; i < clusters.size(); ++i) {
@@ -4722,17 +4729,20 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       }
     }
 
-    return addClusterInternal(clusterName, clusterPos, parameters);
+    if (binaryVersion == null){
+      binaryVersion = OPaginatedCluster.getLatestBinaryVersion();
+    }
+    return addClusterInternal(clusterName, clusterPos, binaryVersion, parameters);
   }
 
-  private int addClusterInternal(String clusterName, int clusterPos, Object... parameters) throws IOException {
+  private int addClusterInternal(String clusterName, int clusterPos, int binaryVersion, Object... parameters) throws IOException {
 
     final OCluster cluster;
     if (clusterName != null) {
       clusterName = clusterName.toLowerCase(configuration.getLocaleInstance());
 
       cluster = OPaginatedClusterFactory
-          .createCluster(clusterName, configuration.getVersion(), OPaginatedCluster.getLatestBinaryVersion(), this);
+          .createCluster(clusterName, configuration.getVersion(), binaryVersion, this);
       cluster.configure(this, clusterPos, clusterName, parameters);
     } else {
       cluster = null;

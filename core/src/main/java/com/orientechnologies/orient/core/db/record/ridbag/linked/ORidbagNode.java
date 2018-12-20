@@ -24,8 +24,9 @@ import java.util.Objects;
  */
 abstract class ORidbagNode{    
     
-  public ORidbagNode(long rid){
+  public ORidbagNode(long rid, boolean considerLoaded){
     clusterPosition = rid;
+    loaded = considerLoaded;
   }
   
   private final long clusterPosition;

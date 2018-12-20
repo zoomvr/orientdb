@@ -34,15 +34,15 @@ class ORidBagArrayNode extends ORidbagNode{
     return RIDBAG_ARRAY_NODE_TYPE;
   }
   
-  protected ORidBagArrayNode(long physicalPosition, boolean initContainer) {
-    super(physicalPosition);
+  protected ORidBagArrayNode(long physicalPosition, boolean initContainer, boolean considerLoaded) {
+    super(physicalPosition, considerLoaded);
     if (initContainer){
       rids = new OIdentifiable[1];
     }
   }
   
-  protected ORidBagArrayNode(long physicalPosition, int initialCapacity){
-    super(physicalPosition);
+  protected ORidBagArrayNode(long physicalPosition, int initialCapacity, boolean considerLoaded){
+    super(physicalPosition, considerLoaded);
     rids = new OIdentifiable[initialCapacity];
   }
   
@@ -123,6 +123,6 @@ class ORidBagArrayNode extends ORidbagNode{
     for (OIdentifiable value : rids){
       HelperClasses.writeLinkOptimized(container, value);
     }
-    return container.bytes;
+    return container.fitBytes();
   }
 }

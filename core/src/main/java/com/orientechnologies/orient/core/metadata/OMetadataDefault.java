@@ -19,14 +19,11 @@
  */
 package com.orientechnologies.orient.core.metadata;
 
-import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.profiler.OProfiler;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.cache.OCommandCache;
-import com.orientechnologies.orient.core.db.ODatabase;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.OSharedContext;
-import com.orientechnologies.orient.core.exception.OSecurityException;
 import com.orientechnologies.orient.core.index.OIndexManagerProxy;
 import com.orientechnologies.orient.core.metadata.function.OFunctionLibrary;
 import com.orientechnologies.orient.core.metadata.function.OFunctionLibraryProxy;
@@ -45,6 +42,7 @@ public class OMetadataDefault implements OMetadataInternal {
   public static final String CLUSTER_INTERNAL_NAME     = "internal";
   public static final String CLUSTER_INDEX_NAME        = "index";
   public static final String CLUSTER_MANUAL_INDEX_NAME = "manindex";
+  public static final String CLUSTER_RIDBAGS_NAME      = "ridbagcluster";
 
   protected int schemaClusterId;
 

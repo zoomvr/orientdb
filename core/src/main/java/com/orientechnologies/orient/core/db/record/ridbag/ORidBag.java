@@ -29,10 +29,15 @@ import com.orientechnologies.orient.core.db.ODatabaseInternal;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.record.*;
 import com.orientechnologies.orient.core.db.record.ridbag.embedded.OEmbeddedRidBag;
+import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.exception.OSerializationException;
+import com.orientechnologies.orient.core.metadata.OMetadataDefault;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
 import com.orientechnologies.orient.core.serialization.serializer.string.OStringBuilderSerializable;
+import com.orientechnologies.orient.core.storage.OCluster;
+import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
+import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OSBTreeBonsai;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OBonsaiCollectionPointer;
@@ -228,6 +233,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
     final byte[] stream = bytesContainer.bytes;
 
     byte configByte = 0;
+    //as first and second bit are occupied used third one for marking if it is linked list ridbag
     if (isLinkedListRidBag()){
       configByte |= 4;
     }
@@ -250,9 +256,41 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
   }
   
   public void checkAndConvert() {
-    ODatabaseInternal database = ODatabaseRecordThreadLocal.instance().getIfDefined();
+    ODatabaseInternal database = ODatabaseRecordThreadLocal.instance().getIfDefined();    
+    
     if (database != null && !database.getStorage().isRemote()) {
-      if (isEmbedded() && ODatabaseRecordThreadLocal.instance().get().getSbTreeCollectionManager() != null
+      boolean supportsLinkedListRidbag = false;
+      OFastRidBagPaginatedCluster linkedListRidbagsCluster = null;
+      if (database.getStorage() != null && database.getStorage() instanceof OAbstractPaginatedStorage){
+        OAbstractPaginatedStorage aStorage = (OAbstractPaginatedStorage)database.getStorage();
+        OCluster clusterInternal = aStorage.getClusterByName(OMetadataDefault.CLUSTER_RIDBAGS_NAME);
+        if (clusterInternal instanceof OFastRidBagPaginatedCluster){
+          supportsLinkedListRidbag = true;
+          linkedListRidbagsCluster = (OFastRidBagPaginatedCluster)clusterInternal;
+        }
+      }
+      if (isEmbedded() && supportsLinkedListRidbag && delegate.size() >= topThreshold){
+        ORidBagDelegate oldDelegate = delegate;
+        
+        delegate = new OLinkedListRidBag(linkedListRidbagsCluster);
+        boolean oldAutoConvert = oldDelegate.isAutoConvertToRecord();
+        oldDelegate.setAutoConvertToRecord(false);
+
+        for (OIdentifiable identifiable : oldDelegate)
+          delegate.add(identifiable);
+
+        final ORecord owner = oldDelegate.getOwner();
+        delegate.setOwner(owner);
+
+        for (OMultiValueChangeListener<OIdentifiable, OIdentifiable> listener : oldDelegate.getChangeListeners())
+          delegate.addChangeListener(listener);
+
+        owner.setDirty();
+
+        oldDelegate.setAutoConvertToRecord(oldAutoConvert);
+        oldDelegate.requestDelete();
+      }
+      else if (isEmbedded() && ODatabaseRecordThreadLocal.instance().get().getSbTreeCollectionManager() != null
           && delegate.size() >= topThreshold) {
         ORidBagDelegate oldDelegate = delegate;
         delegate = new OSBTreeRidBag();
@@ -324,9 +362,26 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
   }
 
   public void fromStream(BytesContainer stream) {
-    final byte first = stream.bytes[stream.offset++];
-    if ((first & 4) == 4){
-      delegate = new OLinkedListRidBag();
+    final byte first = stream.bytes[stream.offset++];        
+        
+    if ((first & 4) == 4){      
+      ODatabaseInternal database = ODatabaseRecordThreadLocal.instance().getIfDefined(); 
+      boolean supportsLinkedListRidbag = false;
+      OFastRidBagPaginatedCluster linkedListRidbagsCluster = null;
+      if (database.getStorage() != null && database.getStorage() instanceof OAbstractPaginatedStorage){
+        OAbstractPaginatedStorage aStorage = (OAbstractPaginatedStorage)database.getStorage();
+        OCluster clusterInternal = aStorage.getClusterByName(OMetadataDefault.CLUSTER_RIDBAGS_NAME);
+        if (clusterInternal instanceof OFastRidBagPaginatedCluster){
+          supportsLinkedListRidbag = true;
+          linkedListRidbagsCluster = (OFastRidBagPaginatedCluster)clusterInternal;
+        }
+      }
+      if (supportsLinkedListRidbag){
+        delegate = new OLinkedListRidBag(linkedListRidbagsCluster);
+      }
+      else{
+        throw new ODatabaseException("Linked list ridbags cluster not found");
+      }
     }
     else{
       if ((first & 1) == 1){

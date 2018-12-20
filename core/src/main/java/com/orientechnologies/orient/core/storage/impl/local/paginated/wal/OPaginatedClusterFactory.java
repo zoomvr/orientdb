@@ -22,6 +22,7 @@ package com.orientechnologies.orient.core.storage.impl.local.paginated.wal;
 
 import com.orientechnologies.orient.core.exception.OStorageException;
 import com.orientechnologies.orient.core.storage.OCluster;
+import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import com.orientechnologies.orient.core.storage.cluster.v0.OPaginatedClusterV0;
 import com.orientechnologies.orient.core.storage.cluster.v1.OPaginatedClusterV1;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
@@ -45,6 +46,8 @@ public final class OPaginatedClusterFactory {
       return new OPaginatedClusterV0(name, storage);
     case 1:
       return new OPaginatedClusterV1(name, storage);
+    case -1:
+      return new OFastRidBagPaginatedCluster(name, storage);
     default:
       throw new IllegalStateException("Invalid binary version of cluster " + binaryVersion);
     }

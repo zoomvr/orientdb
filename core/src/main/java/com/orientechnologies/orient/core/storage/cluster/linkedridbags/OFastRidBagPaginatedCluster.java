@@ -65,16 +65,10 @@ import java.util.List;
  *
  * @author marko
  */
-public class OFastRidBagPaginatedCluster extends OPaginatedCluster{  
-
-  public OFastRidBagPaginatedCluster(OAbstractPaginatedStorage storage, String name, String extension, String lockName){
-    super(storage, name, extension, lockName);
-    
-    systemCluster = OMetadataInternal.SYSTEM_CLUSTER.contains(name);
-  }
+public class OFastRidBagPaginatedCluster extends OPaginatedCluster{    
   
   private static final int     STATE_ENTRY_INDEX = 0;
-  private static final int     BINARY_VERSION    = 1;
+  public static final int     BINARY_VERSION    = -1;
   private final        boolean addRidMetadata    = OGlobalConfiguration.STORAGE_TRACK_CHANGED_RECORDS_IN_WAL.getValueAsBoolean();
 
   private static final int DISK_PAGE_SIZE           = DISK_CACHE_PAGE_SIZE.getValueAsInteger();
@@ -121,6 +115,12 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }  
 
+  public OFastRidBagPaginatedCluster(final String name, final OAbstractPaginatedStorage storage) {
+    super(storage, name, ".rbc", name + ".rbc");
+
+    systemCluster = OMetadataInternal.SYSTEM_CLUSTER.contains(name);
+  }
+  
   @Override
   public void configure(final OStorage storage, final int id, final String clusterName, final Object... parameters)
       throws IOException {
@@ -2054,10 +2054,14 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   public boolean checkIfNewContentFitsInPage(long ppos, int length) throws IOException {
-    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    final OAtomicOperation atomicOperation = startAtomicOperation(false);
     OPhysicalPosition ridsPPos = new OPhysicalPosition(ppos);
     //here find records physical position
     OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+    //this means that node still not saved
+    if (recordPhysicalPosition == null){
+      return true;
+    }
     OClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPhysicalPosition.clusterPosition, 1, atomicOperation);
     OCacheEntry cacheEntry = null;
     try{
@@ -2070,6 +2074,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       if (cacheEntry != null){
         releasePageFromRead(atomicOperation, cacheEntry);
       }
+      atomicOperationsManager.endAtomicOperation(false);
     }
   }
   

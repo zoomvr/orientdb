@@ -89,6 +89,7 @@ public class OStoragePaginatedClusterConfiguration implements OStorageClusterCon
     status = iStatus;
   }
 
+  @Override
   public int getBinaryVersion() {
     return binaryVersion;
   }

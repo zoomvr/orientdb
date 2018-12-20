@@ -69,10 +69,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   private boolean autoConvertToRecord = true;
   private List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> changeListeners;
-  private ORecord owner = null;
-  
-  public OLinkedListRidBag(){
-  }
+  private ORecord owner = null;    
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster){    
     this.cluster = cluster;
@@ -90,7 +87,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
     if (tailNode == null){
       try{
-        tailNode = createNodeOfSpecificSize(1);
+        tailNode = createNodeOfSpecificSize(1, true);
+        ridbagNodes.add(tailNode);
       }
       catch (IOException exc){
         OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
@@ -99,7 +97,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
     
     //check for megaMerge
-    if (size % MAX_RIDBAG_NODE_SIZE == 0){
+    if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0){
       nodesMegaMerge(hardRelaxPolicy);
     }
     
@@ -133,7 +131,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         allocateSize += extraSlots;
         ORidbagNode ridBagNode;
         try{
-          ridBagNode = getOrCreateNodeOfSpecificSize(allocateSize);
+          ridBagNode = getOrCreateNodeOfSpecificSize(allocateSize, true);
+          ridbagNodes.add(tailNode);
         }
         catch (IOException exc){
           OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
@@ -205,7 +204,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
     ORidbagNode megaNode;
     try{
-      megaNode = getOrCreateNodeOfSpecificSize(mergedRids.length);
+      megaNode = getOrCreateNodeOfSpecificSize(mergedRids.length, true);
     }
     catch (IOException exc){
       OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
@@ -297,7 +296,16 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public int getSerializedSize() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    BytesContainer container = new BytesContainer();
+    try{
+      serializeInternal(container, true);
+    }
+    catch (IOException exc){
+      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+      throw new ODatabaseException(exc.getMessage());
+    }
+    
+    return container.offset;
   }
 
   @Override
@@ -329,11 +337,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     int capacity = OVarIntSerializer.readAsInteger(container);    
     ORidbagNode node;
     if (type == ORidBagArrayNode.RIDBAG_ARRAY_NODE_TYPE){      
-      node = new ORidBagArrayNode(clusterPos, capacity);      
+      node = new ORidBagArrayNode(clusterPos, capacity, false);      
     }
     else{
       //list based ridbag node has to be loaded
-      node = new ORidbagListNode(clusterPos);
+      node = new ORidbagListNode(clusterPos, false);
       tailNode = node;
     }
     node.currentIndex = currentIndex;
@@ -624,7 +632,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public Object returnOriginalState(List<OMultiValueChangeEvent<OIdentifiable, OIdentifiable>> changeEvents) {
-    final OLinkedListRidBag reverted = new OLinkedListRidBag();
+    final OLinkedListRidBag reverted = new OLinkedListRidBag(cluster);
     Iterator<ORidbagNode> iter = ridbagNodes.iterator();
     while (iter.hasNext()){
       ORidbagNode ridbagNode = iter.next();
@@ -698,7 +706,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
    * @param numberOfRids
    * @return 
    */
-  private ORidbagNode getOrCreateNodeOfSpecificSize(int numberOfRids) throws IOException{
+  private ORidbagNode getOrCreateNodeOfSpecificSize(int numberOfRids, boolean considerNodeLoaded) throws IOException{
     Iterator<ORidbagNode> iter = freeNodes.iterator();
     ORidbagNode ret = null;
     while (iter.hasNext() && ret == null){
@@ -713,20 +721,20 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
     
     if (ret == null){
-      ret = createNodeOfSpecificSize(numberOfRids);
+      ret = createNodeOfSpecificSize(numberOfRids, considerNodeLoaded);
     }
     
     return ret;
   }
   
-  private ORidbagNode createNodeOfSpecificSize(int numberOfRids) throws IOException{
+  private ORidbagNode createNodeOfSpecificSize(int numberOfRids, boolean considerNodeLoaded) throws IOException{
     OPhysicalPosition newNodePhysicalPosition = preallocateRid();
     ORidbagNode ret;
     if (numberOfRids > 1){
-      ret = new ORidBagArrayNode(newNodePhysicalPosition.clusterPosition, numberOfRids);
+      ret = new ORidBagArrayNode(newNodePhysicalPosition.clusterPosition, numberOfRids, considerNodeLoaded);
     }
     else{
-      ret = new ORidbagListNode(newNodePhysicalPosition.clusterPosition);
+      ret = new ORidbagListNode(newNodePhysicalPosition.clusterPosition, considerNodeLoaded);
     }
     
     return ret;
@@ -739,7 +747,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private boolean ifOneMoreFitsToPage(OIdentifiable id) throws IOException{    
     BytesContainer container = new BytesContainer();
     HelperClasses.writeLinkOptimized(container, id);
-    return cluster.checkIfNewContentFitsInPage(tailNode.getClusterPosition(), container.bytes.length);    
+    return cluster.checkIfNewContentFitsInPage(tailNode.getClusterPosition(), container.offset);    
   }
     
 }

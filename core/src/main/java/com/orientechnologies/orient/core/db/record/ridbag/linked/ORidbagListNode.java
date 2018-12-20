@@ -29,8 +29,8 @@ public class ORidbagListNode extends ORidbagNode{
 
   private final List<OIdentifiable> rids = new LinkedList<>();
   
-  protected ORidbagListNode(long physicalPosition){
-    super(physicalPosition);
+  protected ORidbagListNode(long physicalPosition, boolean considerLoaded){
+    super(physicalPosition, considerLoaded);
   }
   
   @Override
@@ -101,8 +101,8 @@ public class ORidbagListNode extends ORidbagNode{
     BytesContainer container = new BytesContainer();
     for (OIdentifiable value : rids){
       HelperClasses.writeLinkOptimized(container, value);
-    }
-    return container.bytes;
+    }    
+    return container.fitBytes();
   }
   
 }
