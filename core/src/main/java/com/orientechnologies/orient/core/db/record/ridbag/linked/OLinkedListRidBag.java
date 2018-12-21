@@ -169,6 +169,9 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
     
     ++size;
+    
+    fireCollectionChangedEvent(
+        new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value, null, false));
     //TODO add it to index
   }
   
@@ -388,7 +391,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private void serializeNodeData(ORidbagNode node) throws IOException{
     byte[] serialized = node.serialize();
     OPhysicalPosition ppos = new OPhysicalPosition(node.getClusterPosition());
-    cluster.createRecord(serialized, node.getVersion(), ORidbagNode.RECORD_TYPE, ppos);
+    OPaginatedCluster.RECORD_STATUS status = cluster.getRecordStatus(node.getClusterPosition());
+    if (status == OPaginatedCluster.RECORD_STATUS.ALLOCATED || status == OPaginatedCluster.RECORD_STATUS.REMOVED){
+      cluster.createRecord(serialized, node.getVersion(), ORidbagNode.RECORD_TYPE, ppos);
+    }
+    else if (status == OPaginatedCluster.RECORD_STATUS.PRESENT){
+      cluster.updateRecord(ppos.clusterPosition, serialized, node.getVersion(), ORidbagNode.RECORD_TYPE);
+    }
   }
   
   @Override

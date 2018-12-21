@@ -1990,6 +1990,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return debug;
   }
 
+  @Override
   public RECORD_STATUS getRecordStatus(final long clusterPosition) throws IOException {
     final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     acquireSharedLock();

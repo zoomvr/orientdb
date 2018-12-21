@@ -16,6 +16,9 @@
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
 import java.util.Objects;
 
 /**
@@ -53,6 +56,7 @@ abstract class ORidbagNode{
    * @param index 
    */
   protected abstract void setAt(OIdentifiable value, int index);
+  protected abstract void addInDeserializeInternal(OIdentifiable value, int index);
   
   protected int currentIndex(){
     return currentIndex;
@@ -130,6 +134,15 @@ abstract class ORidbagNode{
   
   int getVersion(){
     return version;
+  }
+  
+  protected void deserialize(byte[] content){
+    BytesContainer conatiner = new BytesContainer(content);
+    long size = OVarIntSerializer.readAsLong(conatiner);
+    for (int i = 0; i < size; i++){
+      OIdentifiable value = HelperClasses.readOptimizedLink(conatiner, false);
+      addInDeserializeInternal(value, i);
+    }
   }
 
 };
