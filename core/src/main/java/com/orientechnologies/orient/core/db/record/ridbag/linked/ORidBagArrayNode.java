@@ -112,11 +112,6 @@ class ORidBagArrayNode extends ORidbagNode{
   protected void setAt(OIdentifiable value, int index){
     rids[index] = value;
   }
-
-  @Override
-  protected void loadInternal() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
   
   @Override
   protected byte[] serialize(){

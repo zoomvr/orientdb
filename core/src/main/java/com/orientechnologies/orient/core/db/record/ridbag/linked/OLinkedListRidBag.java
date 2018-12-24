@@ -98,7 +98,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
     //check for megaMerge
     if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0){
-      nodesMegaMerge(hardRelaxPolicy);
+      try{
+        nodesMegaMerge(hardRelaxPolicy);
+      }
+      catch (IOException exc){
+        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+        throw new ODatabaseException(exc.getMessage());
+      }
     }
     
     //check if there is active node with free space
@@ -163,22 +169,32 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
     else{
       if (!activeNode.isLoaded()){
-        activeNode.load();
+        try{
+          activeNode.load(cluster);
+        }
+        catch (IOException exc){
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+          throw new ODatabaseException(exc.getMessage());
+        }
       }
       activeNode.add(value);      
     }
     
     ++size;
     
+    if (this.owner != null) {
+      ORecordInternal.track(this.owner, value);      
+    }
+    
     fireCollectionChangedEvent(
-        new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value, null, false));
+        new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value));
     //TODO add it to index
   }
   
   /**
    * 
    */
-  private void nodesMegaMerge(boolean hardRelax){
+  private void nodesMegaMerge(boolean hardRelax) throws IOException{
     OIdentifiable[] mergedRids = new OIdentifiable[MAX_RIDBAG_NODE_SIZE];
     int currentOffset = 0;
     Iterator<ORidbagNode> iter = ridbagNodes.iterator();
@@ -186,7 +202,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       ORidbagNode node = iter.next();
       if (!node.isMaxSizeNodeFullNode()){
         if (!node.isLoaded()){
-          node.load();
+          node.load(cluster);
         }
         if (node.currentIndex() > 0){
           OIdentifiable[] nodeRids = node.getAllRids();
@@ -250,7 +266,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       ORidbagNode node = indexedRidsNodes.get(value);
       if (node != null){
         if (!node.isLoaded()){
-          node.load();
+          try{
+            node.load(cluster);
+          }
+          catch (IOException exc){
+            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+            throw new ODatabaseException(exc.getMessage());
+          }
         }
         boolean isTail = node.isTailNode();
         if (node.remove(value)){
@@ -271,7 +293,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       //go through all
       for (ORidbagNode ridbagNode : ridbagNodes){
         if (!ridbagNode.isLoaded()){
-          ridbagNode.load();
+          try{
+            ridbagNode.load(cluster);
+          }
+          catch (IOException exc){
+            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+            throw new ODatabaseException(exc.getMessage());
+          }
         }
         boolean isTail = ridbagNode.isTailNode();
         if (ridbagNode.remove(value)){
@@ -291,6 +319,9 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
     if (removed){
       --size;
+      fireCollectionChangedEvent(
+          new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.REMOVE, value, null,
+              value));
     }    
   }
 
@@ -481,7 +512,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       ORidbagNode node = indexedRidsNodes.get(value);
       if (node != null){
         if (!node.isLoaded()){
-          node.load();
+          try{
+            node.load(cluster);
+          }
+          catch (IOException exc){
+            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+            throw new ODatabaseException(exc.getMessage());
+          }
         }
         return node.contains(value);
       }
@@ -490,7 +527,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       //go through all
       for (ORidbagNode ridbagNode : ridbagNodes){
         if (ridbagNode.isLoaded()){
-          ridbagNode.load();
+          try{
+            ridbagNode.load(cluster);
+          }
+          catch (IOException exc){
+            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+            throw new ODatabaseException(exc.getMessage());
+          }
         }
         if (ridbagNode.contains(value)){
           return true;
@@ -511,7 +554,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       while (iter.hasNext()){
         ORidbagNode ridbagNode = iter.next();
         if (!ridbagNode.isLoaded()){
-          ridbagNode.load();
+          try{
+            ridbagNode.load(cluster);
+          }
+          catch (IOException exc){
+            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+            throw new ODatabaseException(exc.getMessage());
+          }
         }
         for (int i = 0; i < ridbagNode.currentIndex(); i++){          
           ORecordInternal.unTrack(this.owner, ridbagNode.getAt(i));
@@ -557,13 +606,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
 
   @Override
-  public Iterator<OIdentifiable> iterator() {
-    return new OLinkedListRidBagIterator(this);
+  public Iterator<OIdentifiable> iterator() {    
+    return new OLinkedListRidBagIterator(this, cluster);    
   }
 
   @Override
   public Iterator<OIdentifiable> rawIterator() {
-    return new OLinkedListRidBagIterator(this);
+    return new OLinkedListRidBagIterator(this, cluster);
   }
 
   @Override
@@ -572,7 +621,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     while (iter.hasNext()){
       ORidbagNode ridbagNode = iter.next();
       if (!ridbagNode.isLoaded()){
-        ridbagNode.load();
+        try{
+          ridbagNode.load(cluster);
+        }
+        catch (IOException exc){
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+          throw new ODatabaseException(exc.getMessage());
+        }
       }
       for (int i = 0; i < ridbagNode.currentIndex(); i++){
         OIdentifiable id = ridbagNode.getAt(i);
@@ -589,7 +644,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     while (iter.hasNext()){
       ORidbagNode ridbagNode = iter.next();
       if (!ridbagNode.isLoaded()){
-        ridbagNode.load();
+        try{
+          ridbagNode.load(cluster);
+        }
+        catch (IOException exc){
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+          throw new ODatabaseException(exc.getMessage());
+        }
       }
       for (int i = 0; i < ridbagNode.currentIndex(); i++){
         OIdentifiable id = ridbagNode.getAt(i);
@@ -648,7 +709,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     while (iter.hasNext()){
       ORidbagNode ridbagNode = iter.next();
       if (!ridbagNode.isLoaded()){
-        ridbagNode.load();
+        try{
+          ridbagNode.load(cluster);
+        }
+        catch (IOException exc){
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+          throw new ODatabaseException(exc.getMessage());
+        }
       }
       for (int i = 0; i < ridbagNode.currentIndex(); i++){
         OIdentifiable id = ridbagNode.getAt(i);
@@ -725,7 +792,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       if (freeNode.getFreeSpace() >= numberOfRids){
         ret = freeNode;
         if (!ret.isLoaded()){
-          ret.load();
+          ret.load(cluster);
         }
         iter.remove();
       }

@@ -15,7 +15,11 @@
  */
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
+import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import com.orientechnologies.orient.core.exception.ODatabaseException;
+import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
+import java.io.IOException;
 import java.util.Iterator;
 
 /**
@@ -31,16 +35,24 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
   private ORidbagNode currentNode = null;
   private int currentNodeIteratingIndex = iteratingIndexInitialvalue;
   private boolean calledNext = true;
+  private final OFastRidBagPaginatedCluster cluster;
   
-  public OLinkedListRidBagIterator(OLinkedListRidBag ridbag){
+  public OLinkedListRidBagIterator(OLinkedListRidBag ridbag, OFastRidBagPaginatedCluster cluster){
     this.ridbag = ridbag;
+    this.cluster = cluster;
   }
   
   @Override
   public boolean hasNext() {
     try{
       if (currentNode == null){
-        getNextNode();
+        try{
+          getNextNode();
+        }
+        catch (IOException exc){
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+          throw new ODatabaseException(exc.getMessage());
+        }
       }
       if (currentNode == null){
         return false;
@@ -55,8 +67,14 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
           found = true;
           break;
         }
-        //go for next node
-        getNextNode();
+        //go for next node        
+        try{
+          getNextNode();
+        }
+        catch (IOException exc){
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);          
+          throw new ODatabaseException(exc.getMessage());
+        }
         if (currentNode == null){
           break;
         }
@@ -74,11 +92,11 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
     return currentNode.getAt(currentNodeIteratingIndex);
   }
   
-  private void getNextNode(){
+  private void getNextNode() throws IOException{
     currentNode = ridbag.getAtIndex(++currentNodeIndex);
     currentNodeIteratingIndex = iteratingIndexInitialvalue;
     if (currentNode != null && !currentNode.isLoaded()){
-      currentNode.load();
+      currentNode.load(cluster);
     }
   }
   

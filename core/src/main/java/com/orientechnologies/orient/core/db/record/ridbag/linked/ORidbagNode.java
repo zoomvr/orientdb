@@ -19,6 +19,9 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
+import com.orientechnologies.orient.core.storage.ORawBuffer;
+import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
+import java.io.IOException;
 import java.util.Objects;
 
 /**
@@ -45,7 +48,7 @@ abstract class ORidbagNode{
   protected abstract OIdentifiable getAt(int index);
   protected abstract boolean remove(OIdentifiable value);
   protected abstract boolean contains(OIdentifiable value);
-  protected abstract void loadInternal();
+//  protected abstract void loadInternal();
   protected abstract boolean isTailNode();
   protected abstract OIdentifiable[] getAllRids();
   protected abstract byte getNodeType();
@@ -84,9 +87,11 @@ abstract class ORidbagNode{
     return clusterPosition;
   }
 
-  protected void load(){      
+  protected void load(OFastRidBagPaginatedCluster cluster) throws IOException{
     if (!loaded){
-      loadInternal();
+      ORawBuffer buffer = cluster.readRecord(clusterPosition, false);
+      byte[] stream = buffer.getBuffer();
+      deserialize(stream);
     }
     loaded = true;
   }

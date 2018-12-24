@@ -64,12 +64,7 @@ public class ORidbagListNode extends ORidbagNode{
   @Override
   protected boolean contains(OIdentifiable value) {
     return rids.contains(value);
-  }
-
-  @Override
-  protected void loadInternal() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
+  }  
 
   @Override
   protected boolean isTailNode() {

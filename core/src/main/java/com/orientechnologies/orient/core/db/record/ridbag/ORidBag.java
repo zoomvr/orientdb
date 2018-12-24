@@ -276,14 +276,16 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
         boolean oldAutoConvert = oldDelegate.isAutoConvertToRecord();
         oldDelegate.setAutoConvertToRecord(false);
 
-        for (OIdentifiable identifiable : oldDelegate)
+        for (OIdentifiable identifiable : oldDelegate){
           delegate.add(identifiable);
+        }
 
         final ORecord owner = oldDelegate.getOwner();
         delegate.setOwner(owner);
 
-        for (OMultiValueChangeListener<OIdentifiable, OIdentifiable> listener : oldDelegate.getChangeListeners())
+        for (OMultiValueChangeListener<OIdentifiable, OIdentifiable> listener : oldDelegate.getChangeListeners()){
           delegate.addChangeListener(listener);
+        }
 
         owner.setDirty();
 
