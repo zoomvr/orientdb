@@ -2055,7 +2055,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   public boolean checkIfNewContentFitsInPage(long ppos, int length) throws IOException {
-    final OAtomicOperation atomicOperation = startAtomicOperation(false);
+    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     OPhysicalPosition ridsPPos = new OPhysicalPosition(ppos);
     //here find records physical position
     OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
@@ -2074,8 +2074,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     finally{
       if (cacheEntry != null){
         releasePageFromRead(atomicOperation, cacheEntry);
-      }
-      atomicOperationsManager.endAtomicOperation(false);
+      }      
     }
   }
   

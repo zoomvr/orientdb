@@ -62,7 +62,7 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
         if (!calledNext){
           --currentNodeIteratingIndex;
         }
-        if (currentNode.currentIndex() > 0 && currentNodeIteratingIndex < currentNode.capacity() - 1){
+        if (currentNode.currentIndex() > 0 && currentNodeIteratingIndex < currentNode.currentIndex() - 1){
           ++currentNodeIteratingIndex;
           found = true;
           break;

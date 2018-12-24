@@ -269,7 +269,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
           linkedListRidbagsCluster = (OFastRidBagPaginatedCluster)clusterInternal;
         }
       }
-      if (isEmbedded() && supportsLinkedListRidbag && delegate.size() >= topThreshold){
+      /*if (isEmbedded() && supportsLinkedListRidbag && delegate.size() >= topThreshold){
         ORidBagDelegate oldDelegate = delegate;
         
         delegate = new OLinkedListRidBag(linkedListRidbagsCluster);
@@ -292,7 +292,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
         oldDelegate.setAutoConvertToRecord(oldAutoConvert);
         oldDelegate.requestDelete();
       }
-      else if (isEmbedded() && ODatabaseRecordThreadLocal.instance().get().getSbTreeCollectionManager() != null
+      else*/ if (isEmbedded() && ODatabaseRecordThreadLocal.instance().get().getSbTreeCollectionManager() != null
           && delegate.size() >= topThreshold) {
         ORidBagDelegate oldDelegate = delegate;
         delegate = new OSBTreeRidBag();

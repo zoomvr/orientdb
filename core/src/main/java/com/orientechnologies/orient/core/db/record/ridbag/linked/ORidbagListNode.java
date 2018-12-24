@@ -93,7 +93,7 @@ public class ORidbagListNode extends ORidbagNode{
   }
   
   @Override
-  protected byte[] serialize(){
+  protected byte[] serializeInternal(){
     BytesContainer container = new BytesContainer();
     OVarIntSerializer.write(container, rids.size());
     for (OIdentifiable value : rids){

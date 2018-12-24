@@ -41,6 +41,7 @@ abstract class ORidbagNode{
   private boolean loaded = false;    
   int currentIndex = 0;
   static byte RECORD_TYPE = 'l';
+  boolean stored = false;
 
   protected abstract int capacity();
   protected abstract void addInternal(OIdentifiable value);
@@ -52,7 +53,7 @@ abstract class ORidbagNode{
   protected abstract boolean isTailNode();
   protected abstract OIdentifiable[] getAllRids();
   protected abstract byte getNodeType();
-  protected abstract byte[] serialize();
+  protected abstract byte[] serializeInternal();
   /**
    * for internal use, caller have to take care of index bounds
    * @param value
@@ -69,6 +70,7 @@ abstract class ORidbagNode{
     if (currentIndex() < capacity()){
       addInternal(value);
       currentIndex++;
+      stored = false;
       return true;
     }
     return false;
@@ -78,6 +80,7 @@ abstract class ORidbagNode{
     if (currentIndex + values.length <= capacity()){
       addAllInternal(values);              
       currentIndex += values.length;
+      stored = false;
       return true;
     }
     return false;
@@ -106,6 +109,7 @@ abstract class ORidbagNode{
 
   protected void reset(){
     currentIndex = 0;
+    stored = false;
   }  
 
   protected int getFreeSpace(){
@@ -148,6 +152,16 @@ abstract class ORidbagNode{
       OIdentifiable value = HelperClasses.readOptimizedLink(conatiner, false);
       addInDeserializeInternal(value, i);
     }
+  }
+  
+  protected boolean getStored(){
+    return stored;
+  }
+  
+  protected byte[] serialize(){
+    byte[] ret = serializeInternal();
+    stored = true;
+    return ret;
   }
 
 };

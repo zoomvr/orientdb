@@ -400,27 +400,27 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     OVarIntSerializer.write(container, freeNodes.size());
     
     //serialize free nodes queue
-    for (ORidbagNode node : freeNodes){
+    for (ORidbagNode node : freeNodes){      
       serializeRidbagNodeMetadata(container, node);
-      if (!justRunThrough){
+      if (!justRunThrough && !node.getStored()){
         serializeNodeData(node);
-      }
+      }      
     }
     
     //serialize size of associated ridbag nodes
     OVarIntSerializer.write(container, ridbagNodes.size());
     
     //serialize nodes associated with this ridbag    
-    for (ORidbagNode node : ridbagNodes){
+    for (ORidbagNode node : ridbagNodes){      
       serializeRidbagNodeMetadata(container, node);
-      if (!justRunThrough){
+      if (!justRunThrough && !node.getStored()){
         serializeNodeData(node);
-      }
+      }      
     }        
   }
   
   private void serializeNodeData(ORidbagNode node) throws IOException{
-    byte[] serialized = node.serialize();
+    byte[] serialized = node.serialize();    
     OPhysicalPosition ppos = new OPhysicalPosition(node.getClusterPosition());
     OPaginatedCluster.RECORD_STATUS status = cluster.getRecordStatus(node.getClusterPosition());
     if (status == OPaginatedCluster.RECORD_STATUS.ALLOCATED || status == OPaginatedCluster.RECORD_STATUS.REMOVED){
@@ -574,7 +574,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       Iterator<ORidbagNode> iter = ridbagNodes.iterator();
       while (iter.hasNext()){
         ORidbagNode ridbagNode = iter.next();
-        //no need to check if nodes are loaded, they are loaded in loop above
+        if (!ridbagNode.isLoaded()){
+          try{
+            ridbagNode.load(cluster);
+          }
+          catch (IOException exc){
+            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+            throw new ODatabaseException(exc.getMessage());
+          }
+        }
         for (int i = 0; i < ridbagNode.currentIndex(); i++){          
           ORecordInternal.track(this.owner, ridbagNode.getAt(i));
         }

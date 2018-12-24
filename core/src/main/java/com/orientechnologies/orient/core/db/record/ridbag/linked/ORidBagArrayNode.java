@@ -114,7 +114,7 @@ class ORidBagArrayNode extends ORidbagNode{
   }
   
   @Override
-  protected byte[] serialize(){
+  protected byte[] serializeInternal(){
     BytesContainer container = new BytesContainer();
     OVarIntSerializer.write(container, rids.length);
     for (OIdentifiable value : rids){
