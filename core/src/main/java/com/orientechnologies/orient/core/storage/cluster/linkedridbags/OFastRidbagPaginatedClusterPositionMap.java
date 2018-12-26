@@ -18,10 +18,10 @@ package com.orientechnologies.orient.core.storage.cluster.linkedridbags;
 import com.orientechnologies.common.util.OCommonConst;
 import com.orientechnologies.orient.core.exception.OClusterPositionMapException;
 import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cluster.OClusterPositionMap;
 import static com.orientechnologies.orient.core.storage.cluster.OClusterPositionMap.DEF_EXTENSION;
-import com.orientechnologies.orient.core.storage.cluster.OClusterPositionMapBucket;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import java.io.IOException;
@@ -91,7 +91,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     setName(newName);
   }
 
-  public long add(long pageIndex, int recordPosition, final OAtomicOperation atomicOperation) throws IOException {
+  public long add(long pageIndex, int recordPosition, final OAtomicOperation atomicOperation, long previousNodePosition, long nextNodePosition) throws IOException {
     OCacheEntry cacheEntry;
     boolean clear = false;
 
@@ -119,7 +119,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
       }
 
       try {
-        OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, clear);
+        OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, clear);
         if (bucket.isFull()) {
           releasePageFromWrite(atomicOperation, cacheEntry);
 
@@ -133,11 +133,11 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
 
           mapEntryPoint.setFileSize(lastPage + 1);
 
-          bucket = new OClusterPositionMapBucket(cacheEntry, true);
+          bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, true);
         }
 
-        final long index = bucket.add(pageIndex, recordPosition);
-        return index + (cacheEntry.getPageIndex() - 1) * OClusterPositionMapBucket.MAX_ENTRIES;
+        final long index = bucket.add(pageIndex, recordPosition, previousNodePosition, nextNodePosition);
+        return index + (cacheEntry.getPageIndex() - 1) * OFastRidbagClusterPositionMapBucket.MAX_ENTRIES;
       } finally {
         releasePageFromWrite(atomicOperation, cacheEntry);
       }
@@ -186,7 +186,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
       }
 
       try {
-        OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, clear);
+        OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, clear);
         if (bucket.isFull()) {
           releasePageFromWrite(atomicOperation, cacheEntry);
 
@@ -200,11 +200,11 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
 
           mapEntryPoint.setFileSize(lastPage + 1);
 
-          bucket = new OClusterPositionMapBucket(cacheEntry, true);
+          bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, true);
         }
 
         final long index = bucket.allocate();
-        return index + (cacheEntry.getPageIndex() - 1) * OClusterPositionMapBucket.MAX_ENTRIES;
+        return index + (cacheEntry.getPageIndex() - 1) * OFastRidbagClusterPositionMapBucket.MAX_ENTRIES;
       } finally {
         releasePageFromWrite(atomicOperation, cacheEntry);
       }
@@ -214,11 +214,11 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
 
   }
 
-  public void update(final long clusterPosition, final OClusterPositionMapBucket.PositionEntry entry,
+  public void update(final long clusterPosition, final OFastRidbagClusterPositionMapBucket.PositionEntry entry,
       final OAtomicOperation atomicOperation) throws IOException {
 
-    final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
-    final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    final long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+    final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
 
     final long lastPage = getLastPage(atomicOperation);
     if (pageIndex > lastPage) {
@@ -228,17 +228,17 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
 
     final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
     try {
-      final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
       bucket.set(index, entry);
     } finally {
       releasePageFromWrite(atomicOperation, cacheEntry);
     }
   }
 
-  void resurrect(final long clusterPosition, final OClusterPositionMapBucket.PositionEntry entry,
+  void resurrect(final long clusterPosition, final OFastRidbagClusterPositionMapBucket.PositionEntry entry,
       final OAtomicOperation atomicOperation) throws IOException {
-    final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
-    final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    final long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+    final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
 
     final long lastPage = getLastPage(atomicOperation);
 
@@ -249,17 +249,17 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
 
     final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
     try {
-      final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
       bucket.resurrect(index, entry);
     } finally {
       releasePageFromWrite(atomicOperation, cacheEntry);
     }
   }
 
-  public OClusterPositionMapBucket.PositionEntry get(final long clusterPosition, final int pageCount,
+  public OFastRidbagClusterPositionMapBucket.PositionEntry get(final long clusterPosition, final int pageCount,
       final OAtomicOperation atomicOperation) throws IOException {            
-    final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
-    final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    final long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+    final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
 
     final long lastPage = getLastPage(atomicOperation);
 
@@ -269,7 +269,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
 
     final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, pageCount);
     try {
-      final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
       return bucket.get(index);
     } finally {
       releasePageFromRead(atomicOperation, cacheEntry);
@@ -277,12 +277,12 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
   }
 
   public void remove(final long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
-    final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
-    final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    final long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+    final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
 
     final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
     try {
-      final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
 
       bucket.remove(index);
     } finally {
@@ -311,8 +311,8 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
       realPosition = clusterPosition + 1;
     }
 
-    long pageIndex = realPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
-    int index = (int) (realPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    long pageIndex = realPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+    int index = (int) (realPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
 
     final long lastPage = getLastPage(atomicOperation);
 
@@ -324,7 +324,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     do {
       OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
 
-      OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
       int resultSize = bucket.getSize() - index;
 
       if (resultSize <= 0) {
@@ -333,12 +333,12 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
         index = 0;
       } else {
         int entriesCount = 0;
-        long startIndex = cacheEntry.getPageIndex() * OClusterPositionMapBucket.MAX_ENTRIES + index;
+        long startIndex = cacheEntry.getPageIndex() * OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + index;
 
         result = new OClusterPositionEntry[resultSize];
         for (int i = 0; i < resultSize; i++) {
           if (bucket.exists(i + index)) {
-            OClusterPositionMapBucket.PositionEntry val = bucket.get(i + index);
+            OFastRidbagClusterPositionMapBucket.PositionEntry val = bucket.get(i + index);
             assert val != null;
             result[entriesCount] = new OClusterPositionEntry(startIndex + i, val.getPageIndex(), val.getRecordPosition());
             entriesCount++;
@@ -369,8 +369,8 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
       clusterPosition = 0;
     }
 
-    long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
-    int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+    int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
 
     final long lastPage = getLastPage(atomicOperation);
 
@@ -382,7 +382,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     do {
       OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
 
-      OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
       int resultSize = bucket.getSize() - index;
 
       if (resultSize <= 0) {
@@ -391,12 +391,12 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
         index = 0;
       } else {
         int entriesCount = 0;
-        long startIndex = cacheEntry.getPageIndex() * OClusterPositionMapBucket.MAX_ENTRIES + index;
+        long startIndex = cacheEntry.getPageIndex() * OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + index;
 
         result = new long[resultSize];
         for (int i = 0; i < resultSize; i++) {
           if (bucket.exists(i + index)) {
-            result[entriesCount] = startIndex + i - OClusterPositionMapBucket.MAX_ENTRIES;
+            result[entriesCount] = startIndex + i - OFastRidbagClusterPositionMapBucket.MAX_ENTRIES;
             entriesCount++;
           }
         }
@@ -433,8 +433,8 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
       return OCommonConst.EMPTY_LONG_ARRAY;
     }
 
-    long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
-    int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+    int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
 
     final long lastPage = getLastPage(atomicOperation);
     long[] result;
@@ -451,7 +451,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     do {
       OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
 
-      OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
       if (index == Integer.MIN_VALUE) {
         index = bucket.getSize() - 1;
       }
@@ -459,12 +459,12 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
       int resultSize = index + 1;
       int entriesCount = 0;
 
-      long startPosition = cacheEntry.getPageIndex() * OClusterPositionMapBucket.MAX_ENTRIES;
+      long startPosition = cacheEntry.getPageIndex() * OFastRidbagClusterPositionMapBucket.MAX_ENTRIES;
       result = new long[resultSize];
 
       for (int i = 0; i < resultSize; i++) {
         if (bucket.exists(i)) {
-          result[entriesCount] = startPosition + i - OClusterPositionMapBucket.MAX_ENTRIES;
+          result[entriesCount] = startPosition + i - OFastRidbagClusterPositionMapBucket.MAX_ENTRIES;
           entriesCount++;
         }
       }
@@ -493,12 +493,12 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     for (long pageIndex = 1; pageIndex <= lastPage; pageIndex++) {
       OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
       try {
-        OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+        OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
         int bucketSize = bucket.getSize();
 
         for (int index = 0; index < bucketSize; index++) {
           if (bucket.exists(index)) {
-            return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + index - OClusterPositionMapBucket.MAX_ENTRIES;
+            return pageIndex * OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + index - OFastRidbagClusterPositionMapBucket.MAX_ENTRIES;
           }
         }
       } finally {
@@ -510,17 +510,17 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
   }
 
   public byte getStatus(final long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
-    final long pageIndex = (clusterPosition + OClusterPositionMapBucket.MAX_ENTRIES) / OClusterPositionMapBucket.MAX_ENTRIES;
-    final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
+    final long pageIndex = (clusterPosition + OFastRidbagClusterPositionMapBucket.MAX_ENTRIES) / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES;
+    final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
 
     final long lastPage = getLastPage(atomicOperation);
     if (pageIndex > lastPage) {
-      return OClusterPositionMapBucket.NOT_EXISTENT;
+      return OFastRidbagClusterPositionMapBucket.NOT_EXISTENT;
     }
 
     final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
     try {
-      final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
 
       return bucket.getStatus(index);
 
@@ -535,12 +535,12 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     for (long pageIndex = lastPage; pageIndex >= 1; pageIndex--) {
       OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
       try {
-        OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+        OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
         final int bucketSize = bucket.getSize();
 
         for (int index = bucketSize - 1; index >= 0; index--) {
           if (bucket.exists(index)) {
-            return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + index - OClusterPositionMapBucket.MAX_ENTRIES;
+            return pageIndex * OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + index - OFastRidbagClusterPositionMapBucket.MAX_ENTRIES;
           }
         }
       } finally {
@@ -558,9 +558,46 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     final long pageIndex = getLastPage(atomicOperation);
     final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
     try {
-      OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
+      OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
       final int bucketSize = bucket.getSize();
-      return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + bucketSize;
+      return pageIndex * OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + bucketSize;
+    } finally {
+      releasePageFromRead(atomicOperation, cacheEntry);
+    }
+  }
+  
+  /**
+   * returns previous and next node position for current node specified by clusterPosition
+   * @param clusterPosition
+   * @param atomicOperation
+   * @return
+   * @throws IOException 
+   */
+  public HelperClasses.Tuple<Long, Long> getPreviousNextNodeInfo(final long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
+
+    final long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+    final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
+
+    final long lastPage = getLastPage(atomicOperation);
+    if (pageIndex > lastPage) {
+      throw new OClusterPositionMapException(
+          "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
+    }
+
+    final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false);    
+    try {
+      final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
+      OFastRidbagClusterPositionMapBucket.PositionEntry entry = bucket.get(index);
+      Long prevNodePosition = entry.getPreviousNodePosition();
+      if (prevNodePosition == -1){
+        prevNodePosition = null;
+      }
+      Long nxtNodePosition = entry.getNextNodePosition();
+      if (nxtNodePosition == -1){
+        nxtNodePosition = null;
+      }
+      
+      return new HelperClasses.Tuple<>(prevNodePosition, nxtNodePosition);
     } finally {
       releasePageFromRead(atomicOperation, cacheEntry);
     }

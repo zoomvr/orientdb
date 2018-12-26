@@ -141,6 +141,15 @@ class ORidBagArrayNode extends ORidbagNode{
     else{
       OLongSerializer.INSTANCE.serialize(nextNode, stream, pos);
     }
+    
+    //serialize reference to previous node
+    if (previousNode == null){
+      OLongSerializer.INSTANCE.serialize(-1l, stream, pos);
+    }
+    else{
+      OLongSerializer.INSTANCE.serialize(previousNode, stream, pos);
+    }
+    
     pos += OLongSerializer.LONG_SIZE;
     //serialize number of stored rids
     OIntegerSerializer.INSTANCE.serialize(rids.length, stream, pos);

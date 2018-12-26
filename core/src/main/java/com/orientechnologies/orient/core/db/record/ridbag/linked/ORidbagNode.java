@@ -45,6 +45,8 @@ abstract class ORidbagNode{
   boolean stored = false;
   //reference to next node, as in linked list
   Long nextNode;
+  //reference to previous node, as in double linked list
+  Long previousNode;
   final OFastRidBagPaginatedCluster cluster;
 
   protected abstract int capacity();
@@ -53,11 +55,14 @@ abstract class ORidbagNode{
   protected abstract OIdentifiable getAt(int index);
   protected abstract boolean remove(OIdentifiable value);
   protected abstract boolean contains(OIdentifiable value);
-//  protected abstract void loadInternal();
   protected abstract boolean isTailNode();
   protected abstract OIdentifiable[] getAllRids();
   protected abstract byte getNodeType();
   protected abstract byte[] serializeInternal();
+  /**
+   * pre-allocates node in cluster
+   * @throws IOException 
+   */
   protected abstract void initInCluster() throws IOException;
   /**
    * for internal use, caller have to take care of index bounds
@@ -194,6 +199,15 @@ abstract class ORidbagNode{
   public void setNextNode(Long nextNode) {
     this.nextNode = nextNode;
     stored = false;
-  }    
+  }
 
+  public Long getPreviousNode() {
+    return previousNode;
+  }
+
+  public void setPreviousNode(Long previousNode) {
+    this.previousNode = previousNode;
+    stored = false;
+  }
+    
 };

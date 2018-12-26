@@ -105,8 +105,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           //created merged node
           allocateSize += extraSlots;
           ORidbagNode ridBagNode;
-          ridBagNode = createNodeOfSpecificSize(allocateSize, true);
-          linkActiveNodeToNewOne(ridBagNode);
+          ridBagNode = createNodeOfSpecificSize(allocateSize, true, activeNode.getClusterPosition());          
           activeNode = ridBagNode;
 
           OIdentifiable[] mergedTail = mergeTail(extraSlots);
@@ -121,14 +120,12 @@ public class OLinkedListRidBag implements ORidBagDelegate{
             activeNode.addAll(mergedTail);
             relaxTail();
             //add new rid to tail
-            ORidbagNode node = createNodeOfSpecificSize(1, true);
-            linkActiveNodeToNewOne(node);
+            ORidbagNode node = createNodeOfSpecificSize(1, true, activeNode.getClusterPosition());            
             activeNode = node;
             ++tailSize;
           }
         } else {
-          ORidbagNode node = createNodeOfSpecificSize(1, true);
-          linkActiveNodeToNewOne(node);
+          ORidbagNode node = createNodeOfSpecificSize(1, true, activeNode.getClusterPosition());          
           activeNode = node;
           ++tailSize;
         }
@@ -182,8 +179,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
     ORidbagNode megaNode;
     try{
-      megaNode = createNodeOfSpecificSize(mergedRids.length, true);
-      linkActiveNodeToNewOne(megaNode);
+      megaNode = createNodeOfSpecificSize(mergedRids.length, true, activeNode.getClusterPosition());      
     }
     catch (IOException exc){
       OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
@@ -236,6 +232,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
             }
             else{
               previousNode.setNextNode(nextNode.getClusterPosition());
+              nextNode.setPreviousNode(previousNode.getClusterPosition());
             }
           }
         }
@@ -249,6 +246,47 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
   }
 
+  private void linkPreviousNodeWithNextAndDeleteCurrent(ORidbagNode currentNode) throws IOException{
+    ORidbagNode nextNode = getNextNodeOfNode(currentNode);
+    ORidbagNode previousNode = getPreviousNodeOfNode(currentNode);
+    deleteRidbagNodeData(currentNode);
+    if (previousNode != null){
+      if (nextNode != null){
+        previousNode.setNextNode(nextNode.getClusterPosition());
+      }
+      else{
+        previousNode.setNextNode(null);
+      }
+    }
+    if (nextNode != null){
+      if (previousNode != null){
+        nextNode.setPreviousNode(previousNode.getClusterPosition());
+      }
+      else{
+        nextNode.setPreviousNode(null);
+      }
+    }
+  }
+  
+  private void linkNodeToNode(ORidbagNode previousNode, ORidbagNode nextNode){
+    if (previousNode != null){
+      if (nextNode != null){
+        previousNode.setNextNode(nextNode.getClusterPosition());
+      }
+      else{
+        previousNode.setNextNode(null);
+      }
+    }
+    if (nextNode != null){
+      if (previousNode != null){
+        nextNode.setPreviousNode(previousNode.getClusterPosition());
+      }
+      else{
+        nextNode.setPreviousNode(null);
+      }
+    }
+  }
+  
   @Override
   public void remove(OIdentifiable value) {
     boolean removed = false;    
@@ -266,44 +304,47 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         }
         boolean isTail = node.isTailNode();
         if (node.remove(value)){
-          if (activeNode == null && !isTail){
-            activeNode = node;
-          }
-          else{
-            if (!isTail){
-              ridbagNodes.remove(node);
-              freeNodes.add(node);
+          if (isTail){
+            --tailSize;
+            try{
+              linkPreviousNodeWithNextAndDeleteCurrent(node);
             }
-          }          
+            catch (IOException exc){
+              OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+              throw new ODatabaseException(exc.getMessage());
+            }
+          }      
           removed = true;
         }
       }
     }
     else{
       //go through all
-      for (ORidbagNode ridbagNode : ridbagNodes){
-        if (!ridbagNode.isLoaded()){
-          try{
-            ridbagNode.load();
+      ORidbagNode previousNode = null;
+      ORidbagNode currentIteratingNode = firstNode;
+      while(currentIteratingNode != null){
+        try{
+          if (!currentIteratingNode.isLoaded()){            
+            currentIteratingNode.load();            
           }
-          catch (IOException exc){
-            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-            throw new ODatabaseException(exc.getMessage());
+          boolean isTail = currentIteratingNode.isTailNode();
+          if (currentIteratingNode.remove(value)){
+            if (isTail){
+              --tailSize;
+              ORidbagNode nextNode = getNextNodeOfNode(currentIteratingNode);
+              linkNodeToNode(previousNode, nextNode);
+              deleteRidbagNodeData(currentIteratingNode);              
+            }      
+            removed = true;
+            break;
           }
+
+          previousNode = currentIteratingNode;
+          currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
         }
-        boolean isTail = ridbagNode.isTailNode();
-        if (ridbagNode.remove(value)){
-          if (activeNode == null && !isTail){
-            activeNode = ridbagNode;
-          }
-          else{
-            if (!isTail){
-              ridbagNodes.remove(ridbagNode);
-              freeNodes.add(ridbagNode);
-            }
-          }          
-          removed = true;
-          break;
+        catch (IOException exc){
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+          throw new ODatabaseException(exc.getMessage());
         }
       }
     }
@@ -323,32 +364,20 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   @Override
   public int getSerializedSize() {
     BytesContainer container = new BytesContainer();
-    try{
-      serializeInternal(container, true);
-    }
-    catch (IOException exc){
-      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-      throw new ODatabaseException(exc.getMessage());
-    }
+    serializeInternal(container);
     
     return container.offset;
   }
 
   @Override
   public int getSerializedSize(byte[] stream, int offset) {
-    BytesContainer container = new BytesContainer();
-    try{
-      serializeInternal(container, true);
-    }
-    catch (IOException exc){
-      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-      throw new ODatabaseException(exc.getMessage());
-    }
+    BytesContainer container = new BytesContainer();    
+    serializeInternal(container);    
     
     return container.offset;
   }  
   
-  private void serializeInternal(BytesContainer container, boolean justRunThrough) throws IOException{
+  private void serializeInternal(BytesContainer container){
     //serialize currentSize
     OVarIntSerializer.write(container, size);
     //serialize tail size
@@ -385,14 +414,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
-    BytesContainer container = new BytesContainer(stream, offset);
-    try{
-      serializeInternal(container, false);
-    }
-    catch (IOException exc){
-      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-      throw new ODatabaseException(exc.getMessage());
-    }
+    BytesContainer container = new BytesContainer(stream, offset);    
+    serializeInternal(container);    
     return container.offset;
   }
 
@@ -508,7 +531,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void setOwner(ORecord owner) {
-    if (owner != null && this.owner != null && !this.owner.equals(owner)) {
+    /*if (owner != null && this.owner != null && !this.owner.equals(owner)) {
       throw new IllegalStateException("This data structure is owned by document " + owner
           + " if you want to use it in other document create new rid bag instance and copy content of current one.");
     }
@@ -550,7 +573,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           ORecordInternal.track(this.owner, ridbagNode.getAt(i));
         }
       }      
-    }
+    }*/
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
@@ -588,50 +612,58 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void convertLinks2Records() {
-    Iterator<ORidbagNode> iter = ridbagNodes.iterator();
-    while (iter.hasNext()){
-      ORidbagNode ridbagNode = iter.next();
-      if (!ridbagNode.isLoaded()){
-        try{
-          ridbagNode.load();
+    ORidbagNode currentIteratingNode = firstNode;
+    try{
+      while (currentIteratingNode != null){      
+        if (!currentIteratingNode.isLoaded()){
+          try{
+            currentIteratingNode.load();
+          }
+          catch (IOException exc){
+            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+            throw new ODatabaseException(exc.getMessage());
+          }
         }
-        catch (IOException exc){
-          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-          throw new ODatabaseException(exc.getMessage());
+        for (int i = 0; i < currentIteratingNode.currentIndex(); i++){
+          OIdentifiable id = currentIteratingNode.getAt(i);
+          if (id.getRecord() != null){
+            currentIteratingNode.setAt(id.getRecord(), i);
+          }
         }
+
+        currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
       }
-      for (int i = 0; i < ridbagNode.currentIndex(); i++){
-        OIdentifiable id = ridbagNode.getAt(i);
-        if (id.getRecord() != null){
-          ridbagNode.setAt(id.getRecord(), i);
-        }
-      }
+    }
+    catch (IOException exc){
+      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+      throw new ODatabaseException(exc.getMessage());
     }
   }
 
   @Override
   public boolean convertRecords2Links() {
-    Iterator<ORidbagNode> iter = ridbagNodes.iterator();
-    while (iter.hasNext()){
-      ORidbagNode ridbagNode = iter.next();
-      if (!ridbagNode.isLoaded()){
-        try{
-          ridbagNode.load();
+    ORidbagNode currentIteratingNode = firstNode;
+    while (currentIteratingNode != null){      
+      try{
+        if (!currentIteratingNode.isLoaded()){        
+          currentIteratingNode.load();        
         }
-        catch (IOException exc){
-          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-          throw new ODatabaseException(exc.getMessage());
+        for (int i = 0; i < currentIteratingNode.currentIndex(); i++){
+          OIdentifiable id = currentIteratingNode.getAt(i);
+          if (id instanceof ORecord){
+            ORecord rec = (ORecord)id;
+            currentIteratingNode.setAt(rec.getIdentity(), i);
+          }
+          else{
+            return false;
+          }
         }
+
+        currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
       }
-      for (int i = 0; i < ridbagNode.currentIndex(); i++){
-        OIdentifiable id = ridbagNode.getAt(i);
-        if (id instanceof ORecord){
-          ORecord rec = (ORecord)id;
-          ridbagNode.setAt(rec.getIdentity(), i);
-        }
-        else{
-          return false;
-        }
+      catch (IOException exc){
+        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+        throw new ODatabaseException(exc.getMessage());
       }
     }        
 
@@ -744,11 +776,14 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     this.cluster = cluster;
   }
   
-  private ORidbagNode createNodeOfSpecificSize(int numberOfRids, boolean considerNodeLoaded) throws IOException{
+  private ORidbagNode createNodeOfSpecificSize(int numberOfRids, boolean considerNodeLoaded, Long previousNode) throws IOException{
     OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(ORidbagNode.RECORD_TYPE);
     ORidbagNode ret;    
     
-    ret = new ORidBagArrayNode(newNodePhysicalPosition.clusterPosition, numberOfRids, considerNodeLoaded, cluster);    
+    ret = new ORidBagArrayNode(newNodePhysicalPosition.clusterPosition, numberOfRids, considerNodeLoaded, cluster);
+    ret.setPreviousNode(previousNode);
+    ret.setNextNode(null);
+    
     ret.initInCluster();
     
     return ret;
@@ -756,11 +791,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
   private boolean ifOneMoreFitsToPage(ORidbagNode referenceNode) throws IOException{    
     return cluster.checkIfNewContentFitsInPage(referenceNode.getClusterPosition(), ORidbagNode.getSerializedSize(1));
-  }
-
-  private void linkActiveNodeToNewOne(ORidbagNode node) {
-    activeNode.setNextNode(node.getClusterPosition());
-  }      
+  }     
   
   ORidbagNode getNextNodeOfNode(ORidbagNode node) throws IOException{
     Long nextNodeRef = node.getNextNode();
@@ -769,6 +800,17 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
     else{
       ORidbagNode nextNode = new ORidBagArrayNode(nextNodeRef, false, cluster);      
+      return nextNode;
+    }
+  }
+  
+  ORidbagNode getPreviousNodeOfNode(ORidbagNode node) throws IOException{
+    Long previousNodeRef = node.getPreviousNode();
+    if (previousNodeRef == null || previousNodeRef == -1){
+      return null;
+    }
+    else{
+      ORidbagNode nextNode = new ORidBagArrayNode(previousNodeRef, false, cluster);      
       return nextNode;
     }
   }
