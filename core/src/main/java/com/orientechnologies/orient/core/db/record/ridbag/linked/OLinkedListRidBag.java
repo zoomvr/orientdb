@@ -475,8 +475,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     while (currentIteratingNode != null){
       try{
         //have to do load because we need reference to next node
-        if (currentIteratingNode.isLoaded()){            
-          currentIteratingNode.load();            
+        if (currentIteratingNode.isLoadedMetdata()){            
+          currentIteratingNode.loadMetadata();
         }
         deleteRidbagNodeData(currentIteratingNode);
 

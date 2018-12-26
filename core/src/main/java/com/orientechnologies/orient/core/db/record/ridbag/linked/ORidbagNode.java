@@ -315,5 +315,9 @@ class ORidbagNode{
     previousNode = prevNextPosition.getFirstVal();
     nextNode = prevNextPosition.getSecondVal();
   }
+  
+  protected boolean isLoadedMetdata(){
+    return loadedMetadata;
+  }
     
 };
