@@ -20,6 +20,8 @@ import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OLinkSerializer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
+import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.ORawBuffer;
 import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import java.io.IOException;
@@ -29,17 +31,12 @@ import java.util.Objects;
  *
  * @author marko
  */
-abstract class ORidbagNode{    
-    
-  public ORidbagNode(long rid, boolean considerLoaded, OFastRidBagPaginatedCluster cluster){
-    clusterPosition = rid;
-    loaded = considerLoaded;    
-    this.cluster = cluster;
-  }
+class ORidbagNode{
   
   protected final long clusterPosition;  
   private int version;
   private boolean loaded = false;    
+  private boolean loadedMetadata = false;
   int currentIndex = 0;
   static byte RECORD_TYPE = 'l';
   boolean stored = false;
@@ -48,47 +45,87 @@ abstract class ORidbagNode{
   //reference to previous node, as in double linked list
   Long previousNode;
   final OFastRidBagPaginatedCluster cluster;
-
-  protected abstract int capacity();
-  protected abstract void addInternal(OIdentifiable value);
-  protected abstract void addAllInternal(OIdentifiable[] values);
-  protected abstract OIdentifiable getAt(int index);
-  protected abstract boolean remove(OIdentifiable value);
-  protected abstract boolean contains(OIdentifiable value);
-  protected abstract boolean isTailNode();
-  protected abstract OIdentifiable[] getAllRids();
-  protected abstract byte getNodeType();
-  protected abstract byte[] serializeInternal();
-  /**
-   * pre-allocates node in cluster
-   * @throws IOException 
-   */
-  protected abstract void initInCluster() throws IOException;
-  /**
-   * for internal use, caller have to take care of index bounds
-   * @param value
-   * @param index 
-   */
-  protected abstract void setAt(OIdentifiable value, int index);
-  protected abstract void addInDeserializeInternal(OIdentifiable value, int index);
+  private OIdentifiable[] rids;                     
+      
+  
+  protected ORidbagNode(long physicalPosition, boolean considerLoaded, OFastRidBagPaginatedCluster cluster) {
+    clusterPosition = physicalPosition;
+    loaded = considerLoaded;
+    loadedMetadata = considerLoaded;
+    this.cluster = cluster;    
+  }
+  
+  //will also pre allocate size for rids in cluster
+  protected ORidbagNode(long physicalPosition, int initialCapacity, boolean considerLoaded, OFastRidBagPaginatedCluster cluster){
+    this(physicalPosition, considerLoaded, cluster);
+    rids = new OIdentifiable[initialCapacity];
+    for (int i = 0; i < initialCapacity; i++){
+      rids[i] = new ORecordId(-1, -1);
+    }
+  }
   
   protected int currentIndex(){
     return currentIndex;
-  }    
+  }
+  
+  protected int capacity(){
+    return rids.length;
+  }
+  
+  protected OIdentifiable getAt(int index){
+    return rids[index];
+  }
   
   protected boolean add(OIdentifiable value){
     if (currentIndex() < capacity()){
-      addInternal(value);
+      rids[currentIndex] = value;
       currentIndex++;
       stored = false;
       return true;
     }
     return false;
   }
+  
+  protected boolean remove(OIdentifiable value){      
+    for (int i = 0; i < rids.length; i++){
+      OIdentifiable val = rids[i];
+      if (val.equals(value)){
+        //found so remove it
+        //first shift all
+        for (int j = i + 1; j < rids.length; j++){
+          rids[j - 1] = rids[j];
+        }
+        --currentIndex;
+        stored = false;
+        return true;
+      }
+    }
+
+    return false;
+  }
+  
+  protected boolean contains(OIdentifiable value){
+    for (int i = 0; i < rids.length; i++){
+      OIdentifiable val = rids[i];
+      if (val.equals(value)){
+        return true;
+      }
+    }
+
+    return false;
+  }
+  
+  protected boolean isTailNode(){    
+    return capacity() == 1 && currentIndex == 1;
+  }
+  
+  protected OIdentifiable[] getAllRids(){
+    return rids;
+  }
 
   protected boolean addAll(OIdentifiable[] values){
     if (currentIndex + values.length <= capacity()){
-      addAllInternal(values);              
+      System.arraycopy(values, 0, rids, currentIndex, values.length);              
       currentIndex += values.length;
       stored = false;
       return true;
@@ -101,6 +138,9 @@ abstract class ORidbagNode{
   }
 
   protected void load() throws IOException{
+    if (!loadedMetadata){
+      loadMetadata();
+    }
     if (!loaded){
       ORawBuffer buffer = cluster.readRecord(clusterPosition, false);
       byte[] stream = buffer.getBuffer();
@@ -208,6 +248,72 @@ abstract class ORidbagNode{
   public void setPreviousNode(Long previousNode) {
     this.previousNode = previousNode;
     stored = false;
+  }
+  
+  /**
+   * pre-allocates node in cluster
+   * @throws IOException 
+   */
+  protected void initInCluster() throws IOException{
+    byte[] bytes = serialize();
+    OPhysicalPosition ppos = new OPhysicalPosition(clusterPosition);
+    cluster.createRecord(bytes, 1, RECORD_TYPE, ppos);
+  }
+  
+  protected byte[] serializeInternal(){
+    int size = getSerializedSize(rids.length);
+    byte[] stream = new byte[size];
+    int pos = 0;
+    
+    //serialize currentIndex
+    OIntegerSerializer.INSTANCE.serialize(currentIndex, stream, pos);
+    pos += OIntegerSerializer.INT_SIZE;
+    
+    //serialize reference to next node
+    if (nextNode == null){
+      OLongSerializer.INSTANCE.serialize(-1l, stream, pos);
+    }
+    else{
+      OLongSerializer.INSTANCE.serialize(nextNode, stream, pos);
+    }
+    
+    //serialize reference to previous node
+    if (previousNode == null){
+      OLongSerializer.INSTANCE.serialize(-1l, stream, pos);
+    }
+    else{
+      OLongSerializer.INSTANCE.serialize(previousNode, stream, pos);
+    }
+    
+    pos += OLongSerializer.LONG_SIZE;
+    //serialize number of stored rids
+    OIntegerSerializer.INSTANCE.serialize(rids.length, stream, pos);
+    pos += OIntegerSerializer.INT_SIZE;
+    //serialize rids
+    for (OIdentifiable value : rids){
+      OLinkSerializer.INSTANCE.serialize(value, stream, pos);
+      pos += OLinkSerializer.RID_SIZE;
+    }
+    return stream;
+  }
+  
+  /**
+   * for internal use, caller have to take care of index bounds
+   * @param value
+   * @param index 
+   */
+  protected void setAt(OIdentifiable value, int index){
+    rids[index] = value;
+  }
+  
+  protected void addInDeserializeInternal(OIdentifiable value, int index){
+    rids[index] = value;
+  }
+  
+  protected void loadMetadata() throws IOException{    
+    HelperClasses.Tuple<Long, Long> prevNextPosition = cluster.getNodePreviousNextNodePositons(clusterPosition);
+    previousNode = prevNextPosition.getFirstVal();
+    nextNode = prevNextPosition.getSecondVal();
   }
     
 };

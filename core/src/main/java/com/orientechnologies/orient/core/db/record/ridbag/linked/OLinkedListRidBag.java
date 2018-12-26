@@ -434,7 +434,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       activeNode = null;
     }
     else{
-      activeNode = new ORidBagArrayNode(activeNodeRef, false, cluster);
+      activeNode = new ORidbagNode(activeNodeRef, false, cluster);
       try{
         activeNode.load();
       }
@@ -450,7 +450,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       firstNode = null;
     }
     else{
-      firstNode = new ORidBagArrayNode(firstNodeRef, false, cluster);
+      firstNode = new ORidbagNode(firstNodeRef, false, cluster);
       try{
         firstNode.load();
       }
@@ -780,7 +780,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(ORidbagNode.RECORD_TYPE);
     ORidbagNode ret;    
     
-    ret = new ORidBagArrayNode(newNodePhysicalPosition.clusterPosition, numberOfRids, considerNodeLoaded, cluster);
+    ret = new ORidbagNode(newNodePhysicalPosition.clusterPosition, numberOfRids, considerNodeLoaded, cluster);
     ret.setPreviousNode(previousNode);
     ret.setNextNode(null);
     
@@ -799,7 +799,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       return null;
     }
     else{
-      ORidbagNode nextNode = new ORidBagArrayNode(nextNodeRef, false, cluster);      
+      ORidbagNode nextNode = new ORidbagNode(nextNodeRef, false, cluster);      
       return nextNode;
     }
   }
@@ -810,7 +810,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       return null;
     }
     else{
-      ORidbagNode nextNode = new ORidBagArrayNode(previousNodeRef, false, cluster);      
+      ORidbagNode nextNode = new ORidbagNode(previousNodeRef, false, cluster);      
       return nextNode;
     }
   }

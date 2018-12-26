@@ -39,6 +39,7 @@ import com.orientechnologies.orient.core.exception.ORecordNotFoundException;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.metadata.OMetadataInternal;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.ORawBuffer;
 import com.orientechnologies.orient.core.storage.OStorage;
@@ -2104,6 +2105,11 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         releasePageFromRead(atomicOperation, cacheEntry);
       }      
     }
+  }
+  
+  public HelperClasses.Tuple<Long, Long> getNodePreviousNextNodePositons(long position) throws IOException{
+    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    return clusterPositionMap.getPreviousNextNodeInfo(position, atomicOperation);
   }
   
 }
