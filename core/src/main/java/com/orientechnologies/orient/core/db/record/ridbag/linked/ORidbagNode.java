@@ -15,10 +15,11 @@
  */
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
+import com.orientechnologies.common.serialization.types.OIntegerSerializer;
+import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
+import com.orientechnologies.orient.core.id.ORecordId;
+import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OLinkSerializer;
 import com.orientechnologies.orient.core.storage.ORawBuffer;
 import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import java.io.IOException;
@@ -30,18 +31,21 @@ import java.util.Objects;
  */
 abstract class ORidbagNode{    
     
-  public ORidbagNode(long rid, boolean considerLoaded){
+  public ORidbagNode(long rid, boolean considerLoaded, OFastRidBagPaginatedCluster cluster){
     clusterPosition = rid;
-    loaded = considerLoaded;
+    loaded = considerLoaded;    
+    this.cluster = cluster;
   }
   
-  private final long clusterPosition;
-  int pageIndex; 
+  protected final long clusterPosition;  
   private int version;
   private boolean loaded = false;    
   int currentIndex = 0;
   static byte RECORD_TYPE = 'l';
   boolean stored = false;
+  //reference to next node, as in linked list
+  Long nextNode;
+  final OFastRidBagPaginatedCluster cluster;
 
   protected abstract int capacity();
   protected abstract void addInternal(OIdentifiable value);
@@ -54,6 +58,7 @@ abstract class ORidbagNode{
   protected abstract OIdentifiable[] getAllRids();
   protected abstract byte getNodeType();
   protected abstract byte[] serializeInternal();
+  protected abstract void initInCluster() throws IOException;
   /**
    * for internal use, caller have to take care of index bounds
    * @param value
@@ -90,7 +95,7 @@ abstract class ORidbagNode{
     return clusterPosition;
   }
 
-  protected void load(OFastRidBagPaginatedCluster cluster) throws IOException{
+  protected void load() throws IOException{
     if (!loaded){
       ORawBuffer buffer = cluster.readRecord(clusterPosition, false);
       byte[] stream = buffer.getBuffer();
@@ -105,6 +110,10 @@ abstract class ORidbagNode{
 
   protected boolean isMaxSizeNodeFullNode(){
     return capacity() == OLinkedListRidBag.MAX_RIDBAG_NODE_SIZE && currentIndex == OLinkedListRidBag.MAX_RIDBAG_NODE_SIZE;
+  }
+  
+  protected boolean isFullNode(){
+    return capacity() == currentIndex();
   }
 
   protected void reset(){
@@ -145,12 +154,22 @@ abstract class ORidbagNode{
     return version;
   }
   
-  protected void deserialize(byte[] content){
-    BytesContainer conatiner = new BytesContainer(content);
-    long size = OVarIntSerializer.readAsLong(conatiner);
+  protected void deserialize(byte[] content){    
+    int pos = 0;
+    long nextNodeRef = OLongSerializer.INSTANCE.deserialize(content, pos);
+    if (nextNodeRef != -1){
+      nextNode = null;
+    }
+    else{      
+      nextNode = nextNodeRef;
+    }
+    pos += OLongSerializer.LONG_SIZE;
+    int size = OIntegerSerializer.INSTANCE.deserialize(content, pos);
+    pos += OIntegerSerializer.INT_SIZE;    
     for (int i = 0; i < size; i++){
-      OIdentifiable value = HelperClasses.readOptimizedLink(conatiner, false);
+      ORecordId value = OLinkSerializer.INSTANCE.deserialize(content, pos);
       addInDeserializeInternal(value, i);
+      pos += OLinkSerializer.RID_SIZE;
     }
   }
   
@@ -163,5 +182,18 @@ abstract class ORidbagNode{
     stored = true;
     return ret;
   }
+  
+  protected static int getSerializedSize(int numberOfRids){
+    return OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE + OIntegerSerializer.INT_SIZE + OLinkSerializer.RID_SIZE * numberOfRids;
+  }
+
+  public Long getNextNode() {
+    return nextNode;
+  }
+
+  public void setNextNode(Long nextNode) {
+    this.nextNode = nextNode;
+    stored = false;
+  }    
 
 };

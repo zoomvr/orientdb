@@ -15,11 +15,14 @@
  */
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
+import com.orientechnologies.common.serialization.types.OIntegerSerializer;
+import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
+import com.orientechnologies.orient.core.id.ORecordId;
+import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OLinkSerializer;
 import com.orientechnologies.orient.core.storage.OPhysicalPosition;
+import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
+import java.io.IOException;
 
 /**
  *
@@ -28,23 +31,31 @@ import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 class ORidBagArrayNode extends ORidbagNode{
   
   protected static byte RIDBAG_ARRAY_NODE_TYPE = 'a';
-  private OIdentifiable[] rids;  
+  private OIdentifiable[] rids;   
   
   @Override
   protected byte getNodeType(){
     return RIDBAG_ARRAY_NODE_TYPE;
   }
   
-  protected ORidBagArrayNode(long physicalPosition, boolean initContainer, boolean considerLoaded) {
-    super(physicalPosition, considerLoaded);
-    if (initContainer){
-      rids = new OIdentifiable[1];
+  protected ORidBagArrayNode(long physicalPosition, boolean considerLoaded, OFastRidBagPaginatedCluster cluster) {
+    super(physicalPosition, considerLoaded, cluster);    
+  }
+  
+  //will also pre allocate size for rids in cluster
+  protected ORidBagArrayNode(long physicalPosition, int initialCapacity, boolean considerLoaded, OFastRidBagPaginatedCluster cluster){
+    super(physicalPosition, considerLoaded, cluster);
+    rids = new OIdentifiable[initialCapacity];
+    for (int i = 0; i < initialCapacity; i++){
+      rids[i] = new ORecordId(-1, -1);
     }
   }
   
-  protected ORidBagArrayNode(long physicalPosition, int initialCapacity, boolean considerLoaded){
-    super(physicalPosition, considerLoaded);
-    rids = new OIdentifiable[initialCapacity];
+  @Override
+  protected void initInCluster() throws IOException{
+    byte[] bytes = serialize();
+    OPhysicalPosition ppos = new OPhysicalPosition(clusterPosition);
+    cluster.createRecord(bytes, 1, RECORD_TYPE, ppos);
   }
   
   @Override
@@ -78,6 +89,7 @@ class ORidBagArrayNode extends ORidbagNode{
           rids[j - 1] = rids[j];
         }
         --currentIndex;
+        stored = false;
         return true;
       }
     }
@@ -98,9 +110,8 @@ class ORidBagArrayNode extends ORidbagNode{
   }
   
   @Override
-  protected boolean isTailNode(){
-    return false;
-//    return capacity() == 1 && currentIndex == 1;
+  protected boolean isTailNode(){    
+    return capacity() == 1 && currentIndex == 1;
   }
   
   @Override
@@ -115,12 +126,31 @@ class ORidBagArrayNode extends ORidbagNode{
   
   @Override
   protected byte[] serializeInternal(){
-    BytesContainer container = new BytesContainer();
-    OVarIntSerializer.write(container, rids.length);
-    for (OIdentifiable value : rids){
-      HelperClasses.writeLinkOptimized(container, value);
+    int size = getSerializedSize(rids.length);
+    byte[] stream = new byte[size];
+    int pos = 0;
+    
+    //serialize currentIndex
+    OIntegerSerializer.INSTANCE.serialize(currentIndex, stream, pos);
+    pos += OIntegerSerializer.INT_SIZE;
+    
+    //serialize reference to next node
+    if (nextNode == null){
+      OLongSerializer.INSTANCE.serialize(-1l, stream, pos);
     }
-    return container.fitBytes();
+    else{
+      OLongSerializer.INSTANCE.serialize(nextNode, stream, pos);
+    }
+    pos += OLongSerializer.LONG_SIZE;
+    //serialize number of stored rids
+    OIntegerSerializer.INSTANCE.serialize(rids.length, stream, pos);
+    pos += OIntegerSerializer.INT_SIZE;
+    //serialize rids
+    for (OIdentifiable value : rids){
+      OLinkSerializer.INSTANCE.serialize(value, stream, pos);
+      pos += OLinkSerializer.RID_SIZE;
+    }
+    return stream;
   }
   
   @Override

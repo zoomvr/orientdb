@@ -30,8 +30,7 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
 
   private static final int iteratingIndexInitialvalue = -1;
   
-  private final OLinkedListRidBag ridbag;
-  private int currentNodeIndex = -1;
+  private final OLinkedListRidBag ridbag;  
   private ORidbagNode currentNode = null;
   private int currentNodeIteratingIndex = iteratingIndexInitialvalue;
   private boolean calledNext = true;
@@ -40,23 +39,12 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
   public OLinkedListRidBagIterator(OLinkedListRidBag ridbag, OFastRidBagPaginatedCluster cluster){
     this.ridbag = ridbag;
     this.cluster = cluster;
+    currentNode = ridbag.getFirstNode();
   }
   
   @Override
   public boolean hasNext() {
     try{
-      if (currentNode == null){
-        try{
-          getNextNode();
-        }
-        catch (IOException exc){
-          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-          throw new ODatabaseException(exc.getMessage());
-        }
-      }
-      if (currentNode == null){
-        return false;
-      }
       boolean found = false;
       while (!found){
         if (!calledNext){
@@ -93,10 +81,10 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
   }
   
   private void getNextNode() throws IOException{
-    currentNode = ridbag.getAtIndex(++currentNodeIndex);
+    currentNode = ridbag.getNextNodeOfNode(currentNode);
     currentNodeIteratingIndex = iteratingIndexInitialvalue;
     if (currentNode != null && !currentNode.isLoaded()){
-      currentNode.load(cluster);
+      currentNode.load();
     }
   }
   
