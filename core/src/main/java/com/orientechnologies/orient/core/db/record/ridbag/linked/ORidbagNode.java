@@ -31,14 +31,15 @@ import java.util.Objects;
  *
  * @author marko
  */
-class ORidbagNode{
+public class ORidbagNode{
   
   protected final long clusterPosition;  
   private int version;
   private boolean loaded = false;    
   private boolean loadedMetadata = false;
   int currentIndex = 0;
-  static byte RECORD_TYPE = 'l';
+  public static byte RECORD_TYPE_LINKED_NODE = 'l';
+  public static byte RECORD_TYPE_ARRAY_NODE = 'a';
   boolean stored = false;
   //reference to next node, as in linked list
   Long nextNode;
@@ -257,7 +258,7 @@ class ORidbagNode{
   protected void initInCluster() throws IOException{
     byte[] bytes = serialize();
     OPhysicalPosition ppos = new OPhysicalPosition(clusterPosition);
-    cluster.createRecord(bytes, 1, RECORD_TYPE, ppos);
+    cluster.createRecord(bytes, 1, RECORD_TYPE_LINKED_NODE, ppos);
   }
   
   protected byte[] serializeInternal(){

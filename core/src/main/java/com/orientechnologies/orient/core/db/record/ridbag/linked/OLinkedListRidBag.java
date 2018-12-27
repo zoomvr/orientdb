@@ -400,17 +400,17 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
   }
   
-  private void serializeNodeData(ORidbagNode node) throws IOException{
-    byte[] serialized = node.serialize();    
-    OPhysicalPosition ppos = new OPhysicalPosition(node.getClusterPosition());
-    OPaginatedCluster.RECORD_STATUS status = cluster.getRecordStatus(node.getClusterPosition());
-    if (status == OPaginatedCluster.RECORD_STATUS.ALLOCATED || status == OPaginatedCluster.RECORD_STATUS.REMOVED){
-      cluster.createRecord(serialized, node.getVersion(), ORidbagNode.RECORD_TYPE, ppos);
-    }
-    else if (status == OPaginatedCluster.RECORD_STATUS.PRESENT){
-      cluster.updateRecord(ppos.clusterPosition, serialized, node.getVersion(), ORidbagNode.RECORD_TYPE);
-    }
-  }
+//  private void serializeNodeData(ORidbagNode node) throws IOException{
+//    byte[] serialized = node.serialize();    
+//    OPhysicalPosition ppos = new OPhysicalPosition(node.getClusterPosition());
+//    OPaginatedCluster.RECORD_STATUS status = cluster.getRecordStatus(node.getClusterPosition());
+//    if (status == OPaginatedCluster.RECORD_STATUS.ALLOCATED || status == OPaginatedCluster.RECORD_STATUS.REMOVED){
+//      cluster.createRecord(serialized, node.getVersion(), ORidbagNode.RECORD_TYPE, ppos);
+//    }
+//    else if (status == OPaginatedCluster.RECORD_STATUS.PRESENT){
+//      cluster.updateRecord(ppos.clusterPosition, serialized, node.getVersion(), ORidbagNode.RECORD_TYPE);
+//    }
+//  }
   
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
@@ -531,49 +531,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void setOwner(ORecord owner) {
-    /*if (owner != null && this.owner != null && !this.owner.equals(owner)) {
-      throw new IllegalStateException("This data structure is owned by document " + owner
-          + " if you want to use it in other document create new rid bag instance and copy content of current one.");
-    }
-    if (this.owner != null) {
-      Iterator<ORidbagNode> iter = ridbagNodes.iterator();
-      while (iter.hasNext()){
-        ORidbagNode ridbagNode = iter.next();
-        if (!ridbagNode.isLoaded()){
-          try{
-            ridbagNode.load();
-          }
-          catch (IOException exc){
-            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-            throw new ODatabaseException(exc.getMessage());
-          }
-        }
-        for (int i = 0; i < ridbagNode.currentIndex(); i++){          
-          ORecordInternal.unTrack(this.owner, ridbagNode.getAt(i));
-        }
-      }      
-    }
-
-    this.owner = owner;
-    
-    if (this.owner != null) {
-      Iterator<ORidbagNode> iter = ridbagNodes.iterator();
-      while (iter.hasNext()){
-        ORidbagNode ridbagNode = iter.next();
-        if (!ridbagNode.isLoaded()){
-          try{
-            ridbagNode.load();
-          }
-          catch (IOException exc){
-            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-            throw new ODatabaseException(exc.getMessage());
-          }
-        }
-        for (int i = 0; i < ridbagNode.currentIndex(); i++){          
-          ORecordInternal.track(this.owner, ridbagNode.getAt(i));
-        }
-      }      
-    }*/
     throw new UnsupportedOperationException("Not implemented");
   }
 
@@ -777,7 +734,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
   
   private ORidbagNode createNodeOfSpecificSize(int numberOfRids, boolean considerNodeLoaded, Long previousNode) throws IOException{
-    OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(ORidbagNode.RECORD_TYPE);
+    OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(ORidbagNode.RECORD_TYPE_LINKED_NODE);
     ORidbagNode ret;    
     
     ret = new ORidbagNode(newNodePhysicalPosition.clusterPosition, numberOfRids, considerNodeLoaded, cluster);
