@@ -24,6 +24,7 @@ import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
 import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
@@ -46,22 +47,22 @@ import java.util.UUID;
  */
 public class OLinkedListRidBag implements ORidBagDelegate{           
   
-  private OIdentifiable ridbagRid;  
-  private Map<OIdentifiable, ORidbagNode> indexedRidsNodes;
+  public static final byte RECORD_TYPE_LINKED_NODE = 'l';
+  public static final byte RECORD_TYPE_ARRAY_NODE = 'a';
+  
+  private Long firstRidBagNodeClusterPos;
+  private Long currentRidbagNodeClusterPos;
+  
+  private Map<OIdentifiable, Long> indexedRidsNodes;
   private OFastRidBagPaginatedCluster cluster = null;
-  private int size = 0;
   private int tailSize = 0;    
       
   protected static final int MAX_RIDBAG_NODE_SIZE = 600;
-  private static final int ADDITIONAL_ALLOCATION_SIZE = 20;    
-  
-  //currently active node
-  private ORidbagNode activeNode = null;  
-  private ORidbagNode firstNode = null;
+  private static final int ADDITIONAL_ALLOCATION_SIZE = 20;
   
   private boolean autoConvertToRecord = true;
   private List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> changeListeners;
-  private ORecord owner = null;    
+  private final ORecord owner = null;    
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster){    
     this.cluster = cluster;
@@ -72,6 +73,18 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     values.forEach(this::add);
   }
 
+  private HelperClasses.Tuple<Boolean, Byte> isCurrentNodeFullNode() throws IOException{
+    HelperClasses.Tuple<Byte, Long> pageIndexAndType = cluster.getPageIndexAndTypeOfRecord(currentRidbagNodeClusterPos);
+    Byte type = pageIndexAndType.getFirstVal();
+    if (type == RECORD_TYPE_LINKED_NODE){
+      return new HelperClasses.Tuple<>(ifOneMoreFitsToPage(currentRidbagNodeClusterPos), type);
+    }
+    else if (type == RECORD_TYPE_ARRAY_NODE){
+      return new HelperClasses.Tuple<>(cluster.isArrayNodeFull(currentRidbagNodeClusterPos), type);
+    }
+    throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
+  }
+  
   @Override
   public void add(OIdentifiable value) {
     if (value == null) {
@@ -79,6 +92,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
 
     //check for megaMerge
+    long size = getSize();
     if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0) {
       try {
         nodesMegaMerge();
@@ -89,54 +103,29 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
 
     try {
-      if (activeNode.isFullNode()) {
-        boolean canFitInPage;
-        //check if new rid can fit in page with previous tail Node           
-        canFitInPage = ifOneMoreFitsToPage(activeNode);
-
-        if (!canFitInPage) {
-          int allocateSize = Math.min(tailSize * 2, tailSize + ADDITIONAL_ALLOCATION_SIZE);
-          allocateSize = Math.min(allocateSize, MAX_RIDBAG_NODE_SIZE);
-
-          int extraSlots = 1;
-          if (allocateSize == MAX_RIDBAG_NODE_SIZE) {
-            extraSlots = 0;
-          }
-          //created merged node
-          allocateSize += extraSlots;
-          ORidbagNode ridBagNode;
-          ridBagNode = createNodeOfSpecificSize(allocateSize, true, activeNode.getClusterPosition());          
-          activeNode = ridBagNode;
-
-          OIdentifiable[] mergedTail = mergeTail(extraSlots);
-          if (extraSlots == 1) {
-            //here we are dealing with node size less than max node size
-            mergedTail[mergedTail.length - 1] = value;            
-            activeNode.addAll(mergedTail);
-            relaxTail();
-            //no increment of tailSize bacuse no way that this node is tail node
-          } else {
-            //here we deal with node which size is equal to max node size          
-            activeNode.addAll(mergedTail);
-            relaxTail();
-            //add new rid to tail
-            ORidbagNode node = createNodeOfSpecificSize(1, true, activeNode.getClusterPosition());            
-            activeNode = node;
-            ++tailSize;
-          }
-        } else {
-          ORidbagNode node = createNodeOfSpecificSize(1, true, activeNode.getClusterPosition());          
-          activeNode = node;
-          ++tailSize;
+      HelperClasses.Tuple<Boolean, Byte> isCurrentFullAndType = isCurrentNodeFullNode();
+      boolean isCurrentNodeFull = isCurrentFullAndType.getFirstVal();
+      byte currentNodeType = isCurrentFullAndType.getSecondVal();
+      if (isCurrentNodeFull) {
+        if (currentNodeType == RECORD_TYPE_LINKED_NODE){
+          
         }
-      } else {
-        if (!activeNode.isLoaded()) {
-          activeNode.load();
+        else if (currentNodeType  == RECORD_TYPE_ARRAY_NODE){
+          
         }
-        if (activeNode.isTailNode()) {
-          ++tailSize;
+      } 
+      else {
+        switch (currentNodeType){
+          case RECORD_TYPE_LINKED_NODE:
+            cluster.addRidToLinkedNode(value.getIdentity(), currentRidbagNodeClusterPos);
+            break;
+          case RECORD_TYPE_ARRAY_NODE:
+            HelperClasses.Tuple<Long, Integer> pgaeIndexAndPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos);
+            cluster.addRidToArrayNode(value.getIdentity(), currentRidbagNodeClusterPos, pgaeIndexAndPagePosition.getSecondVal());
+            break;
+          default:
+            throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
         }
-        activeNode.add(value);
       }
     } catch (IOException exc) {
       OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
@@ -375,42 +364,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     serializeInternal(container);    
     
     return container.offset;
-  }  
-  
-  private void serializeInternal(BytesContainer container){
-    //serialize currentSize
-    OVarIntSerializer.write(container, size);
-    //serialize tail size
-    OVarIntSerializer.write(container, tailSize);
-    
-    //serialize active node
-    if (activeNode != null){           
-      OVarIntSerializer.write(container, activeNode.getClusterPosition());
-    }
-    else{
-      OVarIntSerializer.write(container, -1l);
-    }
-    
-    //serialize first node
-    if (firstNode != null){
-      OVarIntSerializer.write(container, firstNode.getClusterPosition());
-    }
-    else{
-      OVarIntSerializer.write(container, -1l);
-    }
   }
-  
-//  private void serializeNodeData(ORidbagNode node) throws IOException{
-//    byte[] serialized = node.serialize();    
-//    OPhysicalPosition ppos = new OPhysicalPosition(node.getClusterPosition());
-//    OPaginatedCluster.RECORD_STATUS status = cluster.getRecordStatus(node.getClusterPosition());
-//    if (status == OPaginatedCluster.RECORD_STATUS.ALLOCATED || status == OPaginatedCluster.RECORD_STATUS.REMOVED){
-//      cluster.createRecord(serialized, node.getVersion(), ORidbagNode.RECORD_TYPE, ppos);
-//    }
-//    else if (status == OPaginatedCluster.RECORD_STATUS.PRESENT){
-//      cluster.updateRecord(ppos.clusterPosition, serialized, node.getVersion(), ORidbagNode.RECORD_TYPE);
-//    }
-//  }
   
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
@@ -724,55 +678,19 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   public void replace(OMultiValueChangeEvent<Object, Object> event, Object newValue) {
     //do nothing
   }
+    
+  private boolean ifOneMoreFitsToPage(long nodeClusterPosition) throws IOException{    
+    return cluster.checkIfNewContentFitsInPage(nodeClusterPosition, OFastRidBagPaginatedCluster.getRidEntrySize());
+  }
 
-  public OPaginatedCluster getCluster() {
-    return cluster;
-  }
-
-  public void setCluster(OFastRidBagPaginatedCluster cluster) {
-    this.cluster = cluster;
-  }
-  
-  private ORidbagNode createNodeOfSpecificSize(int numberOfRids, boolean considerNodeLoaded, Long previousNode) throws IOException{
-    OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(ORidbagNode.RECORD_TYPE_LINKED_NODE);
-    ORidbagNode ret;    
-    
-    ret = new ORidbagNode(newNodePhysicalPosition.clusterPosition, numberOfRids, considerNodeLoaded, cluster);
-    ret.setPreviousNode(previousNode);
-    ret.setNextNode(null);
-    
-    ret.initInCluster();
-    
-    return ret;
-  }
-    
-  private boolean ifOneMoreFitsToPage(ORidbagNode referenceNode) throws IOException{    
-    return cluster.checkIfNewContentFitsInPage(referenceNode.getClusterPosition(), ORidbagNode.getSerializedSize(1));
-  }     
-  
-  ORidbagNode getNextNodeOfNode(ORidbagNode node) throws IOException{
-    Long nextNodeRef = node.getNextNode();
-    if (nextNodeRef == null || nextNodeRef == -1){
-      return null;
+  private long getSize() throws IOException{
+    long size = 0;
+    Long iteratingNode = firstRidBagNodeClusterPos;
+    while (iteratingNode != null){
+      size += cluster.getNodeSize(iteratingNode);
+      iteratingNode = cluster.getNextNode(iteratingNode);
     }
-    else{
-      ORidbagNode nextNode = new ORidbagNode(nextNodeRef, false, cluster);      
-      return nextNode;
-    }
+    return size;
   }
-  
-  ORidbagNode getPreviousNodeOfNode(ORidbagNode node) throws IOException{
-    Long previousNodeRef = node.getPreviousNode();
-    if (previousNodeRef == null || previousNodeRef == -1){
-      return null;
-    }
-    else{
-      ORidbagNode nextNode = new ORidbagNode(previousNodeRef, false, cluster);      
-      return nextNode;
-    }
-  }
-  
-  protected ORidbagNode getFirstNode(){
-    return firstNode;
-  }
+ 
 }

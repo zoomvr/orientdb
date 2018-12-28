@@ -64,7 +64,7 @@ public final class OFastRidbagClusterPositionMapBucket extends ODurablePage {
     position += setLongValue(position, pageIndex);    
     position += setIntValue(position, recordPosition);
     position += setLongValue(position, previousNodePosition);
-    position += setLongValue(position, nextNodePosition);
+    setLongValue(position, nextNodePosition);
 
     setIntValue(SIZE_OFFSET, size + 1);
 
