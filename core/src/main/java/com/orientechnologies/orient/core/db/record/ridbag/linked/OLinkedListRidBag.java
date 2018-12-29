@@ -16,18 +16,18 @@
 package com.orientechnologies.orient.core.db.record.ridbag.linked;
 
 import com.orientechnologies.common.log.OLogManager;
+import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeEvent;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeListener;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBagDelegate;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
+import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.ORecordInternal;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
-import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
 import com.orientechnologies.orient.core.storage.OPhysicalPosition;
-import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
 import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.io.IOException;
@@ -36,7 +36,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.UUID;
@@ -55,17 +54,49 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   private Map<OIdentifiable, Long> indexedRidsNodes;
   private OFastRidBagPaginatedCluster cluster = null;
-  private int tailSize = 0;    
       
   protected static final int MAX_RIDBAG_NODE_SIZE = 600;
   private static final int ADDITIONAL_ALLOCATION_SIZE = 20;
   
   private boolean autoConvertToRecord = true;
   private List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> changeListeners;
-  private final ORecord owner = null;    
+  private ORecord owner = null;  
+
+  //cached size of ridbag
+  private long size = 0;
   
-  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster){    
+  private static int calculateArrayRidNodeAllocationSize(final int initialNumberOfRids){
+    int size = Math.min(initialNumberOfRids + ADDITIONAL_ALLOCATION_SIZE, initialNumberOfRids * 2);
+    size = Math.min(size, MAX_RIDBAG_NODE_SIZE);
+    return size;
+  }
+  
+  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster){
     this.cluster = cluster;
+  }
+  
+  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID firstRid) throws IOException{    
+    this.cluster = cluster;
+    OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_LINKED_NODE);
+    long clusterPosition = cluster.addRid(firstRid, allocatedPos, -1l, -1l);
+    firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
+  }
+  
+  private void fillRestOfArrayWithDummyRids(final ORID[] array, final int lastValidIndex){
+    for (int i = lastValidIndex + 1; i < array.length; i++){
+      array[i] = new ORecordId(-1, -1);
+    }
+  }
+  
+  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID[] rids) throws IOException{    
+    this.cluster = cluster;
+    final OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_LINKED_NODE);
+    final int size = calculateArrayRidNodeAllocationSize(rids.length);
+    final ORID[] toAllocate = new ORID[size];
+    System.arraycopy(rids, 0, toAllocate, 0, rids.length);
+    fillRestOfArrayWithDummyRids(toAllocate, rids.length - 1);
+    long clusterPosition = cluster.addRids(rids, allocatedPos, -1l, -1l, rids.length - 1);
+    firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
   }
   
   @Override
@@ -91,27 +122,42 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
     }
 
-    //check for megaMerge
-    long size = getSize();
-    if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0) {
-      try {
-        nodesMegaMerge();
-      } catch (IOException exc) {
-        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[]) null);
-        throw new ODatabaseException(exc.getMessage());
-      }
-    }
-
     try {
+      //check for megaMerge
+      if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0) {
+        try {
+          nodesMegaMerge();
+        } catch (IOException exc) {
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[]) null);
+          throw new ODatabaseException(exc.getMessage());
+        }
+      }
+      
       HelperClasses.Tuple<Boolean, Byte> isCurrentFullAndType = isCurrentNodeFullNode();
       boolean isCurrentNodeFull = isCurrentFullAndType.getFirstVal();
       byte currentNodeType = isCurrentFullAndType.getSecondVal();
       if (isCurrentNodeFull) {
+        //allways link node is followed with array node and vice versa
         if (currentNodeType == RECORD_TYPE_LINKED_NODE){
-          
+          ORID[] currentNodeRids = cluster.getAllRidsFromLinkedNode(currentRidbagNodeClusterPos);
+          OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
+          int newNodePreallocatedSize = calculateArrayRidNodeAllocationSize(currentNodeRids.length);
+          ORID[] newNodePreallocatedRids = new ORID[newNodePreallocatedSize];
+          System.arraycopy(currentNodeRids, 0, newNodePreallocatedRids, 0, currentNodeRids.length);
+          fillRestOfArrayWithDummyRids(newNodePreallocatedRids, currentNodeRids.length - 1);
+          long newNodeClusterPosition = cluster.addRids(currentNodeRids, newNodePhysicalPosition, currentRidbagNodeClusterPos, 
+                  -1l, currentNodeRids.length - 1);
+          cluster.removeNode(currentRidbagNodeClusterPos);
+          if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
+            firstRidBagNodeClusterPos = newNodeClusterPosition;
+          }
+          currentRidbagNodeClusterPos = newNodeClusterPosition;          
         }
         else if (currentNodeType  == RECORD_TYPE_ARRAY_NODE){
           
+        }
+        else{
+          throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
         }
       } 
       else {
@@ -132,8 +178,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       throw new ODatabaseException(exc.getMessage());
     }
 
-    ++size;
-
     if (this.owner != null) {
       ORecordInternal.track(this.owner, value);
     }
@@ -143,206 +187,59 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     //TODO add it to index
   }
   
+  private boolean isMaxSizeNodeFullNode(long nodeClusterPosition) throws IOException{
+    return cluster.getNodeSize(nodeClusterPosition) == MAX_RIDBAG_NODE_SIZE;
+  }
+  
   /**
-   * 
+   * merges all tailing node in node of maximum length. Caller should take care of counting tail rids
+   * @throws IOException 
    */
   private void nodesMegaMerge() throws IOException{
-    OIdentifiable[] mergedRids = new OIdentifiable[MAX_RIDBAG_NODE_SIZE];
+    final ORID[] mergedRids = new ORID[MAX_RIDBAG_NODE_SIZE];
     int currentOffset = 0;
-    ORidbagNode currentIteratingNode = firstNode;
+    Long currentIteratingNode = firstRidBagNodeClusterPos;
+    boolean removedFirstNode = false;
+    long lastNonRemovedNode = -1;
     while (currentIteratingNode != null){      
-      if (!currentIteratingNode.isMaxSizeNodeFullNode()){
-        if (!currentIteratingNode.isLoaded()){
-          currentIteratingNode.load();
+      if (!isMaxSizeNodeFullNode(currentIteratingNode)){
+        final HelperClasses.Tuple<Byte, Long> nodePageIndexAndType = cluster.getPageIndexAndTypeOfRecord(currentIteratingNode);
+        final byte type = nodePageIndexAndType.getFirstVal();
+        final ORID[] nodeRids;
+        if (type == RECORD_TYPE_LINKED_NODE){
+          nodeRids = cluster.getAllRidsFromLinkedNode(currentIteratingNode);          
         }
-        if (currentIteratingNode.currentIndex() > 0){
-          OIdentifiable[] nodeRids = currentIteratingNode.getAllRids();
-          System.arraycopy(nodeRids, 0, mergedRids, currentOffset, currentIteratingNode.currentIndex());          
-                    
-          deleteRidbagNodeData(currentIteratingNode);          
+        else if (type == RECORD_TYPE_ARRAY_NODE){
+          nodeRids = cluster.getAllRidsFromArrayNode(currentIteratingNode);
         }
+        else{
+          throw new ODatabaseException("Invalid node type: " + type);
+        }
+        System.arraycopy(nodeRids, 0, mergedRids, currentOffset, nodeRids.length);
+        cluster.removeNode(currentIteratingNode);
+        currentOffset += nodeRids.length;
+        if (currentIteratingNode.equals(firstRidBagNodeClusterPos)){
+          removedFirstNode = true;
+        }
+      }
+      else{
+        lastNonRemovedNode = currentIteratingNode;
       }
       
-      currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
+      currentIteratingNode = cluster.getNextNode(currentIteratingNode);
     }
     
-    ORidbagNode megaNode;
-    try{
-      megaNode = createNodeOfSpecificSize(mergedRids.length, true, activeNode.getClusterPosition());      
-    }
-    catch (IOException exc){
-      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-      throw new ODatabaseException(exc.getMessage());
-    }
-    
-    megaNode.addAll(mergedRids);    
-  }
-  
-  private OIdentifiable[] mergeTail(int extraSlots) {           
-    OIdentifiable[] ret = new OIdentifiable[tailSize + extraSlots];
-    ORidbagNode currentIteratingNode = firstNode;
-    int currentIndex = 0;
-    while (currentIteratingNode != null){
-      try{
-        if (!currentIteratingNode.isLoaded()){
-          currentIteratingNode.load();
-        }
-        if (currentIteratingNode.isTailNode()){
-          ret[currentIndex++] = currentIteratingNode.getAt(0);          
-        }
-        currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
-      }
-      catch (IOException exc){
-        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-        throw new ODatabaseException(exc.getMessage());
-      }
-    }
-    return ret;
-  }
-  
-  private void relaxTail(){    
-    ORidbagNode previousNode = null;
-    ORidbagNode currentIteratingNode = firstNode;
-    while (currentIteratingNode != null){
-      try{
-        if (!currentIteratingNode.isLoaded()){
-          currentIteratingNode.load();
-        }
-        ORidbagNode nextNode = getNextNodeOfNode(currentIteratingNode);
-        if (currentIteratingNode.isTailNode()){
-          deleteRidbagNodeData(currentIteratingNode);
-          --tailSize;
-          if (previousNode == null){
-            firstNode = nextNode;
-          }
-          else{
-            if (nextNode == null){
-              previousNode.setNextNode(null);
-            }
-            else{
-              previousNode.setNextNode(nextNode.getClusterPosition());
-              nextNode.setPreviousNode(previousNode.getClusterPosition());
-            }
-          }
-        }
-        previousNode = currentIteratingNode;
-        currentIteratingNode = nextNode;        
-      }
-      catch (IOException exc){
-        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-        throw new ODatabaseException(exc.getMessage());
-      }
-    }
-  }
-
-  private void linkPreviousNodeWithNextAndDeleteCurrent(ORidbagNode currentNode) throws IOException{
-    ORidbagNode nextNode = getNextNodeOfNode(currentNode);
-    ORidbagNode previousNode = getPreviousNodeOfNode(currentNode);
-    deleteRidbagNodeData(currentNode);
-    if (previousNode != null){
-      if (nextNode != null){
-        previousNode.setNextNode(nextNode.getClusterPosition());
-      }
-      else{
-        previousNode.setNextNode(null);
-      }
-    }
-    if (nextNode != null){
-      if (previousNode != null){
-        nextNode.setPreviousNode(previousNode.getClusterPosition());
-      }
-      else{
-        nextNode.setPreviousNode(null);
-      }
-    }
-  }
-  
-  private void linkNodeToNode(ORidbagNode previousNode, ORidbagNode nextNode){
-    if (previousNode != null){
-      if (nextNode != null){
-        previousNode.setNextNode(nextNode.getClusterPosition());
-      }
-      else{
-        previousNode.setNextNode(null);
-      }
-    }
-    if (nextNode != null){
-      if (previousNode != null){
-        nextNode.setPreviousNode(previousNode.getClusterPosition());
-      }
-      else{
-        nextNode.setPreviousNode(null);
-      }
+    OPhysicalPosition megaNodeAllocatedPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
+    long megaNodeClusterPosition = cluster.addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE);
+    currentRidbagNodeClusterPos = megaNodeClusterPosition;
+    if (removedFirstNode){
+      firstRidBagNodeClusterPos = megaNodeClusterPosition;
     }
   }
   
   @Override
   public void remove(OIdentifiable value) {
-    boolean removed = false;    
-    if (indexedRidsNodes == null){
-      ORidbagNode node = indexedRidsNodes.get(value);
-      if (node != null){
-        if (!node.isLoaded()){
-          try{
-            node.load();
-          }
-          catch (IOException exc){
-            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-            throw new ODatabaseException(exc.getMessage());
-          }
-        }
-        boolean isTail = node.isTailNode();
-        if (node.remove(value)){
-          if (isTail){
-            --tailSize;
-            try{
-              linkPreviousNodeWithNextAndDeleteCurrent(node);
-            }
-            catch (IOException exc){
-              OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-              throw new ODatabaseException(exc.getMessage());
-            }
-          }      
-          removed = true;
-        }
-      }
-    }
-    else{
-      //go through all
-      ORidbagNode previousNode = null;
-      ORidbagNode currentIteratingNode = firstNode;
-      while(currentIteratingNode != null){
-        try{
-          if (!currentIteratingNode.isLoaded()){            
-            currentIteratingNode.load();            
-          }
-          boolean isTail = currentIteratingNode.isTailNode();
-          if (currentIteratingNode.remove(value)){
-            if (isTail){
-              --tailSize;
-              ORidbagNode nextNode = getNextNodeOfNode(currentIteratingNode);
-              linkNodeToNode(previousNode, nextNode);
-              deleteRidbagNodeData(currentIteratingNode);              
-            }      
-            removed = true;
-            break;
-          }
-
-          previousNode = currentIteratingNode;
-          currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
-        }
-        catch (IOException exc){
-          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-          throw new ODatabaseException(exc.getMessage());
-        }
-      }
-    }
-    if (removed){
-      --size;
-      fireCollectionChangedEvent(
-          new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.REMOVE, value, null,
-              value));
-    }    
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
@@ -352,140 +249,77 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public int getSerializedSize() {
-    BytesContainer container = new BytesContainer();
-    serializeInternal(container);
-    
-    return container.offset;
+    return OLongSerializer.LONG_SIZE;
   }
 
   @Override
   public int getSerializedSize(byte[] stream, int offset) {
-    BytesContainer container = new BytesContainer();    
-    serializeInternal(container);    
-    
-    return container.offset;
+    return OLongSerializer.LONG_SIZE;
   }
   
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
-    BytesContainer container = new BytesContainer(stream, offset);    
-    serializeInternal(container);    
-    return container.offset;
+    OLongSerializer.INSTANCE.serialize(firstRidBagNodeClusterPos, stream, offset);
+    return offset + OLongSerializer.LONG_SIZE;
   }
 
   @Override
   public int deserialize(byte[] stream, int offset) {
-    BytesContainer container = new BytesContainer(stream, offset);
-    //deserialize size
-    size = OVarIntSerializer.readAsInteger(container);
-    
-    //deserialize tail size   
-    tailSize = OVarIntSerializer.readAsInteger(container);
-    
-    //deserialize reference to active node
-    long activeNodeRef = OVarIntSerializer.readAsLong(container);
-    if (activeNodeRef == -1){
-      activeNode = null;
+    currentRidbagNodeClusterPos = firstRidBagNodeClusterPos = OLongSerializer.INSTANCE.deserialize(stream, offset);
+    boolean exit = false;
+    try{
+      while (exit == false) {
+        Long nextNode = cluster.getNextNode(currentRidbagNodeClusterPos);
+        if (nextNode != null){
+          currentRidbagNodeClusterPos = nextNode;
+        }
+        else{
+          exit = true;
+        }
+      }
+      size = getSize();
     }
-    else{
-      activeNode = new ORidbagNode(activeNodeRef, false, cluster);
-      try{
-        activeNode.load();
-      }
-      catch (IOException exc){
-        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-        throw new ODatabaseException(exc.getMessage());
-      }
+    catch (IOException exc){
+      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
+      throw new ODatabaseException(exc.getMessage());
     }
     
-    //deserialize first node ref
-    long firstNodeRef = OVarIntSerializer.readAsLong(container);
-    if (firstNodeRef == -1){
-      firstNode = null;
-    }
-    else{
-      firstNode = new ORidbagNode(firstNodeRef, false, cluster);
-      try{
-        firstNode.load();
-      }
-      catch (IOException exc){
-        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-        throw new ODatabaseException(exc.getMessage());
-      }
-    }
-    
-    return container.offset;
-  }
-
-  private void deleteRidbagNodeData(ORidbagNode node) throws IOException{
-    OPhysicalPosition nodesRidPos = new OPhysicalPosition(node.getClusterPosition());
-    OPhysicalPosition pos = cluster.getPhysicalPosition(nodesRidPos);
-    cluster.deleteRecord(pos.clusterPosition);
+    return offset + OLongSerializer.LONG_SIZE;
   }
   
   @Override
   public void requestDelete() {
-    ORidbagNode currentIteratingNode = firstNode;
-    while (currentIteratingNode != null){
-      try{
-        //have to do load because we need reference to next node
-        if (currentIteratingNode.isLoadedMetdata()){            
-          currentIteratingNode.loadMetadata();
-        }
-        deleteRidbagNodeData(currentIteratingNode);
-
-        currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
-      }
-      catch (IOException exc){
-        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-        throw new ODatabaseException(exc.getMessage());
-      }
-    }
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
   public boolean contains(OIdentifiable value) {    
-    if (indexedRidsNodes == null){
-      ORidbagNode node = indexedRidsNodes.get(value);
-      if (node != null){
-        if (!node.isLoaded()){
-          try{
-            node.load();
-          }
-          catch (IOException exc){
-            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-            throw new ODatabaseException(exc.getMessage());
-          }
-        }
-        return node.contains(value);
-      }
-    }
-    else{    
-      //go through all
-      ORidbagNode currentIteratingNode = firstNode;
-      while (currentIteratingNode != null){
-        try{
-          if (currentIteratingNode.isLoaded()){            
-            currentIteratingNode.load();            
-          }
-          if (currentIteratingNode.contains(value)){
-            return true;
-          }
-
-          currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
-        }
-        catch (IOException exc){
-          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-          throw new ODatabaseException(exc.getMessage());
-        }
-      }
-    }
-    return false;
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
   public void setOwner(ORecord owner) {
-    throw new UnsupportedOperationException("Not implemented");
+    if (owner != null && this.owner != null && !this.owner.equals(owner)) {
+      throw new IllegalStateException("This data structure is owned by document " + owner
+          + " if you want to use it in other document create new rid bag instance and copy content of current one.");
+    }
+    if (this.owner != null) {
+      Iterator<OIdentifiable> iter = iterator();
+      while (iter.hasNext()) {
+        OIdentifiable rid = iterator().next();
+        ORecordInternal.unTrack(this.owner, rid);
+      }
+    }
+
+    this.owner = owner;
+    
+    if (this.owner != null) {
+      Iterator<OIdentifiable> iter = iterator();
+      while (iter.hasNext()) {
+        OIdentifiable rid = iterator().next();
+        ORecordInternal.track(this.owner, rid);
+      }
+    }
   }
 
   @Override
@@ -508,77 +342,27 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public void setSize(int size) {
-    this.size = size;
+    //do nothing , this size is invalid one
   }
 
   @Override
   public Iterator<OIdentifiable> iterator() {    
-    return new OLinkedListRidBagIterator(this, cluster);    
+    return new OLinkedListRidBagIterator(this);    
   }
 
   @Override
   public Iterator<OIdentifiable> rawIterator() {
-    return new OLinkedListRidBagIterator(this, cluster);
+    return new OLinkedListRidBagIterator(this);
   }
 
   @Override
   public void convertLinks2Records() {
-    ORidbagNode currentIteratingNode = firstNode;
-    try{
-      while (currentIteratingNode != null){      
-        if (!currentIteratingNode.isLoaded()){
-          try{
-            currentIteratingNode.load();
-          }
-          catch (IOException exc){
-            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-            throw new ODatabaseException(exc.getMessage());
-          }
-        }
-        for (int i = 0; i < currentIteratingNode.currentIndex(); i++){
-          OIdentifiable id = currentIteratingNode.getAt(i);
-          if (id.getRecord() != null){
-            currentIteratingNode.setAt(id.getRecord(), i);
-          }
-        }
-
-        currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
-      }
-    }
-    catch (IOException exc){
-      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-      throw new ODatabaseException(exc.getMessage());
-    }
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
   public boolean convertRecords2Links() {
-    ORidbagNode currentIteratingNode = firstNode;
-    while (currentIteratingNode != null){      
-      try{
-        if (!currentIteratingNode.isLoaded()){        
-          currentIteratingNode.load();        
-        }
-        for (int i = 0; i < currentIteratingNode.currentIndex(); i++){
-          OIdentifiable id = currentIteratingNode.getAt(i);
-          if (id instanceof ORecord){
-            ORecord rec = (ORecord)id;
-            currentIteratingNode.setAt(rec.getIdentity(), i);
-          }
-          else{
-            return false;
-          }
-        }
-
-        currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
-      }
-      catch (IOException exc){
-        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-        throw new ODatabaseException(exc.getMessage());
-      }
-    }        
-
-    return true;
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
@@ -598,7 +382,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public int size() {
-    return size;
+    return Long.valueOf(size).intValue();
   }
 
   @Override
@@ -618,44 +402,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public Object returnOriginalState(List<OMultiValueChangeEvent<OIdentifiable, OIdentifiable>> changeEvents) {
-    final OLinkedListRidBag reverted = new OLinkedListRidBag(cluster);    
-    ORidbagNode currentIteratingNode = firstNode;
-    while (currentIteratingNode != null){      
-      try{
-        if (!currentIteratingNode.isLoaded()){       
-          currentIteratingNode.load();          
-        }
-        for (int i = 0; i < currentIteratingNode.currentIndex(); i++){
-          OIdentifiable id = currentIteratingNode.getAt(i);
-          reverted.add(id);
-        }
-
-        currentIteratingNode = getNextNodeOfNode(currentIteratingNode);
-      }
-      catch (IOException exc){
-        OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-        throw new ODatabaseException(exc.getMessage());
-      }
-    }
-
-    final ListIterator<OMultiValueChangeEvent<OIdentifiable, OIdentifiable>> listIterator = changeEvents
-        .listIterator(changeEvents.size());
-
-    while (listIterator.hasPrevious()) {
-      final OMultiValueChangeEvent<OIdentifiable, OIdentifiable> event = listIterator.previous();
-      switch (event.getChangeType()) {
-      case ADD:
-        reverted.remove(event.getKey());
-        break;
-      case REMOVE:
-        reverted.add(event.getOldValue());
-        break;
-      default:
-        throw new IllegalArgumentException("Invalid change type : " + event.getChangeType());
-      }
-    }
-
-    return reverted;
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override

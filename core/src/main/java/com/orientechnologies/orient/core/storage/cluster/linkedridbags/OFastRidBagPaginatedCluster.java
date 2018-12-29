@@ -772,7 +772,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }
   
-  public OPhysicalPosition addRids(final ORID[] rids, final OPhysicalPosition allocatedPosition,
+  public long addRids(final ORID[] rids, final OPhysicalPosition allocatedPosition,
           final Long previousNodePosition, final Long nextNodePosition, int lastRealRidIndex) throws IOException {
 
     byte[] content = new byte[OIntegerSerializer.INT_SIZE * 2 + OLinkSerializer.RID_SIZE * rids.length];
@@ -806,7 +806,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
                   atomicOperation, previousNodePosition, nextNodePosition);
         }
 
-        return createPhysicalPosition(OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE, clusterPosition, addEntryResult.recordVersion);
+        return clusterPosition;
 
       } finally {
         releaseExclusiveLock();
@@ -2489,18 +2489,20 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return currentIndex >= capacity;
   }
   
-  public Collection<ORID> getAllRidsFromLinkedNode(long nodeClusterPosition) throws IOException{
-    Collection<ORID> ret = new ArrayList<>();
+  public ORID[] getAllRidsFromLinkedNode(long nodeClusterPosition) throws IOException{
     HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
-    long pageIndex = pageIndexPagePosition.getFirstVal();
+    final long pageIndex = pageIndexPagePosition.getFirstVal();
     //this is entry position on page
     int ridPosition = pageIndexPagePosition.getSecondVal();
     byte[] content = getRidEntry(pageIndex, ridPosition);
+    final int size = OIntegerSerializer.INSTANCE.deserialize(content, getRidEntrySize());
+    final ORID[] ret = new ORID[size];
     boolean hasMore = true;
+    int counter = 0;
     while (hasMore){
       int pos = 0;
       ORID rid = OLinkSerializer.INSTANCE.deserialize(content, pos);
-      ret.add(rid);
+      ret[counter++] = rid;
       pos += OLinkSerializer.RID_SIZE;
       ridPosition = OIntegerSerializer.INSTANCE.deserialize(content, pos);
       if (ridPosition == -1){
@@ -2509,6 +2511,22 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       else{
         content = getRidEntry(pageIndex, ridPosition);
       }
+    }
+    return ret;
+  }
+  
+  public ORID[] getAllRidsFromArrayNode(long nodeClusterPosition) throws IOException{
+    final HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
+    final long pageIndex = pageIndexPagePosition.getFirstVal();
+    //this is entry position on page
+    final int ridPosition = pageIndexPagePosition.getSecondVal();
+    final byte[] content = getRidEntry(pageIndex, ridPosition);
+    final int lastValidIndex = OIntegerSerializer.INSTANCE.deserialize(content, 0);
+    final ORID[] ret = new ORID[lastValidIndex + 1];
+    int pos = OIntegerSerializer.INT_SIZE * 2;
+    for (int i = 0; i <= lastValidIndex; i++){
+      ret[i] = OLinkSerializer.INSTANCE.deserialize(content, pos);
+      pos += OLinkSerializer.RID_SIZE;
     }
     return ret;
   }
@@ -2526,12 +2544,102 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       return size;
     }
     else if (type == OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE){
-      //skip current index info
-      int pos = OIntegerSerializer.INT_SIZE;
-      int size = OIntegerSerializer.INSTANCE.deserialize(entry, pos);
-      return size;
+      //read last valid index info
+      int size = OIntegerSerializer.INSTANCE.deserialize(entry, 0);
+      return size + 1;
     }
     throw new ODatabaseException("Invalid ridbag node type: " + type);
+  }
+  
+  public Long getNextNode(long currentNodeClusterPosition) throws IOException{
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(currentNodeClusterPosition, 1, atomicOperation);
+    Long nextPos = positionEntry.getNextNodePosition();    
+    if (nextPos == -1){
+      nextPos = null;
+    }
+    return nextPos;
+  }
+  
+  public Long getPreviousNode(long currentNodeClusterPosition) throws IOException{
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(currentNodeClusterPosition, 1, atomicOperation);
+    Long prevPos = positionEntry.getPreviousNodePosition();    
+    if (prevPos == -1){
+      prevPos = null;
+    }
+    return prevPos;
+  }
+  
+  public void removeNode(long currentNodeClusterPosition) throws IOException{
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(currentNodeClusterPosition, 1, atomicOperation);
+    //find previous and next node of current node, and connect them
+    Long nextPos = positionEntry.getNextNodePosition();
+    Long prevPos = positionEntry.getPreviousNodePosition();
+    if (prevPos != -1){
+      OFastRidbagClusterPositionMapBucket.PositionEntry previousNodePositionEntry = clusterPositionMap.get(prevPos, 1, atomicOperation);
+      previousNodePositionEntry = new OFastRidbagClusterPositionMapBucket.PositionEntry(previousNodePositionEntry.getPageIndex(), 
+              previousNodePositionEntry.getRecordPosition(), previousNodePositionEntry.getPreviousNodePosition(), nextPos);
+      clusterPositionMap.update(prevPos, previousNodePositionEntry, atomicOperation);
+    }
+    if (nextPos != -1){
+      OFastRidbagClusterPositionMapBucket.PositionEntry nextNodePositionEntry = clusterPositionMap.get(nextPos, 1, atomicOperation);
+      nextNodePositionEntry = new OFastRidbagClusterPositionMapBucket.PositionEntry(nextNodePositionEntry.getPageIndex(), 
+              nextNodePositionEntry.getRecordPosition(), prevPos, nextNodePositionEntry.getNextNodePosition());
+      clusterPositionMap.update(nextPos, nextNodePositionEntry, atomicOperation);
+    }
+    //delete node data
+    HelperClasses.Tuple<Byte, Long> nodeTypeAndPageIndex = getPageIndexAndTypeOfRecord(currentNodeClusterPosition);
+    byte type = nodeTypeAndPageIndex.getFirstVal();
+    if (type == OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE){
+      deleteArrayNodeData(currentNodeClusterPosition);
+    }
+    else if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
+      deleteLinkNodeData(currentNodeClusterPosition);
+    }
+  }
+  
+  private void deleteArrayNodeData(long nodeClusterPosition) throws IOException{
+    deleteRecord(nodeClusterPosition);
+  }
+  
+  /**
+   * delete node and re-link it's previous with it's next node
+   * @param nodeClusterPosition
+   * @throws IOException 
+   */
+  private void deleteLinkNodeData(long nodeClusterPosition) throws IOException{
+    OAtomicOperation atomicOperation = startAtomicOperation(true);
+    boolean rollback = false;
+    try{
+      HelperClasses.Tuple<Long, Integer> nodePageIndexAndPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);    
+      long pageIndex = nodePageIndexAndPagePosition.getFirstVal();
+      byte[] content = getRidEntry(pageIndex, nodePageIndexAndPagePosition.getSecondVal());
+      //delete all following rid entries
+      int pos = OLinkSerializer.RID_SIZE;
+      int nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);
+      while (nextEntryPos != -1){
+        content = getRidEntry(pageIndex, nextEntryPos);
+        OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
+        try{
+          final OClusterPage localPage = new OClusterPage(cacheEntry, false);
+          localPage.deleteRecord(nextEntryPos);
+          nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);
+        }
+        finally{
+          releasePageFromWrite(atomicOperation, cacheEntry);
+        }
+      }
+      //delete first rid entry
+      deleteRecord(nodeClusterPosition);
+    }
+    catch (Exception exc){
+      rollback = true;
+    }
+    finally{
+      endAtomicOperation(rollback);
+    }
   }
   
 }

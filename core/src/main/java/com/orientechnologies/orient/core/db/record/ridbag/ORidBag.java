@@ -22,6 +22,7 @@ package com.orientechnologies.orient.core.db.record.ridbag;
 
 import com.orientechnologies.orient.core.db.record.ridbag.linked.OLinkedListRidBag;
 import com.orientechnologies.common.collection.OCollection;
+import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OUUIDSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
@@ -31,6 +32,7 @@ import com.orientechnologies.orient.core.db.record.*;
 import com.orientechnologies.orient.core.db.record.ridbag.embedded.OEmbeddedRidBag;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.exception.OSerializationException;
+import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.metadata.OMetadataDefault;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.BytesContainer;
@@ -269,17 +271,25 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
           linkedListRidbagsCluster = (OFastRidBagPaginatedCluster)clusterInternal;
         }
       }
-      /*if (isEmbedded() && supportsLinkedListRidbag && delegate.size() >= topThreshold){
+      if (isEmbedded() && supportsLinkedListRidbag && delegate.size() >= topThreshold){
         ORidBagDelegate oldDelegate = delegate;
         
-        delegate = new OLinkedListRidBag(linkedListRidbagsCluster);
         boolean oldAutoConvert = oldDelegate.isAutoConvertToRecord();
         oldDelegate.setAutoConvertToRecord(false);
 
+        ORID[] oldDelegateRids = new ORID[oldDelegate.size()];
+        int counter = 0;
         for (OIdentifiable identifiable : oldDelegate){
-          delegate.add(identifiable);
+          oldDelegateRids[counter++] = identifiable.getIdentity();
         }
 
+        try{
+          delegate = new OLinkedListRidBag(linkedListRidbagsCluster, oldDelegateRids);
+        }
+        catch (IOException exc){
+          OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
+          throw new ODatabaseException(exc.getMessage());
+        }
         final ORecord owner = oldDelegate.getOwner();
         delegate.setOwner(owner);
 
@@ -292,7 +302,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
         oldDelegate.setAutoConvertToRecord(oldAutoConvert);
         oldDelegate.requestDelete();
       }
-      else*/ if (isEmbedded() && ODatabaseRecordThreadLocal.instance().get().getSbTreeCollectionManager() != null
+      else if (isEmbedded() && ODatabaseRecordThreadLocal.instance().get().getSbTreeCollectionManager() != null
           && delegate.size() >= topThreshold) {
         ORidBagDelegate oldDelegate = delegate;
         delegate = new OSBTreeRidBag();

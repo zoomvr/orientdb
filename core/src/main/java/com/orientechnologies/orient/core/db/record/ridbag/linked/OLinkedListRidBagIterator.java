@@ -27,65 +27,19 @@ import java.util.Iterator;
  * @author marko
  */
 public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
-
-  private static final int iteratingIndexInitialvalue = -1;
   
-  private final OLinkedListRidBag ridbag;  
-  private ORidbagNode currentNode = null;
-  private int currentNodeIteratingIndex = iteratingIndexInitialvalue;
-  private boolean calledNext = true;
-  private final OFastRidBagPaginatedCluster cluster;
-  
-  public OLinkedListRidBagIterator(OLinkedListRidBag ridbag, OFastRidBagPaginatedCluster cluster){
-    this.ridbag = ridbag;
-    this.cluster = cluster;
-    currentNode = ridbag.getFirstNode();
+  public OLinkedListRidBagIterator(OLinkedListRidBag ridbag){
+    
   }
   
   @Override
   public boolean hasNext() {
-    try{
-      boolean found = false;
-      while (!found){
-        if (!calledNext){
-          --currentNodeIteratingIndex;
-        }
-        if (currentNode.currentIndex() > 0 && currentNodeIteratingIndex < currentNode.currentIndex() - 1){
-          ++currentNodeIteratingIndex;
-          found = true;
-          break;
-        }
-        //go for next node        
-        try{
-          getNextNode();
-        }
-        catch (IOException exc){
-          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);          
-          throw new ODatabaseException(exc.getMessage());
-        }
-        if (currentNode == null){
-          break;
-        }
-      }
-      return found;
-    }
-    finally{
-      calledNext = false;
-    }
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
   public OIdentifiable next() {
-    calledNext = true;
-    return currentNode.getAt(currentNodeIteratingIndex);
-  }
-  
-  private void getNextNode() throws IOException{
-    currentNode = ridbag.getNextNodeOfNode(currentNode);
-    currentNodeIteratingIndex = iteratingIndexInitialvalue;
-    if (currentNode != null && !currentNode.isLoaded()){
-      currentNode.load();
-    }
+    throw new UnsupportedOperationException("Not implemented");
   }
   
   @Override
