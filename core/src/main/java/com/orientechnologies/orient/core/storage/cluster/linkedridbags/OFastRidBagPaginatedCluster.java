@@ -561,7 +561,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @return 
    */
   public static int getRidEntrySize(){
-    return OLinkSerializer.RID_SIZE + OIntegerSerializer.INT_SIZE;
+    return OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE + OIntegerSerializer.INT_SIZE;
   }
   
   /**
@@ -574,8 +574,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   public void addRidToLinkedNode(final ORID rid, final long currentRidbagNodePosition) throws IOException {
 
     final byte[] content = new byte[getRidEntrySize()];
-    OLinkSerializer.INSTANCE.serialize(rid, content, 0);
-    OIntegerSerializer.INSTANCE.serialize(-1, content, OLinkSerializer.RID_SIZE);
+    int pos = OByteSerializer.BYTE_SIZE;
+    OLinkSerializer.INSTANCE.serialize(rid, content, pos);
+    pos += OLinkSerializer.RID_SIZE;
+    OIntegerSerializer.INSTANCE.serialize(-1, content, pos);
 
     boolean rollback = false;
     OAtomicOperation atomicOperation = startAtomicOperation(true);
@@ -588,18 +590,21 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         final int currentNodePagePosition = currentNodePageIndexAndPagePosition.getSecondVal();
         final byte[] firstEntryContent = getRidEntry(currentNodePageIndex, currentNodePagePosition);
         //this is first linked node entry so it is extended, skip rid info and refernce to next
-        int pos = getRidEntrySize();
+        pos = getRidEntrySize();
         int currentSize = OIntegerSerializer.INSTANCE.deserialize(firstEntryContent, pos);
         pos += OIntegerSerializer.INT_SIZE;
         int previousRidPosition = OIntegerSerializer.INSTANCE.deserialize(firstEntryContent, pos);        
         final AddEntryResult addEntryResult = addEntry(1, content, currentNodePageIndex, atomicOperation);
         byte[] previousRidEntry = getRidEntry(currentNodePageIndex, previousRidPosition);
-        OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, previousRidEntry, OLinkSerializer.RID_SIZE);
+        //update reference to next rid in previuosly added rid entry
+        //position is record type (byte) + rid size
+        OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, previousRidEntry, OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
         replaceContent(currentNodePageIndex, previousRidPosition, previousRidEntry);
         //now increment size, and update info about last added rid. That is done in first entry of node
         ++currentSize;
         pos = getRidEntrySize();
         OIntegerSerializer.INSTANCE.serialize(currentSize, firstEntryContent, pos);
+        //update info about current entry in this node
         pos += OIntegerSerializer.INT_SIZE;
         OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, firstEntryContent, pos);
         replaceContent(currentNodePageIndex, currentNodePagePosition, firstEntryContent);
@@ -721,8 +726,11 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     //only in first node entry, besides rid entry, want to have info about currentSize, info about last added entry
     byte[] content = new byte[OIntegerSerializer.INT_SIZE * 2 + getRidEntrySize()];
     int pos = 0;
+    OByteSerializer.INSTANCE.serialize(OLinkedListRidBag.RECORD_TYPE_LINKED_NODE, content, pos);
+    pos += OByteSerializer.BYTE_SIZE;
     OLinkSerializer.INSTANCE.serialize(rid, content, pos);
     pos += OLinkSerializer.RID_SIZE;
+    //this is reference to next node (here no next one this is first and last so far
     OIntegerSerializer.INSTANCE.serialize(-1, content, pos);
     pos += OIntegerSerializer.INT_SIZE;
     //serialize current size
@@ -2455,7 +2463,8 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     try{      
       cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false);
       OClusterPage localPage = new OClusterPage(cacheEntry, false);
-      return localPage.getFreeSpace() >= length;
+      int freeSpace = localPage.getFreeSpace();
+      return freeSpace >= length;
     }
     finally{
       if (cacheEntry != null){
@@ -2497,7 +2506,8 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     boolean hasMore = true;
     int counter = 0;
     while (hasMore){
-      int pos = 0;
+      //skip record type info
+      int pos = OByteSerializer.BYTE_SIZE;
       ORID rid = OLinkSerializer.INSTANCE.deserialize(content, pos);
       ret[counter++] = rid;
       pos += OLinkSerializer.RID_SIZE;

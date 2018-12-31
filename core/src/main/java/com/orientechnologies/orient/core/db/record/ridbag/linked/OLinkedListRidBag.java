@@ -110,7 +110,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     HelperClasses.Tuple<Byte, Long> pageIndexAndType = cluster.getPageIndexAndTypeOfRecord(currentRidbagNodeClusterPos);
     Byte type = pageIndexAndType.getFirstVal();
     if (type == RECORD_TYPE_LINKED_NODE){
-      return new HelperClasses.Tuple<>(ifOneMoreFitsToPage(currentRidbagNodeClusterPos), type);
+      return new HelperClasses.Tuple<>(!ifOneMoreFitsToPage(currentRidbagNodeClusterPos), type);
     }
     else if (type == RECORD_TYPE_ARRAY_NODE){
       return new HelperClasses.Tuple<>(cluster.isArrayNodeFull(currentRidbagNodeClusterPos), type);
@@ -139,7 +139,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       boolean isCurrentNodeFull = isCurrentFullAndType.getFirstVal();
       byte currentNodeType = isCurrentFullAndType.getSecondVal();
       if (isCurrentNodeFull) {
-        //allways link node is followed with array node and vice versa
+        //By this algorithm allways link node is followed with array node and vice versa
         if (currentNodeType == RECORD_TYPE_LINKED_NODE){
           ORID[] currentNodeRids = cluster.getAllRidsFromLinkedNode(currentRidbagNodeClusterPos);
           OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
