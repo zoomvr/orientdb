@@ -568,7 +568,6 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * add rid to existing ridbag node. Caller should take care of free space
    * @param rid
    * @param currentRidbagNodePosition, node cluster position
-   * @param previousRidPosition previous rid entry page position
    * @throws IOException 
    */
   public void addRidToLinkedNode(final ORID rid, final long currentRidbagNodePosition) throws IOException {
@@ -595,7 +594,13 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         pos += OIntegerSerializer.INT_SIZE;
         int previousRidPosition = OIntegerSerializer.INSTANCE.deserialize(firstEntryContent, pos);        
         final AddEntryResult addEntryResult = addEntry(1, content, currentNodePageIndex, atomicOperation);
-        byte[] previousRidEntry = getRidEntry(currentNodePageIndex, previousRidPosition);
+        byte[] previousRidEntry;
+        if (previousRidPosition == currentNodePagePosition){
+          previousRidEntry = firstEntryContent;
+        }
+        else{
+          previousRidEntry = getRidEntry(currentNodePageIndex, previousRidPosition);
+        }
         //update reference to next rid in previuosly added rid entry
         //position is record type (byte) + rid size
         OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, previousRidEntry, OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
@@ -710,6 +715,38 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       }      
     }
   }
+  
+  public void updatePrevNextNodeinfo(long nodeClusterPosition, 
+          Long previousNodeClusterPosition, Long nextnodeClusterPosition) throws IOException{
+    OAtomicOperation atomicOperation = startAtomicOperation(true);
+    boolean rollback = false;
+    try{
+      acquireExclusiveLock();
+      try{
+        OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(nodeClusterPosition, 1, atomicOperation);
+        if (previousNodeClusterPosition == null){
+          previousNodeClusterPosition = positionEntry.getPreviousNodePosition();
+        }
+        if (nextnodeClusterPosition == null){
+          nextnodeClusterPosition = positionEntry.getNextNodePosition();
+        }
+        positionEntry = new OFastRidbagClusterPositionMapBucket.PositionEntry(positionEntry.getPageIndex(), 
+                positionEntry.getRecordPosition(), previousNodeClusterPosition, nextnodeClusterPosition);
+        clusterPositionMap.update(nodeClusterPosition, positionEntry, atomicOperation);
+      }
+      finally{
+        releaseExclusiveLock();
+      }
+    }
+    catch (Exception exc){
+      rollback = true;
+      throw exc;
+    }
+    finally{
+      endAtomicOperation(rollback);
+    }
+  }
+  
   
   /**
    * should be used to create new ridbag node
@@ -2528,9 +2565,11 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     //this is entry position on page
     final int ridPosition = pageIndexPagePosition.getSecondVal();
     final byte[] content = getRidEntry(pageIndex, ridPosition);
-    final int lastValidIndex = OIntegerSerializer.INSTANCE.deserialize(content, 0);
+    //skip record type info
+    int pos = OByteSerializer.BYTE_SIZE;
+    final int lastValidIndex = OIntegerSerializer.INSTANCE.deserialize(content, pos);
     final ORID[] ret = new ORID[lastValidIndex + 1];
-    int pos = OIntegerSerializer.INT_SIZE * 2;
+    pos = OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE * 2;
     for (int i = 0; i <= lastValidIndex; i++){
       ret[i] = OLinkSerializer.INSTANCE.deserialize(content, pos);
       pos += OLinkSerializer.RID_SIZE;
@@ -2552,7 +2591,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
     else if (type == OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE){
       //read last valid index info
-      int size = OIntegerSerializer.INSTANCE.deserialize(entry, 0);
+      int size = OIntegerSerializer.INSTANCE.deserialize(entry, OByteSerializer.BYTE_SIZE);
       return size + 1;
     }
     throw new ODatabaseException("Invalid ridbag node type: " + type);

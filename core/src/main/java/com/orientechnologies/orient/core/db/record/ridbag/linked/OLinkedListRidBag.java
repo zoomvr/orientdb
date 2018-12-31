@@ -153,11 +153,14 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
             firstRidBagNodeClusterPos = newNodeClusterPosition;
           }
+          //update previous node prev and next info
+          cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
           currentRidbagNodeClusterPos = newNodeClusterPosition;          
         }
         else if (currentNodeType  == RECORD_TYPE_ARRAY_NODE){
           OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
           long newNodeClusterPosition = cluster.addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
+          cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
           currentRidbagNodeClusterPos = newNodeClusterPosition;
         }
         else{
@@ -194,7 +197,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
   
   private boolean isMaxSizeNodeFullNode(long nodeClusterPosition) throws IOException{
-    return cluster.getNodeSize(nodeClusterPosition) == MAX_RIDBAG_NODE_SIZE;
+    HelperClasses.Tuple<Byte, Long> nodeTypeAndPageIndex = cluster.getPageIndexAndTypeOfRecord(nodeClusterPosition);
+    if (nodeTypeAndPageIndex.getFirstVal() == RECORD_TYPE_ARRAY_NODE){
+      return cluster.getNodeSize(nodeClusterPosition) == MAX_RIDBAG_NODE_SIZE;
+    }
+    return false;
   }
   
   /**
@@ -207,7 +214,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     Long currentIteratingNode = firstRidBagNodeClusterPos;
     boolean removedFirstNode = false;
     long lastNonRemovedNode = -1;
-    while (currentIteratingNode != null){      
+    while (currentIteratingNode != null){
+      boolean fetchedNextNode = false;
       if (!isMaxSizeNodeFullNode(currentIteratingNode)){
         final HelperClasses.Tuple<Byte, Long> nodePageIndexAndType = cluster.getPageIndexAndTypeOfRecord(currentIteratingNode);
         final byte type = nodePageIndexAndType.getFirstVal();
@@ -222,21 +230,29 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           throw new ODatabaseException("Invalid node type: " + type);
         }
         System.arraycopy(nodeRids, 0, mergedRids, currentOffset, nodeRids.length);
-        cluster.removeNode(currentIteratingNode);
+        long tmpCurrNodeClusterPos = currentIteratingNode;
+        currentIteratingNode = cluster.getNextNode(currentIteratingNode);
+        cluster.removeNode(tmpCurrNodeClusterPos);
         currentOffset += nodeRids.length;
-        if (currentIteratingNode.equals(firstRidBagNodeClusterPos)){
+        if (tmpCurrNodeClusterPos == firstRidBagNodeClusterPos){
           removedFirstNode = true;
         }
+        fetchedNextNode = true;
       }
       else{
         lastNonRemovedNode = currentIteratingNode;
       }
-      
-      currentIteratingNode = cluster.getNextNode(currentIteratingNode);
+      if (!fetchedNextNode){
+        currentIteratingNode = cluster.getNextNode(currentIteratingNode);
+      }
     }
     
     OPhysicalPosition megaNodeAllocatedPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
-    long megaNodeClusterPosition = cluster.addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE);
+    long megaNodeClusterPosition = cluster.addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE - 1);
+    //set next node of previous node
+    if (lastNonRemovedNode != -1){
+      cluster.updatePrevNextNodeinfo(lastNonRemovedNode, null, megaNodeClusterPosition);
+    }
     currentRidbagNodeClusterPos = megaNodeClusterPosition;
     if (removedFirstNode){
       firstRidBagNodeClusterPos = megaNodeClusterPosition;
