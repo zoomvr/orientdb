@@ -412,14 +412,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 
   @Override
   public OPhysicalPosition createRecord(byte[] content, final int recordVersion, final byte recordType,
-      OPhysicalPosition allocatedPosition) throws IOException {
-    
-    int pos = 0;    
-    long previousNodePosition = OLongSerializer.INSTANCE.deserialize(content, pos);
-    pos += OLongSerializer.LONG_SIZE;
-    long nextNodePosition = OLongSerializer.INSTANCE.deserialize(content, pos);
-    pos += OLongSerializer.LONG_SIZE;
-    content = Arrays.copyOfRange(content, pos, content.length);
+      OPhysicalPosition allocatedPosition) throws IOException {       
     
     content = compression.compress(content);
     content = encryption.encrypt(content);    
@@ -456,12 +449,12 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
           final long clusterPosition;
           if (allocatedPosition != null) {
             clusterPositionMap.update(allocatedPosition.clusterPosition,
-                new OFastRidbagClusterPositionMapBucket.PositionEntry(addEntryResult.pageIndex, addEntryResult.pagePosition, previousNodePosition, nextNodePosition),
+                new OFastRidbagClusterPositionMapBucket.PositionEntry(addEntryResult.pageIndex, addEntryResult.pagePosition, -1, -1),
                 atomicOperation);
             clusterPosition = allocatedPosition.clusterPosition;
           } else {
             clusterPosition = clusterPositionMap.add(addEntryResult.pageIndex, addEntryResult.pagePosition, 
-                    atomicOperation, previousNodePosition, nextNodePosition);
+                    atomicOperation, -1, -1);
           }
 
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
@@ -540,12 +533,12 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
           final long clusterPosition;
           if (allocatedPosition != null) {
             clusterPositionMap.update(allocatedPosition.clusterPosition,
-                new OFastRidbagClusterPositionMapBucket.PositionEntry(firstPageIndex, firstPagePosition, previousNodePosition, nextNodePosition), 
+                new OFastRidbagClusterPositionMapBucket.PositionEntry(firstPageIndex, firstPagePosition, -1, -1), 
                 atomicOperation);
             clusterPosition = allocatedPosition.clusterPosition;
           } else {
             clusterPosition = clusterPositionMap.add(firstPageIndex, firstPagePosition, atomicOperation,
-                    previousNodePosition, nextNodePosition);
+                    -1, -1);
           }
 
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
@@ -641,7 +634,8 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 
         final long currentNodePageIndex = getPageIndexOfRecord(currentRidbagNodePosition);
         byte[] ridEntry = getRidEntry(currentNodePageIndex, currentRidPagePosition);
-        int pos = 0;
+        //skip record type info
+        int pos = OByteSerializer.BYTE_SIZE;
         //get last valid current index
         int currentIndex = OIntegerSerializer.INSTANCE.deserialize(ridEntry, pos);
         ++currentIndex;
@@ -650,9 +644,9 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         if (currentIndex >= capacity){
           throw new ArrayIndexOutOfBoundsException(currentIndex);
         }
-        //serialize current index
-        OIntegerSerializer.INSTANCE.serialize(currentIndex, ridEntry, 0);
-        pos = OIntegerSerializer.INT_SIZE * 2 + currentIndex * OLinkSerializer.RID_SIZE;
+        //serialize current index after record type info
+        OIntegerSerializer.INSTANCE.serialize(currentIndex, ridEntry, OByteSerializer.BYTE_SIZE);
+        pos = OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE * 2 + currentIndex * OLinkSerializer.RID_SIZE;
         OLinkSerializer.INSTANCE.serialize(rid, ridEntry, pos);
         replaceContent(currentNodePageIndex, currentRidPagePosition, ridEntry);
       } finally {
@@ -775,8 +769,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   public long addRids(final ORID[] rids, final OPhysicalPosition allocatedPosition,
           final Long previousNodePosition, final Long nextNodePosition, int lastRealRidIndex) throws IOException {
 
-    byte[] content = new byte[OIntegerSerializer.INT_SIZE * 2 + OLinkSerializer.RID_SIZE * rids.length];
+    byte[] content = new byte[OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE * 2 + OLinkSerializer.RID_SIZE * rids.length];
     int pos = 0;
+    OByteSerializer.INSTANCE.serialize(OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE, content, pos);
+    pos += OByteSerializer.BYTE_SIZE;
     OIntegerSerializer.INSTANCE.serialize(lastRealRidIndex, content, pos);
     pos += OIntegerSerializer.INT_SIZE;
     OIntegerSerializer.INSTANCE.serialize(rids.length, content, pos);
@@ -2482,11 +2478,12 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   public boolean isArrayNodeFull(long nodeClusterPosition) throws IOException{
     HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
     byte[] content = getRidEntry(pageIndexPagePosition.getFirstVal(), pageIndexPagePosition.getSecondVal());
-    int pos = 0;
+    //skip record type
+    int pos = OByteSerializer.BYTE_SIZE;
     int currentIndex = OIntegerSerializer.INSTANCE.deserialize(content, pos);
     pos += OIntegerSerializer.INT_SIZE;
     int capacity = OIntegerSerializer.INSTANCE.deserialize(content, pos);
-    return currentIndex >= capacity;
+    return currentIndex >= capacity - 1;
   }
   
   public ORID[] getAllRidsFromLinkedNode(long nodeClusterPosition) throws IOException{

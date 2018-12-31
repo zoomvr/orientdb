@@ -80,6 +80,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_LINKED_NODE);
     long clusterPosition = cluster.addRid(firstRid, allocatedPos, -1l, -1l);
     firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
+    size = 1;
   }
   
   private void fillRestOfArrayWithDummyRids(final ORID[] array, final int lastValidIndex){
@@ -90,13 +91,14 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID[] rids) throws IOException{    
     this.cluster = cluster;
-    final OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_LINKED_NODE);
+    final OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
     final int size = calculateArrayRidNodeAllocationSize(rids.length);
     final ORID[] toAllocate = new ORID[size];
     System.arraycopy(rids, 0, toAllocate, 0, rids.length);
     fillRestOfArrayWithDummyRids(toAllocate, rids.length - 1);
-    long clusterPosition = cluster.addRids(rids, allocatedPos, -1l, -1l, rids.length - 1);
+    long clusterPosition = cluster.addRids(toAllocate, allocatedPos, -1l, -1l, rids.length - 1);
     firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
+    this.size = rids.length;
   }
   
   @Override
@@ -154,7 +156,9 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           currentRidbagNodeClusterPos = newNodeClusterPosition;          
         }
         else if (currentNodeType  == RECORD_TYPE_ARRAY_NODE){
-          
+          OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
+          long newNodeClusterPosition = cluster.addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
+          currentRidbagNodeClusterPos = newNodeClusterPosition;
         }
         else{
           throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
@@ -184,6 +188,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
     fireCollectionChangedEvent(
             new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value));
+    
+    ++size;
     //TODO add it to index
   }
   
