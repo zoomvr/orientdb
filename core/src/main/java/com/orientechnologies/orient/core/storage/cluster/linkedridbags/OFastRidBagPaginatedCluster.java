@@ -749,7 +749,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   
   
   /**
-   * should be used to create new ridbag node
+   * should be used to create new link ridbag node
    * @param rid
    * @param allocatedPosition
    * @param previousNodePosition, node should make double linked list, this is cluster position of previous node
