@@ -280,8 +280,13 @@ public class OWALPageChangesPortion implements OWALChanges {
 
     while (read < data.length) {
       byte[] chunk = null;
-      if (pageChunks[portionIndex] != null)
+      if (pageChunks[portionIndex] != null){
+        if (portionIndex < 0 || chunkIndex < 0){
+          int a = 0;
+          ++a;
+        }
         chunk = pageChunks[portionIndex][chunkIndex];
+      }
 
       final int rl = Math.min(CHUNK_SIZE - chunkOffset, data.length - read);
       if (chunk == null) {
