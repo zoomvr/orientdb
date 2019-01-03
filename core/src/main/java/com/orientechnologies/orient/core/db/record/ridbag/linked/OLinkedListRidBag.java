@@ -65,6 +65,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   //cached size of ridbag
   private long size = 0;
   
+  private boolean shouldSaveParentRecord = false;
+  
   private static int calculateArrayRidNodeAllocationSize(final int initialNumberOfRids){
     int size = Math.min(initialNumberOfRids + ADDITIONAL_ALLOCATION_SIZE, initialNumberOfRids * 2);
     size = Math.min(size, MAX_RIDBAG_NODE_SIZE);
@@ -81,6 +83,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     long clusterPosition = cluster.addRid(firstRid, allocatedPos, -1l, -1l);
     firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
     size = 1;
+    shouldSaveParentRecord = true;
   }
   
   private void fillRestOfArrayWithDummyRids(final ORID[] array, final int lastValidIndex){
@@ -99,6 +102,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     long clusterPosition = cluster.addRids(toAllocate, allocatedPos, -1l, -1l, rids.length - 1);
     firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
     this.size = rids.length;
+    shouldSaveParentRecord = true;
   }
   
   @Override
@@ -146,9 +150,10 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           int newNodePreallocatedSize = calculateArrayRidNodeAllocationSize(currentNodeRids.length);
           ORID[] newNodePreallocatedRids = new ORID[newNodePreallocatedSize];
           System.arraycopy(currentNodeRids, 0, newNodePreallocatedRids, 0, currentNodeRids.length);
-          fillRestOfArrayWithDummyRids(newNodePreallocatedRids, currentNodeRids.length - 1);
+          newNodePreallocatedRids[currentNodeRids.length] = value.getIdentity();
+          fillRestOfArrayWithDummyRids(newNodePreallocatedRids, currentNodeRids.length);
           long newNodeClusterPosition = cluster.addRids(currentNodeRids, newNodePhysicalPosition, currentRidbagNodeClusterPos, 
-                  -1l, currentNodeRids.length - 1);
+                  -1l, currentNodeRids.length);
           cluster.removeNode(currentRidbagNodeClusterPos);
           if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
             firstRidBagNodeClusterPos = newNodeClusterPosition;
@@ -173,8 +178,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
             cluster.addRidToLinkedNode(value.getIdentity(), currentRidbagNodeClusterPos);
             break;
           case RECORD_TYPE_ARRAY_NODE:
-            HelperClasses.Tuple<Long, Integer> pgaeIndexAndPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos);
-            cluster.addRidToArrayNode(value.getIdentity(), currentRidbagNodeClusterPos, pgaeIndexAndPagePosition.getSecondVal());
+            HelperClasses.Tuple<Long, Integer> pageIndexAndPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos);
+            cluster.addRidToArrayNode(value.getIdentity(), pageIndexAndPagePosition.getFirstVal(), pageIndexAndPagePosition.getSecondVal());
             break;
           default:
             throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
@@ -189,8 +194,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       ORecordInternal.track(this.owner, value);
     }
 
-    fireCollectionChangedEvent(
-            new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value));
+    if (shouldSaveParentRecord){
+      fireCollectionChangedEvent(
+              new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value));
+      shouldSaveParentRecord = false;
+    }
     
     ++size;
     //TODO add it to index
@@ -448,8 +456,14 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     //do nothing
   }
     
+  //checks if one more rid can be stored on the same page of link ridbag node
   private boolean ifOneMoreFitsToPage(long nodeClusterPosition) throws IOException{    
-    return cluster.checkIfNewContentFitsInPage(nodeClusterPosition, OFastRidBagPaginatedCluster.getRidEntrySize());
+    boolean val = cluster.checkIfNewContentFitsInPage(nodeClusterPosition, OFastRidBagPaginatedCluster.getRidEntrySize());
+    if (val == false){
+      int a = 0;
+      ++a;
+    }
+    return val;
   }
 
   private long getSize() throws IOException{
