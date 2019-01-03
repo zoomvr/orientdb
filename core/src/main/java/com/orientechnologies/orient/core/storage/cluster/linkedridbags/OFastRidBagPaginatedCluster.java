@@ -604,17 +604,9 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         //this is first linked node entry so it is extended, skip rid info and refernce to next
         pos = getRidEntrySize();
         int currentSize = getRecordContentAsInteger(currentNodePageIndex, currentNodePagePosition, pos);
-        if (revertBytes(currentSize) < 0){
-          int a = 0;
-          ++a;
-        }
         currentSize = revertBytes(currentSize);
         pos += OIntegerSerializer.INT_SIZE;
-        int previousRidPosition = getRecordContentAsInteger(currentNodePageIndex, currentNodePagePosition, pos);  
-        if (revertBytes(previousRidPosition) < 0){
-          int a = 0;
-          ++a;
-        }
+        int previousRidPosition = getRecordContentAsInteger(currentNodePageIndex, currentNodePagePosition, pos);          
         previousRidPosition = revertBytes(previousRidPosition);
         final AddEntryResult addEntryResult = addEntry(1, content, currentNodePageIndex, atomicOperation);
 //        byte[] previousRidEntry;
@@ -636,17 +628,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 //        OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, previousRidEntry, OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
 //        replaceContent(currentNodePageIndex, previousRidPosition, previousRidEntry);
         //now increment size, and update info about last added rid. That is done in first entry of node
-        ++currentSize;
-        
-        if (currentSize == 128){
-          int a = 0;
-          ++a;          
-        }
-        
-        if (revertBytes(currentSize) == -2147483648 || revertBytes(addEntryResult.pagePosition) == -2147483648){
-          int a = 0;
-          ++a;
-        }
+        ++currentSize;                
         
         pos = getRidEntrySize();
         replaceRecordContent(currentNodePageIndex, currentNodePagePosition, revertBytes(currentSize), pos);
