@@ -401,6 +401,17 @@ public final class OClusterPage extends ODurablePage {
       setIntValue(entryPosition + 3 * OIntegerSerializer.INT_SIZE + recordSize + offset, value);
     }
   }
+  
+  public void setRecordIntValueFromEntryPosition(final int entryPosition, final int offset, final int value) {    
+    if (offset >= 0) {
+      assert insideRecordBounds(entryPosition, offset, OIntegerSerializer.INT_SIZE);
+      setIntValue(entryPosition + offset + 3 * OIntegerSerializer.INT_SIZE, value);
+    } else {
+      final int recordSize = getIntValue(entryPosition + 2 * OIntegerSerializer.INT_SIZE);
+      assert insideRecordBounds(entryPosition, recordSize + offset, OIntegerSerializer.INT_SIZE);
+      setIntValue(entryPosition + 3 * OIntegerSerializer.INT_SIZE + recordSize + offset, value);
+    }
+  }
 
   public long getRecordLongValue(final int recordPosition, final int offset) {
     assert isPositionInsideInterval(recordPosition);
@@ -416,6 +427,27 @@ public final class OClusterPage extends ODurablePage {
       final int recordSize = getIntValue(entryPosition + 2 * OIntegerSerializer.INT_SIZE);
       assert insideRecordBounds(entryPosition, recordSize + offset, OLongSerializer.LONG_SIZE);
       return getLongValue(entryPosition + 3 * OIntegerSerializer.INT_SIZE + recordSize + offset);
+    }
+  }
+  
+  public int getRecordEntryPosition(final int recordPosition){
+    assert isPositionInsideInterval(recordPosition);
+
+    final int entryIndexPosition = PAGE_INDEXES_OFFSET + recordPosition * INDEX_ITEM_SIZE;
+    final int entryPointer = getIntValue(entryIndexPosition);
+    final int entryPosition = entryPointer & POSITION_MASK;
+    
+    return entryPosition;
+  }
+  
+  public int getRecordIntegerValueFromEntryPosition(final int entryPosition, final int offset){
+    if (offset >= 0) {
+      assert insideRecordBounds(entryPosition, offset, OIntegerSerializer.INT_SIZE);
+      return getIntValue(entryPosition + offset + 3 * OIntegerSerializer.INT_SIZE);
+    } else {
+      final int recordSize = getIntValue(entryPosition + 2 * OIntegerSerializer.INT_SIZE);
+      assert insideRecordBounds(entryPosition, recordSize + offset, OIntegerSerializer.INT_SIZE);
+      return getIntValue(entryPosition + 3 * OIntegerSerializer.INT_SIZE + recordSize + offset);
     }
   }
   

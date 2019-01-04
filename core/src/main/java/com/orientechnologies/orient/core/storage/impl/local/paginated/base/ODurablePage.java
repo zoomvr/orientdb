@@ -275,4 +275,8 @@ public class ODurablePage {
       return super.toString();
     }
   }
+  
+  public OCacheEntry getCacheEntry(){
+    return cacheEntry;
+  }
 }
