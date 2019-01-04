@@ -437,12 +437,16 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   /**
-   * add rid to existing ridbag node. Caller should take care of free space. This is version where record content is updated partially
+   * add rid to existing ridbag node. Caller should take care of free space. 
    * @param rid
    * @param currentRidbagNodePosition, node cluster position
    * @throws IOException 
    */
-  /*public void addRidToLinkedNode(final ORID rid, final long currentRidbagNodePosition) throws IOException {
+  public void addRidToLinkedNode(final ORID rid, final long currentRidbagNodePosition) throws IOException{
+    addRidToLinkedNodeUpdateAtOnce(rid, currentRidbagNodePosition);
+  }
+    
+  private void addRidToLinkedNodePartialUpdate(final ORID rid, final long currentRidbagNodePosition) throws IOException {
 
     final byte[] content = new byte[getRidEntrySize()];
     int pos = OByteSerializer.BYTE_SIZE;
@@ -504,15 +508,9 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     } finally {
       endAtomicOperation(rollback);
     }
-  }*/
-  
-  /**
-   * add rid to existing ridbag node. Caller should take care of free space. This is version where whole first rid entry is updated at once
-   * @param rid
-   * @param currentRidbagNodePosition, node cluster position
-   * @throws IOException 
-   */
-  public void addRidToLinkedNode(final ORID rid, final long currentRidbagNodePosition) throws IOException {
+  }
+    
+  private void addRidToLinkedNodeUpdateAtOnce(final ORID rid, final long currentRidbagNodePosition) throws IOException {
 
     final byte[] content = new byte[getRidEntrySize()];
     int pos = OByteSerializer.BYTE_SIZE;
@@ -2675,41 +2673,94 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     deleteRecord(nodeClusterPosition);    
   }
   
+  private void deleteLinkNodeData(long nodeClusterPosition) throws IOException{
+    deleteLinkNodeDataFullDataRead(nodeClusterPosition);
+  }
+  
   /**
    * delete node and re-link it's previous with it's next node
    * @param nodeClusterPosition
    * @throws IOException 
    */
-   private void deleteLinkNodeData(long nodeClusterPosition) throws IOException{
+   private void deleteLinkNodeDataPartialRead(long nodeClusterPosition) throws IOException {
+    OAtomicOperation atomicOperation = startAtomicOperation(true);
+    boolean rollback = false;
+    try {
+      HelperClasses.Tuple<Long, Integer> nodePageIndexAndPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
+      long pageIndex = nodePageIndexAndPagePosition.getFirstVal();
+      int pagePosition = nodePageIndexAndPagePosition.getSecondVal();
+//      byte[] content = getRidEntry(pageIndex, pagePosition);            
+
+      //delete all following rid entries
+      int pos = OLinkSerializer.RID_SIZE + OByteSerializer.BYTE_SIZE;
+      int nextEntryPos = getRecordContentAsInteger(pageIndex, pagePosition, pos);//OIntegerSerializer.INSTANCE.deserialize(content, pos);
+      nextEntryPos = revertBytes(nextEntryPos);
+      OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
+      boolean firstInNode = true;
+      long recordsSizeDiff = 0;
+      try {
+        final OClusterPage localPage = new OClusterPage(cacheEntry, false);
+        int initialFreePageIndex = calculateFreePageIndex(localPage);
+        while (nextEntryPos != -1) {
+          int freeSizeBefore = localPage.getFreeSpace();
+          int tmpNextEntryPos = getRecordContentAsInteger(pageIndex, nextEntryPos, pos);
+          tmpNextEntryPos = revertBytes(tmpNextEntryPos);
+          if (!firstInNode) {
+            localPage.deleteRecord(nextEntryPos);
+          } else {
+            firstInNode = false;
+          }
+          recordsSizeDiff += localPage.getFreeSpace() - freeSizeBefore;
+          nextEntryPos = tmpNextEntryPos;
+
+        }
+        updateFreePagesIndex(initialFreePageIndex, pageIndex, atomicOperation);
+        updateClusterState(-1, -recordsSizeDiff, atomicOperation);
+      } finally {
+        releasePageFromWrite(atomicOperation, cacheEntry);
+      }
+
+      //delete first rid entry
+      deleteRecord(nodeClusterPosition);
+    } catch (Exception exc) {
+      rollback = true;
+    } finally {
+      endAtomicOperation(rollback);
+    }
+  }
+   
+  private void deleteLinkNodeDataFullDataRead(long nodeClusterPosition) throws IOException{
     OAtomicOperation atomicOperation = startAtomicOperation(true);
     boolean rollback = false;
     try{
       HelperClasses.Tuple<Long, Integer> nodePageIndexAndPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);    
       long pageIndex = nodePageIndexAndPagePosition.getFirstVal();
-      byte[] content = getRidEntry(pageIndex, nodePageIndexAndPagePosition.getSecondVal());
+      int pagePosition = nodePageIndexAndPagePosition.getSecondVal();
+      byte[] content = getRidEntry(pageIndex, pagePosition);            
+      
       //delete all following rid entries
       int pos = OLinkSerializer.RID_SIZE + OByteSerializer.BYTE_SIZE;
-      int nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);
+      int nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);      
       OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
       boolean firstInNode = true;
-      long recordsSizeDiff = 0;      
+      long recordsSizeDiff = 0;            
       try{
         final OClusterPage localPage = new OClusterPage(cacheEntry, false);
-        int initialFreePageIndex = calculateFreePageIndex(localPage);
+        int initialFreePageIndex = calculateFreePageIndex(localPage);        
         while (nextEntryPos != -1){
-          int freeSizeBefore = localPage.getFreeSpace();
-          content = getRidEntry(pageIndex, nextEntryPos);                  
+          int freeSizeBefore = localPage.getFreeSpace();           
+          content = getRidEntry(pageIndex, nextEntryPos);
           if (!firstInNode){
             localPage.deleteRecord(nextEntryPos);
           }
           else{
             firstInNode = false;
           }
-          recordsSizeDiff += localPage.getFreeSpace() - freeSizeBefore; 
-          nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);
+          recordsSizeDiff += localPage.getFreeSpace() - freeSizeBefore;                           
+          nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);          
         }
         updateFreePagesIndex(initialFreePageIndex, pageIndex, atomicOperation);
-        updateClusterState(-1, -recordsSizeDiff, atomicOperation);
+        updateClusterState(-1, -recordsSizeDiff, atomicOperation);        
       }
       finally{
         releasePageFromWrite(atomicOperation, cacheEntry);
