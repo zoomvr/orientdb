@@ -18,7 +18,7 @@ package com.orientechnologies.orient.core.db.record.ridbag.linked;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
-import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
+import com.orientechnologies.orient.core.id.ORID;
 import java.io.IOException;
 import java.util.Iterator;
 
@@ -28,23 +28,82 @@ import java.util.Iterator;
  */
 public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
   
+  private static final int nodeStartIteratingIndex = -1;
+  
+  private final OLinkedListRidBag ridbag;
+  private Long currentIterRidbagNode;
+  private ORID[] currentNodeContent;
+  private int currentNodeIteartionIndex = nodeStartIteratingIndex;
+  
+  private boolean noMore = false;
+  
+  private boolean calledNextAfterHasNext = true;
+  
   public OLinkedListRidBagIterator(OLinkedListRidBag ridbag){
-    
+    this.ridbag = ridbag;
+    currentIterRidbagNode = ridbag.getFirstNodeClusterPos();
   }
   
   @Override
   public boolean hasNext() {
-    throw new UnsupportedOperationException("Not implemented");
+    try{
+      if (noMore){
+        return false;
+      }
+
+      if (!calledNextAfterHasNext){
+        return true;
+      }
+      
+      try{
+        if (currentNodeContent == null || currentNodeIteartionIndex == currentNodeContent.length - 1){
+          if (currentNodeContent != null){
+            currentIterRidbagNode = ridbag.getCluster().getNextNode(currentIterRidbagNode);
+            if (currentIterRidbagNode == null){
+              noMore = true;
+              return false;
+            }
+          }
+          currentNodeContent = ridbag.getCluster().getAllRidsFromNode(currentIterRidbagNode);
+          currentNodeIteartionIndex = nodeStartIteratingIndex;
+        }
+      }
+      catch (IOException exc){
+        OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
+        throw new ODatabaseException(exc.getMessage());
+      }
+
+      ++currentNodeIteartionIndex;
+      //this should never happen, bu just in case
+      if (currentNodeIteartionIndex >= currentNodeContent.length){
+        noMore = true;
+        return false;
+      }
+
+      return true;
+    }
+    finally{
+      calledNextAfterHasNext = false;
+    }
   }
 
   @Override
   public OIdentifiable next() {
-    throw new UnsupportedOperationException("Not implemented");
+    try{
+      if (noMore){
+        throw new IllegalStateException("No more elements");
+      }
+
+      return currentNodeContent[currentNodeIteartionIndex];
+    }
+    finally{
+      calledNextAfterHasNext = true;
+    }
   }
   
   @Override
   public void remove(){
-    
+    throw new UnsupportedOperationException("Not implemented");
   }
   
 }

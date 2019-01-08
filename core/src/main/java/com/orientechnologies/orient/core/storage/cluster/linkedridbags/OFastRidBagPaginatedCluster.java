@@ -2555,6 +2555,20 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return currentIndex >= capacity - 1;
   }
   
+  public ORID[] getAllRidsFromNode(long nodeClusterPosition) throws IOException{
+    HelperClasses.Tuple<Byte, Long> typeAndPageIndex = getPageIndexAndTypeOfRecord(nodeClusterPosition);
+    Byte type = typeAndPageIndex.getFirstVal();
+    if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
+      return getAllRidsFromLinkedNode(nodeClusterPosition);
+    }
+    else if (type == OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE){
+      return getAllRidsFromArrayNode(nodeClusterPosition);
+    }
+    else{
+      throw new ODatabaseException("Invalid ridbag node type: " + type);
+    }
+  }
+  
   public ORID[] getAllRidsFromLinkedNode(long nodeClusterPosition) throws IOException{
     HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
     final long pageIndex = pageIndexPagePosition.getFirstVal();

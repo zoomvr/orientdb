@@ -194,11 +194,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       ORecordInternal.track(this.owner, value);
     }
 
-    if (shouldSaveParentRecord){
+//    if (shouldSaveParentRecord){
       fireCollectionChangedEvent(
               new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value));
       shouldSaveParentRecord = false;
-    }
+//    }
     
     ++size;
     //TODO add it to index
@@ -296,17 +296,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   @Override
   public int deserialize(byte[] stream, int offset) {
     currentRidbagNodeClusterPos = firstRidBagNodeClusterPos = OLongSerializer.INSTANCE.deserialize(stream, offset);
-    boolean exit = false;
-    try{
-      while (exit == false) {
-        Long nextNode = cluster.getNextNode(currentRidbagNodeClusterPos);
-        if (nextNode != null){
-          currentRidbagNodeClusterPos = nextNode;
-        }
-        else{
-          exit = true;
-        }
-      }
+    try{      
       size = getSize();
     }
     catch (IOException exc){
@@ -336,7 +326,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     if (this.owner != null) {
       Iterator<OIdentifiable> iter = iterator();
       while (iter.hasNext()) {
-        OIdentifiable rid = iterator().next();
+        OIdentifiable rid = iter.next();
         ORecordInternal.unTrack(this.owner, rid);
       }
     }
@@ -346,7 +336,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     if (this.owner != null) {
       Iterator<OIdentifiable> iter = iterator();
       while (iter.hasNext()) {
-        OIdentifiable rid = iterator().next();
+        OIdentifiable rid = iter.next();
         ORecordInternal.track(this.owner, rid);
       }
     }
@@ -458,11 +448,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
   //checks if one more rid can be stored on the same page of link ridbag node
   private boolean ifOneMoreFitsToPage(long nodeClusterPosition) throws IOException{    
-    boolean val = cluster.checkIfNewContentFitsInPage(nodeClusterPosition, OFastRidBagPaginatedCluster.getRidEntrySize());
-    if (val == false){
-      int a = 0;
-      ++a;
-    }
+    boolean val = cluster.checkIfNewContentFitsInPage(nodeClusterPosition, OFastRidBagPaginatedCluster.getRidEntrySize());    
     return val;
   }
 
@@ -474,6 +460,14 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       iteratingNode = cluster.getNextNode(iteratingNode);
     }
     return size;
+  }
+  
+  protected Long getFirstNodeClusterPos(){
+    return firstRidBagNodeClusterPos;
+  }
+  
+  protected OFastRidBagPaginatedCluster getCluster(){
+    return cluster;
   }
  
 }
