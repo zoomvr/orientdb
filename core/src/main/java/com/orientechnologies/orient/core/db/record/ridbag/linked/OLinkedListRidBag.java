@@ -157,6 +157,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           cluster.removeNode(currentRidbagNodeClusterPos);
           if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
             firstRidBagNodeClusterPos = newNodeClusterPosition;
+            shouldSaveParentRecord = true;
           }
           //update previous node prev and next info
           cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
@@ -194,11 +195,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       ORecordInternal.track(this.owner, value);
     }
 
-//    if (shouldSaveParentRecord){
+    if (shouldSaveParentRecord){
       fireCollectionChangedEvent(
               new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value));
       shouldSaveParentRecord = false;
-//    }
+    }
     
     ++size;
     //TODO add it to index
@@ -243,7 +244,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         cluster.removeNode(tmpCurrNodeClusterPos);
         currentOffset += nodeRids.length;
         if (tmpCurrNodeClusterPos == firstRidBagNodeClusterPos){
-          removedFirstNode = true;
+          removedFirstNode = true;          
         }
         fetchedNextNode = true;
       }
@@ -264,6 +265,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     currentRidbagNodeClusterPos = megaNodeClusterPosition;
     if (removedFirstNode){
       firstRidBagNodeClusterPos = megaNodeClusterPosition;
+      shouldSaveParentRecord = true;
     }
   }
   
@@ -296,7 +298,18 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   @Override
   public int deserialize(byte[] stream, int offset) {
     currentRidbagNodeClusterPos = firstRidBagNodeClusterPos = OLongSerializer.INSTANCE.deserialize(stream, offset);
-    try{      
+    //find last node
+    boolean exit = false;
+    try{
+      while (exit == false) {
+        Long nextNode = cluster.getNextNode(currentRidbagNodeClusterPos);
+        if (nextNode != null){
+          currentRidbagNodeClusterPos = nextNode;
+        }
+        else{
+          exit = true;
+        }
+      }
       size = getSize();
     }
     catch (IOException exc){
