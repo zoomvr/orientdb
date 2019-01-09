@@ -851,6 +851,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     OIntegerSerializer.INSTANCE.serialize(rids.length, content, pos);
     pos += OIntegerSerializer.INT_SIZE;
     for (int i = 0; i < rids.length; i++){
+      if (rids[i] == null){
+        int a = 0;
+        ++a;
+      }
       OLinkSerializer.INSTANCE.serialize(rids[i], content, pos);
       pos += OLinkSerializer.RID_SIZE;
     }

@@ -101,12 +101,16 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     final OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
     final int size = calculateArrayRidNodeAllocationSize(rids.length);
     final ORID[] toAllocate = new ORID[size];
-    System.arraycopy(rids, 0, toAllocate, 0, rids.length);
-    fillRestOfArrayWithDummyRids(toAllocate, rids.length - 1);
-    long clusterPosition = cluster.addRids(toAllocate, allocatedPos, -1l, -1l, rids.length - 1);
+//    System.arraycopy(rids, 0, toAllocate, 0, rids.length);
+    fillRestOfArrayWithDummyRids(toAllocate, -1);
+    long clusterPosition = cluster.addRids(toAllocate, allocatedPos, -1l, -1l, -1);
     firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
-    storedSize = this.size = rids.length;
+    //storedSize should remain 0
+    this.size = rids.length;
     shouldSaveParentRecord = true;
+    for (ORID inputRid : rids){
+      addedStillInvalidRids.add(inputRid);
+    }
   }
   
   @Override
@@ -268,6 +272,12 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         }
         else{
           throw new ODatabaseException("Invalid node type: " + type);
+        }
+        for (int i = 0; i < nodeRids.length; i++){
+          if (nodeRids[i] == null){
+            int a = 0;
+            ++a;
+          }
         }
         System.arraycopy(nodeRids, 0, mergedRids, currentOffset, nodeRids.length);
         long tmpCurrNodeClusterPos = currentIteratingNode;
