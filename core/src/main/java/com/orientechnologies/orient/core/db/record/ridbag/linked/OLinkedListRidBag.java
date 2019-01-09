@@ -118,9 +118,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     values.forEach(this::add);
   }
 
-  private HelperClasses.Tuple<Boolean, Byte> isCurrentNodeFullNode() throws IOException{
-    HelperClasses.Tuple<Byte, Long> pageIndexAndType = cluster.getPageIndexAndTypeOfRecord(currentRidbagNodeClusterPos);
-    Byte type = pageIndexAndType.getFirstVal();
+  private HelperClasses.Tuple<Boolean, Byte> isCurrentNodeFullNode() throws IOException{    
+    byte type = cluster.getTypeOfRecord(currentRidbagNodeClusterPos);
     if (type == RECORD_TYPE_LINKED_NODE){
       return new HelperClasses.Tuple<>(!ifOneMoreFitsToPage(currentRidbagNodeClusterPos), type);
     }
@@ -241,8 +240,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
   
   private boolean isMaxSizeNodeFullNode(long nodeClusterPosition) throws IOException{
-    HelperClasses.Tuple<Byte, Long> nodeTypeAndPageIndex = cluster.getPageIndexAndTypeOfRecord(nodeClusterPosition);
-    if (nodeTypeAndPageIndex.getFirstVal() == RECORD_TYPE_ARRAY_NODE){
+    byte nodeType = cluster.getTypeOfRecord(nodeClusterPosition);
+    if (nodeType == RECORD_TYPE_ARRAY_NODE){
       return cluster.getNodeSize(nodeClusterPosition) == MAX_RIDBAG_NODE_SIZE;
     }
     return false;
@@ -261,8 +260,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     while (currentIteratingNode != null){
       boolean fetchedNextNode = false;
       if (!isMaxSizeNodeFullNode(currentIteratingNode)){
-        final HelperClasses.Tuple<Byte, Long> nodePageIndexAndType = cluster.getPageIndexAndTypeOfRecord(currentIteratingNode);
-        final byte type = nodePageIndexAndType.getFirstVal();
+        final byte type = cluster.getTypeOfRecord(currentIteratingNode);
         final ORID[] nodeRids;
         if (type == RECORD_TYPE_LINKED_NODE){
           nodeRids = cluster.getAllRidsFromLinkedNode(currentIteratingNode);          
@@ -272,12 +270,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         }
         else{
           throw new ODatabaseException("Invalid node type: " + type);
-        }
-        for (int i = 0; i < nodeRids.length; i++){
-          if (nodeRids[i] == null){
-            int a = 0;
-            ++a;
-          }
         }
         System.arraycopy(nodeRids, 0, mergedRids, currentOffset, nodeRids.length);
         long tmpCurrNodeClusterPos = currentIteratingNode;

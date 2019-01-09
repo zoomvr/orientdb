@@ -851,10 +851,6 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     OIntegerSerializer.INSTANCE.serialize(rids.length, content, pos);
     pos += OIntegerSerializer.INT_SIZE;
     for (int i = 0; i < rids.length; i++){
-      if (rids[i] == null){
-        int a = 0;
-        ++a;
-      }
       OLinkSerializer.INSTANCE.serialize(rids[i], content, pos);
       pos += OLinkSerializer.RID_SIZE;
     }
@@ -2466,14 +2462,14 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   
   private Long getPageIndexOfRecord(final long recordPos) throws IOException{
     final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-    OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
+//    OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
     //here find records physical position
-    OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+//    OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
     //this means that node still not saved
-    if (recordPhysicalPosition == null){
-      return null;
-    }
-    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPhysicalPosition.clusterPosition, 1, atomicOperation);
+//    if (recordPhysicalPosition == null){
+//      return null;
+//    }
+    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPos, 1, atomicOperation);
     return positionEntry.getPageIndex();
   }
   
@@ -2496,13 +2492,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return new HelperClasses.Tuple<>(recordPhysicalPosition.recordType, positionEntry.getPageIndex());
   }
   
-  /**
-   * 
-   * @param recordPos node cluster position
-   * @return
-   * @throws IOException 
-   */
-  public HelperClasses.Tuple<Long, Integer> getPageIndexAndPagePositionOfRecord(final long recordPos) throws IOException{
+  public HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> getPageIndexAndPagePositionAndTypeOfRecord(final long recordPos) throws IOException{
     final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
     //here find records physical position
@@ -2512,6 +2502,34 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       return null;
     }
     OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPhysicalPosition.clusterPosition, 1, atomicOperation);
+    HelperClasses.Tuple<Byte, Long> pageIndexType = new HelperClasses.Tuple<>(recordPhysicalPosition.recordType, positionEntry.getPageIndex());
+    return new HelperClasses.Tuple<>(pageIndexType, positionEntry.getRecordPosition());
+  }
+  
+  public byte getTypeOfRecord(final long recordPos) throws IOException{    
+    OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
+    //here find records physical position
+    OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+    //this means that node still not saved    
+    return recordPhysicalPosition.recordType;
+  }
+  
+  /**
+   * 
+   * @param recordPos node cluster position
+   * @return
+   * @throws IOException 
+   */
+  public HelperClasses.Tuple<Long, Integer> getPageIndexAndPagePositionOfRecord(final long recordPos) throws IOException{
+    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+//    OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
+    //here find records physical position
+//    OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+    //this means that node still not saved
+//    if (recordPhysicalPosition == null){
+//      return null;
+//    }
+    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPos, 1, atomicOperation);
     return new HelperClasses.Tuple<>(positionEntry.getPageIndex(), positionEntry.getRecordPosition());
   }
   
@@ -2560,8 +2578,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   public ORID[] getAllRidsFromNode(long nodeClusterPosition) throws IOException{
-    HelperClasses.Tuple<Byte, Long> typeAndPageIndex = getPageIndexAndTypeOfRecord(nodeClusterPosition);
-    Byte type = typeAndPageIndex.getFirstVal();
+    byte type = getTypeOfRecord(nodeClusterPosition);    
     if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
       return getAllRidsFromLinkedNode(nodeClusterPosition);
     }
@@ -2619,11 +2636,11 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   public int getNodeSize(long nodeClusterPosition) throws IOException{
-    HelperClasses.Tuple<Byte, Long> nodeTypePageIndex = getPageIndexAndTypeOfRecord(nodeClusterPosition);
+    HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> nodeTypePageIndexPagePosition = getPageIndexAndPagePositionAndTypeOfRecord(nodeClusterPosition);
+    HelperClasses.Tuple<Byte, Long> nodeTypePageIndex = nodeTypePageIndexPagePosition.getFirstVal();
     byte type = nodeTypePageIndex.getFirstVal();
-    long pageIndex = nodeTypePageIndex.getSecondVal();
-    HelperClasses.Tuple<Long, Integer> nodePageIndexPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
-    int pagePosition = nodePageIndexPagePosition.getSecondVal();
+    long pageIndex = nodeTypePageIndex.getSecondVal();    
+    int pagePosition = nodeTypePageIndexPagePosition.getSecondVal();
     byte[] entry = getRidEntry(pageIndex, pagePosition);
     if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
       int pos = getRidEntrySize();
