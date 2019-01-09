@@ -31,7 +31,6 @@ import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -118,13 +117,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     values.forEach(this::add);
   }
 
-  private HelperClasses.Tuple<Boolean, Byte> isCurrentNodeFullNode() throws IOException{    
-    byte type = cluster.getTypeOfRecord(currentRidbagNodeClusterPos);
+  private boolean isCurrentNodeFullNode(long pageIndex, int pagePosition, byte type) throws IOException{        
+    HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> nodeTypeAndPageIndexAndPagePosition = cluster.getPageIndexAndPagePositionAndTypeOfRecord(currentRidbagNodeClusterPos);
     if (type == RECORD_TYPE_LINKED_NODE){
-      return new HelperClasses.Tuple<>(!ifOneMoreFitsToPage(currentRidbagNodeClusterPos), type);
+      return (!ifOneMoreFitsToPage(pageIndex));
     }
-    else if (type == RECORD_TYPE_ARRAY_NODE){
-      return new HelperClasses.Tuple<>(cluster.isArrayNodeFull(currentRidbagNodeClusterPos), type);
+    else if (type == RECORD_TYPE_ARRAY_NODE){      
+      return cluster.isArrayNodeFull(pageIndex, pagePosition);
     }
     throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
   }
@@ -138,6 +137,23 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     OIdentifiable ret = null;
     //go through collection of invalid rids and check if some become valid
     Iterator<OIdentifiable> addedInvalidRidsIter = addedStillInvalidRids.iterator();
+    
+    byte currentNodeType;
+    long pageIndex;
+    int pagePosition;
+    
+    try{
+      HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> currentNodeTypeAndPageIndexAndPagePosition = cluster.getPageIndexAndPagePositionAndTypeOfRecord(currentRidbagNodeClusterPos);
+      currentNodeType = currentNodeTypeAndPageIndexAndPagePosition.getFirstVal().getFirstVal();
+      pageIndex = currentNodeTypeAndPageIndexAndPagePosition.getFirstVal().getSecondVal();
+      pagePosition = currentNodeTypeAndPageIndexAndPagePosition.getSecondVal();    
+    }
+    catch (IOException exc){
+      OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
+      throw new ODatabaseException(exc.getMessage());
+    }
+    long previousCurrentNodeClusterPos = currentRidbagNodeClusterPos;
+    
     while (addedInvalidRidsIter.hasNext()){
       OIdentifiable value = addedInvalidRidsIter.next();
       //process only persistent rids
@@ -155,9 +171,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           }
         }
 
-        HelperClasses.Tuple<Boolean, Byte> isCurrentFullAndType = isCurrentNodeFullNode();
-        boolean isCurrentNodeFull = isCurrentFullAndType.getFirstVal();
-        byte currentNodeType = isCurrentFullAndType.getSecondVal();
+        if (previousCurrentNodeClusterPos != currentRidbagNodeClusterPos){
+          HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> currentNodeTypeAndPageIndexAndPagePosition = cluster.getPageIndexAndPagePositionAndTypeOfRecord(currentRidbagNodeClusterPos);
+          currentNodeType = currentNodeTypeAndPageIndexAndPagePosition.getFirstVal().getFirstVal();
+          pageIndex = currentNodeTypeAndPageIndexAndPagePosition.getFirstVal().getSecondVal();
+          pagePosition = currentNodeTypeAndPageIndexAndPagePosition.getSecondVal();    
+          previousCurrentNodeClusterPos = currentRidbagNodeClusterPos;
+        }
+       
+        boolean isCurrentNodeFull = isCurrentNodeFullNode(pageIndex, pagePosition, currentNodeType);
         if (isCurrentNodeFull) {
           //By this algorithm allways link node is followed with array node and vice versa
           if (currentNodeType == RECORD_TYPE_LINKED_NODE){
@@ -192,11 +214,10 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         else {
           switch (currentNodeType){
             case RECORD_TYPE_LINKED_NODE:
-              cluster.addRidToLinkedNode(value.getIdentity(), currentRidbagNodeClusterPos);
+              cluster.addRidToLinkedNode(value.getIdentity(), pageIndex, pagePosition);
               break;
-            case RECORD_TYPE_ARRAY_NODE:
-              HelperClasses.Tuple<Long, Integer> pageIndexAndPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos);
-              cluster.addRidToArrayNode(value.getIdentity(), pageIndexAndPagePosition.getFirstVal(), pageIndexAndPagePosition.getSecondVal());
+            case RECORD_TYPE_ARRAY_NODE:              
+              cluster.addRidToArrayNode(value.getIdentity(), pageIndex, pagePosition);
               break;
             default:
               throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
@@ -482,8 +503,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
     
   //checks if one more rid can be stored on the same page of link ridbag node
-  private boolean ifOneMoreFitsToPage(long nodeClusterPosition) throws IOException{    
-    boolean val = cluster.checkIfNewContentFitsInPage(nodeClusterPosition, OFastRidBagPaginatedCluster.getRidEntrySize());    
+  private boolean ifOneMoreFitsToPage(long pageIndex) throws IOException{    
+    boolean val = cluster.checkIfNewContentFitsInPage(OFastRidBagPaginatedCluster.getRidEntrySize(), pageIndex);
     return val;
   }
 
