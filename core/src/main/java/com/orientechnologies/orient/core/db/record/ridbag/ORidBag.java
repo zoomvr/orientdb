@@ -291,7 +291,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
           throw new ODatabaseException(exc.getMessage());
         }
         final ORecord owner = oldDelegate.getOwner();
-//        delegate.setOwner(owner);
+        delegate.setOwner(owner);
 
         for (OMultiValueChangeListener<OIdentifiable, OIdentifiable> listener : oldDelegate.getChangeListeners()){
           delegate.addChangeListener(listener);

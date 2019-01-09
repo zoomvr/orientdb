@@ -31,6 +31,7 @@ import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -64,8 +65,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   //cached size of ridbag
   private long size = 0;
+  private long storedSize = 0;
   
   private boolean shouldSaveParentRecord = false;
+  
+  private final List<OIdentifiable> addedStillInvalidRids = new LinkedList<>();
   
   private static int calculateArrayRidNodeAllocationSize(final int initialNumberOfRids){
     int size = Math.min(initialNumberOfRids + ADDITIONAL_ALLOCATION_SIZE, initialNumberOfRids * 2);
@@ -82,7 +86,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_LINKED_NODE);
     long clusterPosition = cluster.addRid(firstRid, allocatedPos, -1l, -1l);
     firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
-    size = 1;
+    storedSize = size = 1;
     shouldSaveParentRecord = true;
   }
   
@@ -101,7 +105,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     fillRestOfArrayWithDummyRids(toAllocate, rids.length - 1);
     long clusterPosition = cluster.addRids(toAllocate, allocatedPos, -1l, -1l, rids.length - 1);
     firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
-    this.size = rids.length;
+    storedSize = this.size = rids.length;
     shouldSaveParentRecord = true;
   }
   
@@ -122,86 +126,113 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
   }
   
+  /**
+   * process all previously invalid rids, which are valid now
+   * @param fireChangedEvent
+   * 
+   */
+  private OIdentifiable processInvalidRidsReferences(){        
+    OIdentifiable ret = null;
+    //go through collection of invalid rids and check if some become valid
+    Iterator<OIdentifiable> addedInvalidRidsIter = addedStillInvalidRids.iterator();
+    while (addedInvalidRidsIter.hasNext()){
+      OIdentifiable value = addedInvalidRidsIter.next();
+      //process only persistent rids
+      if (!value.getIdentity().isPersistent()){
+        continue;
+      }
+      try {
+        //check for megaMerge
+        if (storedSize > 0 && storedSize % MAX_RIDBAG_NODE_SIZE == 0) {
+          try {
+            nodesMegaMerge();
+          } catch (IOException exc) {
+            OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[]) null);
+            throw new ODatabaseException(exc.getMessage());
+          }
+        }
+
+        HelperClasses.Tuple<Boolean, Byte> isCurrentFullAndType = isCurrentNodeFullNode();
+        boolean isCurrentNodeFull = isCurrentFullAndType.getFirstVal();
+        byte currentNodeType = isCurrentFullAndType.getSecondVal();
+        if (isCurrentNodeFull) {
+          //By this algorithm allways link node is followed with array node and vice versa
+          if (currentNodeType == RECORD_TYPE_LINKED_NODE){
+            ORID[] currentNodeRids = cluster.getAllRidsFromLinkedNode(currentRidbagNodeClusterPos);
+            OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
+            int newNodePreallocatedSize = calculateArrayRidNodeAllocationSize(currentNodeRids.length);
+            ORID[] newNodePreallocatedRids = new ORID[newNodePreallocatedSize];
+            System.arraycopy(currentNodeRids, 0, newNodePreallocatedRids, 0, currentNodeRids.length);
+            newNodePreallocatedRids[currentNodeRids.length] = value.getIdentity();
+            fillRestOfArrayWithDummyRids(newNodePreallocatedRids, currentNodeRids.length);
+            long newNodeClusterPosition = cluster.addRids(currentNodeRids, newNodePhysicalPosition, currentRidbagNodeClusterPos, 
+                    -1l, currentNodeRids.length);
+            cluster.removeNode(currentRidbagNodeClusterPos);
+            if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
+              firstRidBagNodeClusterPos = newNodeClusterPosition;
+              shouldSaveParentRecord = true;
+            }
+            //update previous node prev and next info
+            cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
+            currentRidbagNodeClusterPos = newNodeClusterPosition;          
+          }
+          else if (currentNodeType  == RECORD_TYPE_ARRAY_NODE){
+            OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
+            long newNodeClusterPosition = cluster.addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
+            cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
+            currentRidbagNodeClusterPos = newNodeClusterPosition;
+          }
+          else{
+            throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
+          }
+        } 
+        else {
+          switch (currentNodeType){
+            case RECORD_TYPE_LINKED_NODE:
+              cluster.addRidToLinkedNode(value.getIdentity(), currentRidbagNodeClusterPos);
+              break;
+            case RECORD_TYPE_ARRAY_NODE:
+              HelperClasses.Tuple<Long, Integer> pageIndexAndPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos);
+              cluster.addRidToArrayNode(value.getIdentity(), pageIndexAndPagePosition.getFirstVal(), pageIndexAndPagePosition.getSecondVal());
+              break;
+            default:
+              throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
+          }
+        }
+      } catch (IOException exc) {
+        OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
+        throw new ODatabaseException(exc.getMessage());
+      }
+
+      ++storedSize;
+      addedInvalidRidsIter.remove();            
+      if (ret == null){
+        ret = value;
+      }
+    }    
+
+    return ret;
+  }
+  
   @Override
-  public void add(OIdentifiable value) {
-    if (value == null) {
+  public void add(OIdentifiable valToAdd) {
+    if (valToAdd == null) {
       throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
     }
-
-    try {
-      //check for megaMerge
-      if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0) {
-        try {
-          nodesMegaMerge();
-        } catch (IOException exc) {
-          OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[]) null);
-          throw new ODatabaseException(exc.getMessage());
-        }
-      }
-      
-      HelperClasses.Tuple<Boolean, Byte> isCurrentFullAndType = isCurrentNodeFullNode();
-      boolean isCurrentNodeFull = isCurrentFullAndType.getFirstVal();
-      byte currentNodeType = isCurrentFullAndType.getSecondVal();
-      if (isCurrentNodeFull) {
-        //By this algorithm allways link node is followed with array node and vice versa
-        if (currentNodeType == RECORD_TYPE_LINKED_NODE){
-          ORID[] currentNodeRids = cluster.getAllRidsFromLinkedNode(currentRidbagNodeClusterPos);
-          OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
-          int newNodePreallocatedSize = calculateArrayRidNodeAllocationSize(currentNodeRids.length);
-          ORID[] newNodePreallocatedRids = new ORID[newNodePreallocatedSize];
-          System.arraycopy(currentNodeRids, 0, newNodePreallocatedRids, 0, currentNodeRids.length);
-          newNodePreallocatedRids[currentNodeRids.length] = value.getIdentity();
-          fillRestOfArrayWithDummyRids(newNodePreallocatedRids, currentNodeRids.length);
-          long newNodeClusterPosition = cluster.addRids(currentNodeRids, newNodePhysicalPosition, currentRidbagNodeClusterPos, 
-                  -1l, currentNodeRids.length);
-          cluster.removeNode(currentRidbagNodeClusterPos);
-          if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
-            firstRidBagNodeClusterPos = newNodeClusterPosition;
-            shouldSaveParentRecord = true;
-          }
-          //update previous node prev and next info
-          cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
-          currentRidbagNodeClusterPos = newNodeClusterPosition;          
-        }
-        else if (currentNodeType  == RECORD_TYPE_ARRAY_NODE){
-          OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
-          long newNodeClusterPosition = cluster.addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
-          cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
-          currentRidbagNodeClusterPos = newNodeClusterPosition;
-        }
-        else{
-          throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
-        }
-      } 
-      else {
-        switch (currentNodeType){
-          case RECORD_TYPE_LINKED_NODE:
-            cluster.addRidToLinkedNode(value.getIdentity(), currentRidbagNodeClusterPos);
-            break;
-          case RECORD_TYPE_ARRAY_NODE:
-            HelperClasses.Tuple<Long, Integer> pageIndexAndPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos);
-            cluster.addRidToArrayNode(value.getIdentity(), pageIndexAndPagePosition.getFirstVal(), pageIndexAndPagePosition.getSecondVal());
-            break;
-          default:
-            throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
-        }
-      }
-    } catch (IOException exc) {
-      OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
-      throw new ODatabaseException(exc.getMessage());
-    }
-
+    
+    addedStillInvalidRids.add(valToAdd);    
+    
+  //processInvalidRidsReferences();
+    
+    ++size;    
+    
     if (this.owner != null) {
-      ORecordInternal.track(this.owner, value);
-    }
-
-    if (shouldSaveParentRecord){
-      fireCollectionChangedEvent(
-              new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, value, value));
-      shouldSaveParentRecord = false;
+      ORecordInternal.track(this.owner, valToAdd);
     }
     
-    ++size;
+    fireCollectionChangedEvent(
+                new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, false));
+    shouldSaveParentRecord = false;
     //TODO add it to index
   }
   
@@ -291,6 +322,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
+    OIdentifiable firstStored = processInvalidRidsReferences();    
+    if (firstStored != null && shouldSaveParentRecord){
+      fireCollectionChangedEvent(
+                new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, firstStored, firstStored, null, true));
+      shouldSaveParentRecord = false;
+    }
+    
     OLongSerializer.INSTANCE.serialize(firstRidBagNodeClusterPos, stream, offset);
     return offset + OLongSerializer.LONG_SIZE;
   }
@@ -310,7 +348,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           exit = true;
         }
       }
-      size = getSize();
+      storedSize = size = getSize();
     }
     catch (IOException exc){
       OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
@@ -331,28 +369,10 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
 
   @Override
-  public void setOwner(ORecord owner) {
-    if (owner != null && this.owner != null && !this.owner.equals(owner)) {
-      throw new IllegalStateException("This data structure is owned by document " + owner
-          + " if you want to use it in other document create new rid bag instance and copy content of current one.");
-    }
-    if (this.owner != null) {
-      Iterator<OIdentifiable> iter = iterator();
-      while (iter.hasNext()) {
-        OIdentifiable rid = iter.next();
-        ORecordInternal.unTrack(this.owner, rid);
-      }
-    }
+  public void setOwner(ORecord owner) {    
 
     this.owner = owner;
-    
-    if (this.owner != null) {
-      Iterator<OIdentifiable> iter = iterator();
-      while (iter.hasNext()) {
-        OIdentifiable rid = iter.next();
-        ORecordInternal.track(this.owner, rid);
-      }
-    }
+        
   }
 
   @Override
