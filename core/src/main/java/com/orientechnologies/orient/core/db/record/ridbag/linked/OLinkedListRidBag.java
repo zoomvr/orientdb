@@ -49,8 +49,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   public static final byte RECORD_TYPE_LINKED_NODE = 'l';
   public static final byte RECORD_TYPE_ARRAY_NODE = 'a';
   
-  private static final Object lockObject = new Object();
-  
   private Long firstRidBagNodeClusterPos;
   private Long currentRidbagNodeClusterPos;
   
@@ -91,7 +89,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 //    shouldSaveParentRecord = true;
 //  }
   
-  private void fillRestOfArrayWithDummyRids(final ORID[] array, final int lastValidIndex){
+  private static void fillRestOfArrayWithDummyRids(final ORID[] array, final int lastValidIndex){
     for (int i = lastValidIndex + 1; i < array.length; i++){
       array[i] = new ORecordId(-1, -1);
     }
@@ -99,20 +97,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID[] rids) throws IOException{    
     this.cluster = cluster;
-    synchronized(lockObject){
-      final OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
-      final int size = calculateArrayRidNodeAllocationSize(rids.length);
-      final ORID[] toAllocate = new ORID[size];
-  //    System.arraycopy(rids, 0, toAllocate, 0, rids.length);
-      fillRestOfArrayWithDummyRids(toAllocate, -1);
-      long clusterPosition = cluster.addRids(toAllocate, allocatedPos, -1l, -1l, -1);
-      firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
-      //storedSize should remain 0
-      this.size = rids.length;
-      shouldSaveParentRecord = true;
-      for (ORID inputRid : rids){
-        addedStillInvalidRids.add(inputRid);
-      }
+    this.size = rids.length;
+    OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.firstNodeAllocation(rids, ADDITIONAL_ALLOCATION_SIZE, MAX_RIDBAG_NODE_SIZE);
+    firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
+    currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
+    shouldSaveParentRecord = output.shouldSaveParentRecord;
+    for (ORID inputRid : rids){
+      addedStillInvalidRids.add(inputRid);
     }
   }
   
@@ -171,10 +162,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       try {
         //check for megaMerge
         if (storedSize > 0 && storedSize % MAX_RIDBAG_NODE_SIZE == 0) {
-          try {
-            synchronized(lockObject){
-              nodesMegaMerge();
-            }
+          try {            
+            nodesMegaMerge();            
           } catch (IOException exc) {
             OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[]) null);
             throw new ODatabaseException(exc.getMessage());
@@ -189,51 +178,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           previousCurrentNodeClusterPos = currentRidbagNodeClusterPos;
         }
         
-        synchronized(lockObject){
-          boolean isCurrentNodeFull = isCurrentNodeFullNode(pageIndex, pagePosition, currentNodeType);
-          if (isCurrentNodeFull) {
-            //By this algorithm allways link node is followed with array node and vice versa
-            if (currentNodeType == RECORD_TYPE_LINKED_NODE){
-              ORID[] currentNodeRids = cluster.getAllRidsFromLinkedNode(currentRidbagNodeClusterPos);
-              OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
-              int newNodePreallocatedSize = calculateArrayRidNodeAllocationSize(currentNodeRids.length);
-              ORID[] newNodePreallocatedRids = new ORID[newNodePreallocatedSize];
-              System.arraycopy(currentNodeRids, 0, newNodePreallocatedRids, 0, currentNodeRids.length);
-              newNodePreallocatedRids[currentNodeRids.length] = value.getIdentity();
-              fillRestOfArrayWithDummyRids(newNodePreallocatedRids, currentNodeRids.length);
-              long newNodeClusterPosition = cluster.addRids(currentNodeRids, newNodePhysicalPosition, currentRidbagNodeClusterPos, 
-                      -1l, currentNodeRids.length);
-              cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
-              cluster.removeNode(currentRidbagNodeClusterPos);            
-              if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
-                firstRidBagNodeClusterPos = newNodeClusterPosition;
-                shouldSaveParentRecord = true;
-              }            
-              currentRidbagNodeClusterPos = newNodeClusterPosition;          
-            }
-            else if (currentNodeType  == RECORD_TYPE_ARRAY_NODE){
-              OPhysicalPosition newNodePhysicalPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
-              long newNodeClusterPosition = cluster.addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
-              cluster.updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
-              currentRidbagNodeClusterPos = newNodeClusterPosition;
-            }
-            else{
-              throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
-            }
-          } 
-          else {
-            switch (currentNodeType){
-              case RECORD_TYPE_LINKED_NODE:
-                cluster.addRidToLinkedNode(value.getIdentity(), pageIndex, pagePosition);
-                break;
-              case RECORD_TYPE_ARRAY_NODE:              
-                cluster.addRidToArrayNode(value.getIdentity(), pageIndex, pagePosition);
-                break;
-              default:
-                throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
-            }
-          }
-        }
+        OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.addRidHighLevel(value, pageIndex, pagePosition, currentNodeType, ADDITIONAL_ALLOCATION_SIZE, MAX_RIDBAG_NODE_SIZE, 
+                currentRidbagNodeClusterPos, firstRidBagNodeClusterPos, shouldSaveParentRecord);
+        firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
+        currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
+        shouldSaveParentRecord = output.shouldSaveParentRecord;
       } catch (IOException exc) {
         OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
         throw new ODatabaseException(exc.getMessage());
@@ -284,54 +233,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
    * @throws IOException 
    */
   private void nodesMegaMerge() throws IOException{
-    final ORID[] mergedRids = new ORID[MAX_RIDBAG_NODE_SIZE];
-    int currentOffset = 0;
-    Long currentIteratingNode = firstRidBagNodeClusterPos;
-    boolean removedFirstNode = false;
-    long lastNonRemovedNode = -1;
-    while (currentIteratingNode != null){
-      boolean fetchedNextNode = false;
-      if (!isMaxSizeNodeFullNode(currentIteratingNode)){
-        final byte type = cluster.getTypeOfRecord(currentIteratingNode);
-        final ORID[] nodeRids;
-        if (type == RECORD_TYPE_LINKED_NODE){
-          nodeRids = cluster.getAllRidsFromLinkedNode(currentIteratingNode);          
-        }
-        else if (type == RECORD_TYPE_ARRAY_NODE){
-          nodeRids = cluster.getAllRidsFromArrayNode(currentIteratingNode);
-        }
-        else{
-          throw new ODatabaseException("Invalid node type: " + type);
-        }
-        System.arraycopy(nodeRids, 0, mergedRids, currentOffset, nodeRids.length);
-        long tmpCurrNodeClusterPos = currentIteratingNode;
-        currentIteratingNode = cluster.getNextNode(currentIteratingNode);
-        cluster.removeNode(tmpCurrNodeClusterPos);
-        currentOffset += nodeRids.length;
-        if (tmpCurrNodeClusterPos == firstRidBagNodeClusterPos){
-          removedFirstNode = true;          
-        }
-        fetchedNextNode = true;
-      }
-      else{
-        lastNonRemovedNode = currentIteratingNode;
-      }
-      if (!fetchedNextNode){
-        currentIteratingNode = cluster.getNextNode(currentIteratingNode);
-      }
-    }
-    
-    OPhysicalPosition megaNodeAllocatedPosition = cluster.allocatePosition(RECORD_TYPE_ARRAY_NODE);
-    long megaNodeClusterPosition = cluster.addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE - 1);
-    //set next node of previous node
-    if (lastNonRemovedNode != -1){
-      cluster.updatePrevNextNodeinfo(lastNonRemovedNode, null, megaNodeClusterPosition);
-    }
-    currentRidbagNodeClusterPos = megaNodeClusterPosition;
-    if (removedFirstNode){
-      firstRidBagNodeClusterPos = megaNodeClusterPosition;
-      shouldSaveParentRecord = true;
-    }
+    OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.nodesMegaMerge(currentRidbagNodeClusterPos, 
+            firstRidBagNodeClusterPos, MAX_RIDBAG_NODE_SIZE, shouldSaveParentRecord);
+    currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
+    firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
+    shouldSaveParentRecord = output.shouldSaveParentRecord;
   }
   
   @Override
