@@ -517,8 +517,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     boolean rollback = false;
     OAtomicOperation atomicOperation = startAtomicOperation(true);    
     try {
-      acquireExclusiveLock();
-      HelperClasses.Tuple<OClusterPage, Integer> firstRecordPageAndEntryPosition = null;
+      acquireExclusiveLock();      
       try {       
         final byte[] firstEntryContent = getRidEntry(pageIndex, pagePosition);
         
@@ -563,17 +562,13 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   /**
    * 
    * @param rid
+   * @param currentNodePageIndex
    * @param currentRidPagePosition, node position in page
    * @throws IOException 
    */
-  public void addRidToArrayNode(final ORID rid, final long currentNodePageIndex, int currentRidPagePosition) throws IOException {
-
-    boolean rollback = false;
-    OAtomicOperation atomicOperation = startAtomicOperation(true);
-    try {
+  public void addRidToArrayNode(final ORID rid, final long currentNodePageIndex, int currentRidPagePosition) throws IOException {       
       acquireExclusiveLock();
-      try {
-        
+      try {        
 //        byte[] ridEntry = getRidEntry(currentNodePageIndex, currentRidPagePosition);
         //skip record type info
         int pos = OByteSerializer.BYTE_SIZE;
@@ -599,13 +594,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 //        replaceContent(currentNodePageIndex, currentRidPagePosition, ridEntry);
       } finally {
         releaseExclusiveLock();
-      }
-    } catch (Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
-    }
+      }    
   }
   
   /**
@@ -737,6 +726,9 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       acquireExclusiveLock();
       try{
         OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(nodeClusterPosition, 1, atomicOperation);
+        if (positionEntry == null){
+          positionEntry = clusterPositionMap.get(nodeClusterPosition, 1, atomicOperation);
+        }
         if (previousNodeClusterPosition == null){
           previousNodeClusterPosition = positionEntry.getPreviousNodePosition();
         }
@@ -1578,9 +1570,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             return null;
           }
 
-          if (localPage.getRecordByteValue(recordPosition, -OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE) == 0) {
-            return null;
-          }
+          //do not know what is this, int his cluster no negative offsets are used so suppose that this shouldn't be here
+//          if (localPage.getRecordByteValue(recordPosition, -OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE) == 0) {
+//            return null;
+//          }
 
           final OPhysicalPosition physicalPosition = new OPhysicalPosition();
           physicalPosition.recordSize = -1;
@@ -2040,10 +2033,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       position = localPage.appendRecord(recordVersion, entryContent);
 
       if (position < 0) {
-        localPage.dumpToLog();
+        localPage.dumpToLog();        
         throw new IllegalStateException(
             "Page " + cacheEntry.getPageIndex() + " does not have enough free space to add record content, freePageIndex="
-                + freePageIndex + ", entryContent.length=" + entryContent.length);
+                + freePageIndex + ", entryContent.length=" + entryContent.length);        
       }
 
       finalVersion = localPage.getRecordVersion(position);
@@ -2483,7 +2476,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     //here find records physical position
     OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
     //this means that node still not saved
-    if (recordPhysicalPosition == null){
+    if (recordPhysicalPosition == null){      
       return null;
     }
     OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPhysicalPosition.clusterPosition, 1, atomicOperation);
@@ -2536,7 +2529,8 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   
   public boolean checkIfNewContentFitsInPage(final int length, long pageIndex) throws IOException {
     Integer freeSpace = getFreeSpace(pageIndex);        
-    return freeSpace >= length;
+    //three ints are header for record content in page
+    return freeSpace >= length + 3 * OIntegerSerializer.INT_SIZE;
   }
   
   public HelperClasses.Tuple<Long, Long> getNodePreviousNextNodePositons(long position) throws IOException{
@@ -2623,6 +2617,9 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     if (nodeTypePageIndexPagePosition == null){
       int a = 0;
       ++a;
+      System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+      System.out.println("Node cluster position: " + nodeClusterPosition);
+      System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
     }
     HelperClasses.Tuple<Byte, Long> nodeTypePageIndex = nodeTypePageIndexPagePosition.getFirstVal();
     byte type = nodeTypePageIndex.getFirstVal();
@@ -2662,7 +2659,13 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return prevPos;
   }
   
-  public void removeNode(long currentNodeClusterPosition) throws IOException{
+  /**
+   * 
+   * @param currentNodeClusterPosition
+   * @return previous node cluster position
+   * @throws IOException 
+   */
+  public long removeNode(long currentNodeClusterPosition) throws IOException{
     OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(currentNodeClusterPosition, 1, atomicOperation);
     //find previous and next node of current node, and connect them
@@ -2689,6 +2692,8 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     else if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
       deleteLinkNodeData(currentNodeClusterPosition);
     }
+    
+    return prevPos;
   }
   
   private void deleteArrayNodeData(long nodeClusterPosition) throws IOException{    
@@ -2746,6 +2751,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       deleteRecord(nodeClusterPosition);
     } catch (Exception exc) {
       rollback = true;
+      throw exc;
     } finally {
       endAtomicOperation(rollback);
     }
@@ -2793,6 +2799,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
     catch (Exception exc){
       rollback = true;
+      throw exc;
     }
     finally{
       endAtomicOperation(rollback);
