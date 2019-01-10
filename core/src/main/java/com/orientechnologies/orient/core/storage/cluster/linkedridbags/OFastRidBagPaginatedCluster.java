@@ -67,6 +67,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /**
  *
@@ -393,23 +394,42 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
 
   @Override
-  public OPhysicalPosition allocatePosition(byte recordType) throws IOException {
+  public OPhysicalPosition allocatePosition(byte recordType) throws IOException{
+    return allocatePosition(recordType, true);
+  }
+  
+  private OPhysicalPosition allocatePosition(byte recordType, boolean lock) throws IOException {
     boolean rollback = false;
-    final OAtomicOperation atomicOperation = startAtomicOperation(true);
-    try {
-      acquireExclusiveLock();
-      try {
+    OAtomicOperation atomicOperation;
+    if (lock){
+      atomicOperation = startAtomicOperation(true);
+    }
+    else{
+     atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    }
+    try{
+      if (lock){
+        acquireExclusiveLock();
+      }
+      try{
         final OPhysicalPosition pos = createPhysicalPosition(recordType, clusterPositionMap.allocate(atomicOperation), -1);
         addAtomicOperationMetadata(new ORecordId(id, pos.clusterPosition), atomicOperation);
-        return pos;
-      } finally {
-        releaseExclusiveLock();
+        return pos;      
       }
-    } catch (Exception e) {
+      finally{
+        if (lock){
+          releaseExclusiveLock();
+        }
+      }
+    }
+    catch (Exception exc){
       rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
+      throw exc;
+    }
+    finally{
+      if (lock){
+        endAtomicOperation(rollback);
+      }
     }
   }
 
@@ -447,7 +467,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @param pagePosition
    * @throws IOException 
    */
-  public void addRidToLinkedNode(final ORID rid, final long pageIndex, final int pagePosition) throws IOException{
+  private void addRidToLinkedNode(final ORID rid, final long pageIndex, final int pagePosition) throws IOException{
     addRidToLinkedNodeUpdateAtOnce(rid, pageIndex, pagePosition);
   }
     
@@ -458,56 +478,47 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     OLinkSerializer.INSTANCE.serialize(rid, content, pos);
     pos += OLinkSerializer.RID_SIZE;
     OIntegerSerializer.INSTANCE.serialize(-1, content, pos);
+    
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    
+    HelperClasses.Tuple<OClusterPage, Integer> firstRecordPageAndEntryPosition = null;
+    try {                
+      firstRecordPageAndEntryPosition = getRecordPageAndEntryPosition(pageIndex, pagePosition, false, atomicOperation);
+      OClusterPage firstRecordPage = firstRecordPageAndEntryPosition.getFirstVal();
+      int firstRecordPageEntryPosition = firstRecordPageAndEntryPosition.getSecondVal();
 
-    boolean rollback = false;
-    OAtomicOperation atomicOperation = startAtomicOperation(true);    
-    try {
-      acquireExclusiveLock();
-      HelperClasses.Tuple<OClusterPage, Integer> firstRecordPageAndEntryPosition = null;
-      try {                
-        firstRecordPageAndEntryPosition = getRecordPageAndEntryPosition(pageIndex, pagePosition, false, atomicOperation);
-        OClusterPage firstRecordPage = firstRecordPageAndEntryPosition.getFirstVal();
-        int firstRecordPageEntryPosition = firstRecordPageAndEntryPosition.getSecondVal();
-        
-        //this is first linked node entry so it is extended, skip rid info and refernce to next
-        pos = getRidEntrySize();
-        int currentSize = getRecordContentAsIntegerFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, pos);
-        currentSize = revertBytes(currentSize);
-        pos += OIntegerSerializer.INT_SIZE;
-        int previousRidPosition = getRecordContentAsIntegerFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, pos);
-        previousRidPosition = revertBytes(previousRidPosition);
-        final AddEntryResult addEntryResult = addEntry(1, content, pageIndex, atomicOperation);
-        //update reference to next rid in previuosly added rid entry
-        //position is record type (byte) + rid size
-        if (pagePosition != previousRidPosition){          
-          replaceRecordContent(pageIndex, previousRidPosition, revertBytes(addEntryResult.pagePosition), OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
-        }
-        else{
-          replaceRecordContentFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, revertBytes(addEntryResult.pagePosition), OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
-        }
-        //now increment size, and update info about last added rid. That is done in first entry of node
-        ++currentSize;                
-        
-        pos = getRidEntrySize();
-        replaceRecordContentFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, revertBytes(currentSize), pos);
-        //update info about current entry in this node
-        pos += OIntegerSerializer.INT_SIZE;
-        replaceRecordContentFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, revertBytes(addEntryResult.pagePosition), pos);
-               
-        updateClusterState(1, addEntryResult.recordsSizeDiff, atomicOperation);                
-
-      } finally {
-        releaseExclusiveLock();
-        if (firstRecordPageAndEntryPosition != null){
-          releaseRecordPage(firstRecordPageAndEntryPosition.getFirstVal(), false, atomicOperation);
-        }
+      //this is first linked node entry so it is extended, skip rid info and refernce to next
+      pos = getRidEntrySize();
+      int currentSize = getRecordContentAsIntegerFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, pos);
+      currentSize = revertBytes(currentSize);
+      pos += OIntegerSerializer.INT_SIZE;
+      int previousRidPosition = getRecordContentAsIntegerFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, pos);
+      previousRidPosition = revertBytes(previousRidPosition);
+      final AddEntryResult addEntryResult = addEntry(1, content, pageIndex, atomicOperation);
+      //update reference to next rid in previuosly added rid entry
+      //position is record type (byte) + rid size
+      if (pagePosition != previousRidPosition){          
+        replaceRecordContent(pageIndex, previousRidPosition, revertBytes(addEntryResult.pagePosition), OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
       }
-    } catch (Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
-    }
+      else{
+        replaceRecordContentFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, revertBytes(addEntryResult.pagePosition), OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
+      }
+      //now increment size, and update info about last added rid. That is done in first entry of node
+      ++currentSize;                
+
+      pos = getRidEntrySize();
+      replaceRecordContentFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, revertBytes(currentSize), pos);
+      //update info about current entry in this node
+      pos += OIntegerSerializer.INT_SIZE;
+      replaceRecordContentFromEntryPosition(firstRecordPage, firstRecordPageEntryPosition, revertBytes(addEntryResult.pagePosition), pos);
+
+      updateClusterState(1, addEntryResult.recordsSizeDiff, atomicOperation);                
+
+    } finally {      
+      if (firstRecordPageAndEntryPosition != null){
+        releaseRecordPage(firstRecordPageAndEntryPosition.getFirstVal(), false, atomicOperation);
+      }
+    }    
   }
     
   private void addRidToLinkedNodeUpdateAtOnce(final ORID rid, final long pageIndex, final int pagePosition) throws IOException {
@@ -517,50 +528,36 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     OLinkSerializer.INSTANCE.serialize(rid, content, pos);
     pos += OLinkSerializer.RID_SIZE;
     OIntegerSerializer.INSTANCE.serialize(-1, content, pos);
+    
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();          
+    final byte[] firstEntryContent = getRidEntry(pageIndex, pagePosition);
 
-    boolean rollback = false;
-    OAtomicOperation atomicOperation = startAtomicOperation(true);    
-    try {
-      acquireExclusiveLock();      
-      try {       
-        final byte[] firstEntryContent = getRidEntry(pageIndex, pagePosition);
-        
-        //this is first linked node entry so it is extended, skip rid info and refernce to next               
-        pos = getRidEntrySize();
-        int currentSize = OIntegerSerializer.INSTANCE.deserialize(firstEntryContent, pos);        
-        pos += OIntegerSerializer.INT_SIZE;
-        int previousRidPosition = OIntegerSerializer.INSTANCE.deserialize(firstEntryContent, pos);
-        final AddEntryResult addEntryResult = addEntry(1, content, pageIndex, atomicOperation);
-        
-        //update reference to next rid in previuosly added rid entry
-        //position is record type (byte) + rid size
-        if (pagePosition != previousRidPosition){          
-          replaceRecordContent(pageIndex, previousRidPosition, revertBytes(addEntryResult.pagePosition), OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
-        }
-        else{        
-          OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, firstEntryContent, OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
-        }
-        //now increment size, and update info about last added rid. That is done in first entry of node
-        ++currentSize;                
-        
-        pos = getRidEntrySize();        
-        OIntegerSerializer.INSTANCE.serialize(currentSize, firstEntryContent, pos);
-        //update info about current entry in this node
-        pos += OIntegerSerializer.INT_SIZE;        
-        OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, firstEntryContent, pos);
-        replaceContent(pageIndex, pagePosition, firstEntryContent);
-                
-        updateClusterState(1, addEntryResult.recordsSizeDiff, atomicOperation);                
+    //this is first linked node entry so it is extended, skip rid info and refernce to next               
+    pos = getRidEntrySize();
+    int currentSize = OIntegerSerializer.INSTANCE.deserialize(firstEntryContent, pos);        
+    pos += OIntegerSerializer.INT_SIZE;
+    int previousRidPosition = OIntegerSerializer.INSTANCE.deserialize(firstEntryContent, pos);
+    final AddEntryResult addEntryResult = addEntry(1, content, pageIndex, atomicOperation);
 
-      } finally {
-        releaseExclusiveLock();        
-      }
-    } catch (Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
+    //update reference to next rid in previuosly added rid entry
+    //position is record type (byte) + rid size
+    if (pagePosition != previousRidPosition){          
+      replaceRecordContent(pageIndex, previousRidPosition, revertBytes(addEntryResult.pagePosition), OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
     }
+    else{        
+      OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, firstEntryContent, OByteSerializer.BYTE_SIZE + OLinkSerializer.RID_SIZE);
+    }
+    //now increment size, and update info about last added rid. That is done in first entry of node
+    ++currentSize;                
+
+    pos = getRidEntrySize();        
+    OIntegerSerializer.INSTANCE.serialize(currentSize, firstEntryContent, pos);
+    //update info about current entry in this node
+    pos += OIntegerSerializer.INT_SIZE;        
+    OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, firstEntryContent, pos);
+    replaceContent(pageIndex, pagePosition, firstEntryContent);
+
+    updateClusterState(1, addEntryResult.recordsSizeDiff, atomicOperation);          
   }
   
   /**
@@ -570,35 +567,31 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @param currentRidPagePosition, node position in page
    * @throws IOException 
    */
-  public void addRidToArrayNode(final ORID rid, final long currentNodePageIndex, int currentRidPagePosition) throws IOException {       
-      acquireExclusiveLock();
-      try {        
-//        byte[] ridEntry = getRidEntry(currentNodePageIndex, currentRidPagePosition);
-        //skip record type info
-        int pos = OByteSerializer.BYTE_SIZE;
-        //get last valid current index
-        int currentIndex = getRecordContentAsInteger(currentNodePageIndex, currentRidPagePosition, pos);
-        currentIndex = revertBytes(currentIndex);
-        ++currentIndex;
-        pos += OIntegerSerializer.INT_SIZE;
-        int capacity = getRecordContentAsInteger(currentNodePageIndex, currentRidPagePosition, pos);
-        capacity = revertBytes(capacity);
-        if (currentIndex >= capacity){
-          throw new ArrayIndexOutOfBoundsException(currentIndex);
-        }
-        //serialize current index after record type info
+  private void addRidToArrayNode(final ORID rid, final long currentNodePageIndex, int currentRidPagePosition) throws IOException {                   
+//    byte[] ridEntry = getRidEntry(currentNodePageIndex, currentRidPagePosition);
+      //skip record type info
+      int pos = OByteSerializer.BYTE_SIZE;
+      //get last valid current index
+      int currentIndex = getRecordContentAsInteger(currentNodePageIndex, currentRidPagePosition, pos);
+      currentIndex = revertBytes(currentIndex);
+      ++currentIndex;
+      pos += OIntegerSerializer.INT_SIZE;
+      int capacity = getRecordContentAsInteger(currentNodePageIndex, currentRidPagePosition, pos);
+      capacity = revertBytes(capacity);
+      if (currentIndex >= capacity){
+        throw new ArrayIndexOutOfBoundsException(currentIndex);
+      }
+      //serialize current index after record type info
 //        OIntegerSerializer.INSTANCE.serialize(currentIndex, ridEntry, OByteSerializer.BYTE_SIZE);
-        replaceRecordContent(currentNodePageIndex, currentRidPagePosition, revertBytes(currentIndex), OByteSerializer.BYTE_SIZE);
-        pos = OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE * 2 + currentIndex * OLinkSerializer.RID_SIZE;
-        //set new rid info
-        byte[] ridSerialized = new byte[OLinkSerializer.RID_SIZE];
-        OLinkSerializer.INSTANCE.serialize(rid, ridSerialized, 0);
+      replaceRecordContent(currentNodePageIndex, currentRidPagePosition, revertBytes(currentIndex), OByteSerializer.BYTE_SIZE);
+      pos = OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE * 2 + currentIndex * OLinkSerializer.RID_SIZE;
+      //set new rid info
+      byte[] ridSerialized = new byte[OLinkSerializer.RID_SIZE];
+      OLinkSerializer.INSTANCE.serialize(rid, ridSerialized, 0);
 //        OLinkSerializer.INSTANCE.serialize(rid, ridEntry, pos);
-        replaceRecordContent(currentNodePageIndex, currentRidPagePosition, ridSerialized, pos);
+      replaceRecordContent(currentNodePageIndex, currentRidPagePosition, ridSerialized, pos);
 //        replaceContent(currentNodePageIndex, currentRidPagePosition, ridEntry);
-      } finally {
-        releaseExclusiveLock();
-      }    
+        
   }
   
   /**
@@ -722,38 +715,23 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }
   
-  public void updatePrevNextNodeinfo(long nodeClusterPosition, 
+  private void updatePrevNextNodeinfo(long nodeClusterPosition, 
           Long previousNodeClusterPosition, Long nextnodeClusterPosition) throws IOException{
-    OAtomicOperation atomicOperation = startAtomicOperation(true);
-    boolean rollback = false;
-    try{
-      acquireExclusiveLock();
-      try{
-        OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(nodeClusterPosition, 1, atomicOperation);
-        if (positionEntry == null){
-          positionEntry = clusterPositionMap.get(nodeClusterPosition, 1, atomicOperation);
-        }
-        if (previousNodeClusterPosition == null){
-          previousNodeClusterPosition = positionEntry.getPreviousNodePosition();
-        }
-        if (nextnodeClusterPosition == null){
-          nextnodeClusterPosition = positionEntry.getNextNodePosition();
-        }
-        positionEntry = new OFastRidbagClusterPositionMapBucket.PositionEntry(positionEntry.getPageIndex(), 
-                positionEntry.getRecordPosition(), previousNodeClusterPosition, nextnodeClusterPosition);
-        clusterPositionMap.update(nodeClusterPosition, positionEntry, atomicOperation);
-      }
-      finally{
-        releaseExclusiveLock();
-      }
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    
+    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(nodeClusterPosition, 1, atomicOperation);
+    if (positionEntry == null){
+      positionEntry = clusterPositionMap.get(nodeClusterPosition, 1, atomicOperation);
     }
-    catch (Exception exc){
-      rollback = true;
-      throw exc;
+    if (previousNodeClusterPosition == null){
+      previousNodeClusterPosition = positionEntry.getPreviousNodePosition();
     }
-    finally{
-      endAtomicOperation(rollback);
+    if (nextnodeClusterPosition == null){
+      nextnodeClusterPosition = positionEntry.getNextNodePosition();
     }
+    positionEntry = new OFastRidbagClusterPositionMapBucket.PositionEntry(positionEntry.getPageIndex(), 
+            positionEntry.getRecordPosition(), previousNodeClusterPosition, nextnodeClusterPosition);
+    clusterPositionMap.update(nodeClusterPosition, positionEntry, atomicOperation);     
   }    
   
   
@@ -766,7 +744,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @return
    * @throws IOException 
    */
-  public Long addRid(final ORID rid, final OPhysicalPosition allocatedPosition,
+  private Long addRid(final ORID rid, final OPhysicalPosition allocatedPosition,
           final Long previousNodePosition, final Long nextNodePosition) throws IOException {
 
     //only in first node entry, besides rid entry, want to have info about currentSize, info about last added entry
@@ -782,45 +760,32 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     //serialize current size
     OIntegerSerializer.INSTANCE.serialize(1, content, pos);
     pos += OIntegerSerializer.INT_SIZE;
+    
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    
+    //TODO in add entry maybe we want to find page with at least twice free space??
+    final AddEntryResult addEntryResult = addEntry(1, content, atomicOperation);
 
-    boolean rollback = false;
-    OAtomicOperation atomicOperation = startAtomicOperation(true);
-    try {
-      acquireExclusiveLock();
-      try {
-        //TODO in add entry maybe we want to find page with at least twice free space??
-        final AddEntryResult addEntryResult = addEntry(1, content, atomicOperation);
+    updateClusterState(1, addEntryResult.recordsSizeDiff, atomicOperation);
 
-        updateClusterState(1, addEntryResult.recordsSizeDiff, atomicOperation);
-
-        final long clusterPosition;
-        if (allocatedPosition != null) {
-          clusterPositionMap.update(allocatedPosition.clusterPosition,
-                  new OFastRidbagClusterPositionMapBucket.PositionEntry(addEntryResult.pageIndex, addEntryResult.pagePosition, previousNodePosition, nextNodePosition),
-                  atomicOperation);
-          clusterPosition = allocatedPosition.clusterPosition;
-        } else {
-          clusterPosition = clusterPositionMap.add(addEntryResult.pageIndex, addEntryResult.pagePosition,
-                  atomicOperation, previousNodePosition, nextNodePosition);
-        }
-
-        //write info about last added entry (actually this one)
-        OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, content, pos);
-        replaceContent(addEntryResult.pageIndex, addEntryResult.pagePosition, content);                
-        return clusterPosition;
-
-      } finally {
-        releaseExclusiveLock();
-      }
-    } catch (Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
+    final long clusterPosition;
+    if (allocatedPosition != null) {
+      clusterPositionMap.update(allocatedPosition.clusterPosition,
+              new OFastRidbagClusterPositionMapBucket.PositionEntry(addEntryResult.pageIndex, addEntryResult.pagePosition, previousNodePosition, nextNodePosition),
+              atomicOperation);
+      clusterPosition = allocatedPosition.clusterPosition;
+    } else {
+      clusterPosition = clusterPositionMap.add(addEntryResult.pageIndex, addEntryResult.pagePosition,
+              atomicOperation, previousNodePosition, nextNodePosition);
     }
+
+    //write info about last added entry (actually this one)
+    OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, content, pos);
+    replaceContent(addEntryResult.pageIndex, addEntryResult.pagePosition, content);                
+    return clusterPosition;      
   }
   
-  public long addRids(final ORID[] rids, final OPhysicalPosition allocatedPosition,
+  private long addRids(final ORID[] rids, final OPhysicalPosition allocatedPosition,
           final Long previousNodePosition, final Long nextNodePosition, int lastRealRidIndex) throws IOException {
 
     byte[] content = new byte[OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE * 2 + OLinkSerializer.RID_SIZE * rids.length];
@@ -835,38 +800,24 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       OLinkSerializer.INSTANCE.serialize(rids[i], content, pos);
       pos += OLinkSerializer.RID_SIZE;
     }
+    
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();    
+    final AddEntryResult addEntryResult = addEntry(1, content, atomicOperation);
 
-    boolean rollback = false;
-    OAtomicOperation atomicOperation = startAtomicOperation(true);
-    try {
-      acquireExclusiveLock();
-      try {
-        final AddEntryResult addEntryResult = addEntry(1, content, atomicOperation);
+    updateClusterState(1, addEntryResult.recordsSizeDiff, atomicOperation);
 
-        updateClusterState(1, addEntryResult.recordsSizeDiff, atomicOperation);
-
-        final long clusterPosition;
-        if (allocatedPosition != null) {
-          clusterPositionMap.update(allocatedPosition.clusterPosition,
-                  new OFastRidbagClusterPositionMapBucket.PositionEntry(addEntryResult.pageIndex, addEntryResult.pagePosition, previousNodePosition, nextNodePosition),
-                  atomicOperation);
-          clusterPosition = allocatedPosition.clusterPosition;
-        } else {
-          clusterPosition = clusterPositionMap.add(addEntryResult.pageIndex, addEntryResult.pagePosition,
-                  atomicOperation, previousNodePosition, nextNodePosition);
-        }
-                
-        return clusterPosition;
-
-      } finally {
-        releaseExclusiveLock();
-      }
-    } catch (Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
+    final long clusterPosition;
+    if (allocatedPosition != null) {
+      clusterPositionMap.update(allocatedPosition.clusterPosition,
+              new OFastRidbagClusterPositionMapBucket.PositionEntry(addEntryResult.pageIndex, addEntryResult.pagePosition, previousNodePosition, nextNodePosition),
+              atomicOperation);
+      clusterPosition = allocatedPosition.clusterPosition;
+    } else {
+      clusterPosition = clusterPositionMap.add(addEntryResult.pageIndex, addEntryResult.pagePosition,
+              atomicOperation, previousNodePosition, nextNodePosition);
     }
+
+    return clusterPosition;      
   }
 
   private void addAtomicOperationMetadata(ORID rid, OAtomicOperation atomicOperation) {
@@ -1011,10 +962,22 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 
   @Override
   public boolean deleteRecord(long clusterPosition) throws IOException {
-    boolean rollback = false;
-    final OAtomicOperation atomicOperation = startAtomicOperation(true);
+    return deleteRecord(clusterPosition, true);
+  }
+    
+  private boolean deleteRecord(long clusterPosition, boolean lock) throws IOException {
+    boolean rollback = false;    
+    final OAtomicOperation atomicOperation;
+    if (lock){
+      atomicOperation = startAtomicOperation(true);
+    }
+    else{
+      atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    }
     try {
-      acquireExclusiveLock();
+      if (lock){
+        acquireExclusiveLock();
+      }
       try {
         OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(clusterPosition, 1, atomicOperation);
         if (positionEntry == null) {
@@ -1070,13 +1033,17 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 
         return true;
       } finally {
-        releaseExclusiveLock();
+        if (lock){
+          releaseExclusiveLock();
+        }
       }
     } catch (Exception e) {      
       rollback = true;
       throw e;
     } finally {
-      endAtomicOperation(rollback);
+      if (lock){
+        endAtomicOperation(rollback);
+      }
     }
   }
 
@@ -2687,7 +2654,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   private void deleteArrayNodeData(long nodeClusterPosition) throws IOException{    
-    deleteRecord(nodeClusterPosition);    
+    deleteRecord(nodeClusterPosition, false);    
   }
   
   private void deleteLinkNodeData(long nodeClusterPosition) throws IOException{
@@ -2700,100 +2667,81 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @throws IOException 
    */
    private void deleteLinkNodeDataPartialRead(long nodeClusterPosition) throws IOException {
-    OAtomicOperation atomicOperation = startAtomicOperation(true);
-    boolean rollback = false;
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();        
+    HelperClasses.Tuple<Long, Integer> nodePageIndexAndPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
+    long pageIndex = nodePageIndexAndPagePosition.getFirstVal();
+    int pagePosition = nodePageIndexAndPagePosition.getSecondVal();          
+
+    //delete all following rid entries
+    int pos = OLinkSerializer.RID_SIZE + OByteSerializer.BYTE_SIZE;
+    int nextEntryPos = getRecordContentAsInteger(pageIndex, pagePosition, pos);
+    nextEntryPos = revertBytes(nextEntryPos);
+    OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
+    boolean firstInNode = true;
+    long recordsSizeDiff = 0;
     try {
-      HelperClasses.Tuple<Long, Integer> nodePageIndexAndPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
-      long pageIndex = nodePageIndexAndPagePosition.getFirstVal();
-      int pagePosition = nodePageIndexAndPagePosition.getSecondVal();
-//      byte[] content = getRidEntry(pageIndex, pagePosition);            
-
-      //delete all following rid entries
-      int pos = OLinkSerializer.RID_SIZE + OByteSerializer.BYTE_SIZE;
-      int nextEntryPos = getRecordContentAsInteger(pageIndex, pagePosition, pos);//OIntegerSerializer.INSTANCE.deserialize(content, pos);
-      nextEntryPos = revertBytes(nextEntryPos);
-      OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
-      boolean firstInNode = true;
-      long recordsSizeDiff = 0;
-      try {
-        final OClusterPage localPage = new OClusterPage(cacheEntry, false);
-        int initialFreePageIndex = calculateFreePageIndex(localPage);
-        while (nextEntryPos != -1) {
-          int freeSizeBefore = localPage.getFreeSpace();
-          int tmpNextEntryPos = getRecordContentAsInteger(pageIndex, nextEntryPos, pos);
-          tmpNextEntryPos = revertBytes(tmpNextEntryPos);
-          if (!firstInNode) {
-            localPage.deleteRecord(nextEntryPos);
-          } else {
-            firstInNode = false;
-          }
-          recordsSizeDiff += localPage.getFreeSpace() - freeSizeBefore;
-          nextEntryPos = tmpNextEntryPos;
-
+      final OClusterPage localPage = new OClusterPage(cacheEntry, false);
+      int initialFreePageIndex = calculateFreePageIndex(localPage);
+      while (nextEntryPos != -1) {
+        int freeSizeBefore = localPage.getFreeSpace();
+        int tmpNextEntryPos = getRecordContentAsInteger(pageIndex, nextEntryPos, pos);
+        tmpNextEntryPos = revertBytes(tmpNextEntryPos);
+        if (!firstInNode) {
+          localPage.deleteRecord(nextEntryPos);
+        } else {
+          firstInNode = false;
         }
-        updateFreePagesIndex(initialFreePageIndex, pageIndex, atomicOperation);
-        updateClusterState(-1, -recordsSizeDiff, atomicOperation);
-      } finally {
-        releasePageFromWrite(atomicOperation, cacheEntry);
-      }
+        recordsSizeDiff += localPage.getFreeSpace() - freeSizeBefore;
+        nextEntryPos = tmpNextEntryPos;
 
-      //delete first rid entry
-      deleteRecord(nodeClusterPosition);
-    } catch (Exception exc) {
-      rollback = true;
-      throw exc;
+      }
+      updateFreePagesIndex(initialFreePageIndex, pageIndex, atomicOperation);
+      updateClusterState(-1, -recordsSizeDiff, atomicOperation);
     } finally {
-      endAtomicOperation(rollback);
+      releasePageFromWrite(atomicOperation, cacheEntry);
     }
+
+    //delete first rid entry
+    deleteRecord(nodeClusterPosition, false);    
   }
    
   private void deleteLinkNodeDataFullDataRead(long nodeClusterPosition) throws IOException{
-    OAtomicOperation atomicOperation = startAtomicOperation(true);
-    boolean rollback = false;
+    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();    
+    HelperClasses.Tuple<Long, Integer> nodePageIndexAndPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);    
+    long pageIndex = nodePageIndexAndPagePosition.getFirstVal();
+    int pagePosition = nodePageIndexAndPagePosition.getSecondVal();
+    byte[] content = getRidEntry(pageIndex, pagePosition);            
+
+    //delete all following rid entries
+    int pos = OLinkSerializer.RID_SIZE + OByteSerializer.BYTE_SIZE;
+    int nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);      
+    OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
+    boolean firstInNode = true;
+    long recordsSizeDiff = 0;            
     try{
-      HelperClasses.Tuple<Long, Integer> nodePageIndexAndPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);    
-      long pageIndex = nodePageIndexAndPagePosition.getFirstVal();
-      int pagePosition = nodePageIndexAndPagePosition.getSecondVal();
-      byte[] content = getRidEntry(pageIndex, pagePosition);            
-      
-      //delete all following rid entries
-      int pos = OLinkSerializer.RID_SIZE + OByteSerializer.BYTE_SIZE;
-      int nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);      
-      OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
-      boolean firstInNode = true;
-      long recordsSizeDiff = 0;            
-      try{
-        final OClusterPage localPage = new OClusterPage(cacheEntry, false);
-        int initialFreePageIndex = calculateFreePageIndex(localPage);        
-        while (nextEntryPos != -1){
-          int freeSizeBefore = localPage.getFreeSpace();           
-          content = getRidEntry(pageIndex, nextEntryPos);
-          if (!firstInNode){
-            localPage.deleteRecord(nextEntryPos);
-          }
-          else{
-            firstInNode = false;
-          }
-          recordsSizeDiff += localPage.getFreeSpace() - freeSizeBefore;                           
-          nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);          
+      final OClusterPage localPage = new OClusterPage(cacheEntry, false);
+      int initialFreePageIndex = calculateFreePageIndex(localPage);        
+      while (nextEntryPos != -1){
+        int freeSizeBefore = localPage.getFreeSpace();           
+        content = getRidEntry(pageIndex, nextEntryPos);
+        if (!firstInNode){
+          localPage.deleteRecord(nextEntryPos);
         }
-        updateFreePagesIndex(initialFreePageIndex, pageIndex, atomicOperation);
-        updateClusterState(-1, -recordsSizeDiff, atomicOperation);        
+        else{
+          firstInNode = false;
+        }
+        recordsSizeDiff += localPage.getFreeSpace() - freeSizeBefore;                           
+        nextEntryPos = OIntegerSerializer.INSTANCE.deserialize(content, pos);          
       }
-      finally{
-        releasePageFromWrite(atomicOperation, cacheEntry);
-      }            
-      
-      //delete first rid entry
-      deleteRecord(nodeClusterPosition);
-    }
-    catch (Exception exc){
-      rollback = true;
-      throw exc;
+      updateFreePagesIndex(initialFreePageIndex, pageIndex, atomicOperation);
+      updateClusterState(-1, -recordsSizeDiff, atomicOperation);        
     }
     finally{
-      endAtomicOperation(rollback);
-    }
+      releasePageFromWrite(atomicOperation, cacheEntry);
+    }            
+
+    //delete first rid entry
+    deleteRecord(nodeClusterPosition, false);    
   }    
   
   public static class MegaMergeOutput{
@@ -2900,7 +2848,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             System.arraycopy(currentNodeRids, 0, newNodePreallocatedRids, 0, currentNodeRids.length);
             newNodePreallocatedRids[currentNodeRids.length] = value.getIdentity();
             fillRestOfArrayWithDummyRids(newNodePreallocatedRids, currentNodeRids.length);
-            long newNodeClusterPosition = addRids(currentNodeRids, newNodePhysicalPosition, currentRidbagNodeClusterPos,
+            long newNodeClusterPosition = addRids(newNodePreallocatedRids, newNodePhysicalPosition, currentRidbagNodeClusterPos,
                     -1l, currentNodeRids.length);
             updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
             removeNode(currentRidbagNodeClusterPos);

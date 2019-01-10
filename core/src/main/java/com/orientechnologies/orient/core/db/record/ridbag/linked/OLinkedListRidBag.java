@@ -23,22 +23,24 @@ import com.orientechnologies.orient.core.db.record.OMultiValueChangeListener;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBagDelegate;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.id.ORID;
-import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
-import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
@@ -51,8 +53,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   private Long firstRidBagNodeClusterPos;
   private Long currentRidbagNodeClusterPos;
-  
-  private Map<OIdentifiable, Long> indexedRidsNodes;
+    
   private OFastRidBagPaginatedCluster cluster = null;
       
   protected static final int MAX_RIDBAG_NODE_SIZE = 600;
@@ -69,31 +70,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private boolean shouldSaveParentRecord = false;
   
   private final List<OIdentifiable> addedStillInvalidRids = new LinkedList<>();
+  private final UUID uuid = UUID.randomUUID();
   
-  private static int calculateArrayRidNodeAllocationSize(final int initialNumberOfRids){
-    int size = Math.min(initialNumberOfRids + ADDITIONAL_ALLOCATION_SIZE, initialNumberOfRids * 2);
-    size = Math.min(size, MAX_RIDBAG_NODE_SIZE);
-    return size;
-  }
+  private static Map<UUID, Set<Long>> nodesInRidbags = new ConcurrentHashMap<>();
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster){
     this.cluster = cluster;
-  }
-  
-//  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID firstRid) throws IOException{    
-//    this.cluster = cluster;
-//    OPhysicalPosition allocatedPos = cluster.allocatePosition(RECORD_TYPE_LINKED_NODE);
-//    long clusterPosition = cluster.addRid(firstRid, allocatedPos, -1l, -1l);
-//    firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;
-//    storedSize = size = 1;
-//    shouldSaveParentRecord = true;
-//  }
-  
-  private static void fillRestOfArrayWithDummyRids(final ORID[] array, final int lastValidIndex){
-    for (int i = lastValidIndex + 1; i < array.length; i++){
-      array[i] = new ORecordId(-1, -1);
-    }
-  }
+    Set<Long> nodes = new HashSet<>();
+    nodesInRidbags.put(uuid, nodes);
+  }  
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID[] rids) throws IOException{    
     this.cluster = cluster;
@@ -105,27 +90,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     for (ORID inputRid : rids){
       addedStillInvalidRids.add(inputRid);
     }
+    Set<Long> nodes = new HashSet<>();
+    nodes.add(firstRidBagNodeClusterPos);
+    nodesInRidbags.put(uuid, nodes);
   }
   
   @Override
   public void addAll(Collection<OIdentifiable> values) {    
     values.forEach(this::add);
-  }
-
-  private boolean isCurrentNodeFullNode(long pageIndex, int pagePosition, byte type) throws IOException{        
-//    HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> nodeTypeAndPageIndexAndPagePosition = cluster.getPageIndexAndPagePositionAndTypeOfRecord(currentRidbagNodeClusterPos);
-    if (type == RECORD_TYPE_LINKED_NODE){
-      return (!ifOneMoreFitsToPage(pageIndex));
-    }
-    else if (type == RECORD_TYPE_ARRAY_NODE){      
-      return cluster.isArrayNodeFull(pageIndex, pagePosition);
-    }
-    throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
-  }
-  
-//  private Object getLocker(long pageIndex){
-//    return lockers[Long.valueOf(pageIndex % lockers.length).intValue()];
-//  }
+  } 
   
   /**
    * process all previously invalid rids, which are valid now
@@ -192,7 +165,10 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       addedInvalidRidsIter.remove();            
       if (ret == null){
         ret = value;
-      }    
+      }
+      Set<Long> nodes = nodesInRidbags.get(uuid);
+      nodes.add(firstRidBagNodeClusterPos);
+      nodes.add(currentRidbagNodeClusterPos);
     }    
 
     return ret;
@@ -204,9 +180,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
     }
     
-    addedStillInvalidRids.add(valToAdd);    
-    
-  //processInvalidRidsReferences();
+    addedStillInvalidRids.add(valToAdd);          
     
     ++size;    
     
@@ -218,15 +192,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
                 new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, false));
     shouldSaveParentRecord = false;
     //TODO add it to index
-  }
-  
-  private boolean isMaxSizeNodeFullNode(long nodeClusterPosition) throws IOException{
-    byte nodeType = cluster.getTypeOfRecord(nodeClusterPosition);
-    if (nodeType == RECORD_TYPE_ARRAY_NODE){
-      return cluster.getNodeSize(nodeClusterPosition) == MAX_RIDBAG_NODE_SIZE;
-    }
-    return false;
-  }
+  }    
   
   /**
    * merges all tailing node in node of maximum length. Caller should take care of counting tail rids
@@ -417,13 +383,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   @Override
   public void replace(OMultiValueChangeEvent<Object, Object> event, Object newValue) {
     //do nothing
-  }
-    
-  //checks if one more rid can be stored on the same page of link ridbag node
-  private boolean ifOneMoreFitsToPage(long pageIndex) throws IOException{    
-    boolean val = cluster.checkIfNewContentFitsInPage(OFastRidBagPaginatedCluster.getRidEntrySize(), pageIndex);
-    return val;
-  }
+  }      
 
   private long getSize() throws IOException{
     long size = 0;

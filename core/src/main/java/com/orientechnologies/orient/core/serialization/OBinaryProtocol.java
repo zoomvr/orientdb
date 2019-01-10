@@ -158,7 +158,11 @@ public class OBinaryProtocol {
     return (short) ((iStream.read() << 8) | (iStream.read() & 0xff));
   }
 
-  public static short bytes2short(final byte[] b, final int offset) {    
+  public static short bytes2short(final byte[] b, final int offset) {
+    if (offset + 1 >= b.length){
+      int a = 0;
+      ++a;
+    }
     return (short) ((b[offset] << 8) | (b[offset + 1] & 0xff));
   }
 
