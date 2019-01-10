@@ -2613,14 +2613,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   public int getNodeSize(long nodeClusterPosition) throws IOException{
-    HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> nodeTypePageIndexPagePosition = getPageIndexAndPagePositionAndTypeOfRecord(nodeClusterPosition);
-    if (nodeTypePageIndexPagePosition == null){
-      int a = 0;
-      ++a;
-      System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
-      System.out.println("Node cluster position: " + nodeClusterPosition);
-      System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
-    }
+    HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> nodeTypePageIndexPagePosition = getPageIndexAndPagePositionAndTypeOfRecord(nodeClusterPosition);    
     HelperClasses.Tuple<Byte, Long> nodeTypePageIndex = nodeTypePageIndexPagePosition.getFirstVal();
     byte type = nodeTypePageIndex.getFirstVal();
     long pageIndex = nodeTypePageIndex.getSecondVal();    
