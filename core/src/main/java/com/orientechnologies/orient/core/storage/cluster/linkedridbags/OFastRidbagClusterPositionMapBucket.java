@@ -94,7 +94,7 @@ public final class OFastRidbagClusterPositionMapBucket extends ODurablePage {
 
     int position = entryPosition(index);
     byte val = getByteValue(position);
-    if (getByteValue(position) != FILLED) {
+    if (val != FILLED) {
       return null;
     }
 
@@ -119,24 +119,24 @@ public final class OFastRidbagClusterPositionMapBucket extends ODurablePage {
     updateEntry(position, entry);
   }
 
-  public void resurrect(final int index, final PositionEntry entry) {
-    final int size = getIntValue(SIZE_OFFSET);
-
-    if (index >= size) {
-      throw new OStorageException("Cannot resurrect a record: provided index " + index + " is out of range");
-    }
-
-    int position = entryPosition(index);
-    final byte flag = getByteValue(position);
-    if (flag == REMOVED) {
-      setByteValue(position, FILLED);
-    } else {
-      throw new OStorageException("Cannot resurrect a record: provided index " + index + " points to a non removed entry");
-    }
-    position += OByteSerializer.BYTE_SIZE;    
-
-    updateEntry(position, entry);
-  }
+//  public void resurrect(final int index, final PositionEntry entry) {
+//    final int size = getIntValue(SIZE_OFFSET);
+//
+//    if (index >= size) {
+//      throw new OStorageException("Cannot resurrect a record: provided index " + index + " is out of range");
+//    }
+//
+//    int position = entryPosition(index);
+//    final byte flag = getByteValue(position);
+//    if (flag == REMOVED) {
+//      setByteValue(position, FILLED);
+//    } else {
+//      throw new OStorageException("Cannot resurrect a record: provided index " + index + " points to a non removed entry");
+//    }
+//    position += OByteSerializer.BYTE_SIZE;    
+//
+//    updateEntry(position, entry);
+//  }
 
   private static int entryPosition(int index) {
     return index * ENTRY_SIZE + POSITIONS_OFFSET;

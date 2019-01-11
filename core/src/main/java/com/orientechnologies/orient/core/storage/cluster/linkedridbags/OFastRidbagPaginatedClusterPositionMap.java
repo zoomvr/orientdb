@@ -240,26 +240,26 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     }
   }
 
-  void resurrect(final long clusterPosition, final OFastRidbagClusterPositionMapBucket.PositionEntry entry,
-      final OAtomicOperation atomicOperation) throws IOException {
-    final long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
-    final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
-
-    final long lastPage = getLastPage(atomicOperation);
-
-    if (pageIndex > lastPage) {
-      throw new OClusterPositionMapException(
-          "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
-    }
-
-    final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
-    try {
-      final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
-      bucket.resurrect(index, entry);
-    } finally {
-      releasePageFromWrite(atomicOperation, cacheEntry);
-    }
-  }
+//  void resurrect(final long clusterPosition, final OFastRidbagClusterPositionMapBucket.PositionEntry entry,
+//      final OAtomicOperation atomicOperation) throws IOException {
+//    final long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
+//    final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
+//
+//    final long lastPage = getLastPage(atomicOperation);
+//
+//    if (pageIndex > lastPage) {
+//      throw new OClusterPositionMapException(
+//          "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
+//    }
+//
+//    final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
+//    try {
+//      final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
+//      bucket.resurrect(index, entry);
+//    } finally {
+//      releasePageFromWrite(atomicOperation, cacheEntry);
+//    }
+//  }
 
   public OFastRidbagClusterPositionMapBucket.PositionEntry get(final long clusterPosition, final int pageCount,
       final OAtomicOperation atomicOperation) throws IOException {            

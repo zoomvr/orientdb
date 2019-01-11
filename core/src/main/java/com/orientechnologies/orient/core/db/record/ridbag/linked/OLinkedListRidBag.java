@@ -31,7 +31,6 @@ import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -76,6 +75,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private static Map<UUID, Set<Long>> deletedNodesInRidbags = new ConcurrentHashMap<>();
   
   private final boolean deserialized;
+  private boolean additionsAfterDeserialization = false;
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster){
     this.cluster = cluster;
@@ -170,8 +170,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
                 currentRidbagNodeClusterPos, firstRidBagNodeClusterPos, shouldSaveParentRecord,
                 nodes, deletedNodes);
         firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
-        currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
-        shouldSaveParentRecord = output.shouldSaveParentRecord;
+        currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;        
       } catch (IOException exc) {
         OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
         throw new ODatabaseException(exc.getMessage());
@@ -184,6 +183,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       }      
       nodes.add(firstRidBagNodeClusterPos);
       nodes.add(currentRidbagNodeClusterPos);
+      additionsAfterDeserialization = true;
     }    
 
     return ret;
@@ -203,11 +203,49 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       ORecordInternal.track(this.owner, valToAdd);
     }
     
+    try{
+      analyzeFutureShouldSaveRecord();
+    }
+    catch (IOException exc){
+      throw new ODatabaseException(exc.getMessage());
+    }
     fireCollectionChangedEvent(
-                new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, false));
+                new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, shouldSaveParentRecord));
+    if (shouldSaveParentRecord){
+      int a = 0;
+      ++a;
+    }
     shouldSaveParentRecord = false;
     //TODO add it to index
-  }    
+  }  
+
+  private void analyzeFutureShouldSaveRecord() throws IOException{
+    if (!shouldSaveParentRecord){
+      shouldSaveParentRecord = analyzeFutureChangeOfFirstMoving() | analyzeFutureChangeOfFirstMegamerge();
+    }
+  }
+  
+  private boolean analyzeFutureChangeOfFirstMegamerge() throws IOException{
+    if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0){      
+      if (!cluster.isMaxSizeNodeFullNode(firstRidBagNodeClusterPos, MAX_RIDBAG_NODE_SIZE, true)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  private boolean analyzeFutureChangeOfFirstMoving() throws IOException{
+    if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
+      byte type = cluster.getTypeOfRecord(currentRidbagNodeClusterPos, true);
+      if (type == RECORD_TYPE_LINKED_NODE){
+        HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos, true);
+        if (cluster.isCurrentNodeFullNodeAtomic(pageIndexPagePosition.getFirstVal(), pageIndexPagePosition.getSecondVal(), type)){
+          return true;
+        }
+      }
+    }
+    return false;
+  }
   
   /**
    * merges all tailing node in node of maximum length. Caller should take care of counting tail rids
@@ -219,8 +257,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.nodesMegaMerge(currentRidbagNodeClusterPos, 
             firstRidBagNodeClusterPos, MAX_RIDBAG_NODE_SIZE, shouldSaveParentRecord, nodes, deletedNodes);
     currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
-    firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
-    shouldSaveParentRecord = output.shouldSaveParentRecord;
+    firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;    
     nodes.add(firstRidBagNodeClusterPos);
     nodes.add(currentRidbagNodeClusterPos);
   }
@@ -247,13 +284,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
-    OIdentifiable firstStored = processInvalidRidsReferences();    
-    if (firstStored != null && shouldSaveParentRecord){
-      fireCollectionChangedEvent(
-                new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, firstStored, firstStored, null, true));
-      shouldSaveParentRecord = false;
-    }
-    
+    processInvalidRidsReferences();            
     OLongSerializer.INSTANCE.serialize(firstRidBagNodeClusterPos, stream, offset);
     return offset + OLongSerializer.LONG_SIZE;
   }
