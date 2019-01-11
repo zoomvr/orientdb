@@ -2004,6 +2004,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       position = localPage.appendRecord(recordVersion, entryContent);
 
       if (position < 0) {
+        position = localPage.appendRecord(recordVersion, entryContent);
         localPage.dumpToLog();        
         throw new IllegalStateException(
             "Page " + cacheEntry.getPageIndex() + " does not have enough free space to add record content, freePageIndex="
@@ -2428,7 +2429,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @return
    * @throws IOException 
    */
-  public HelperClasses.Tuple<Byte, Long> getPageIndexAndTypeOfRecord(final long recordPos) throws IOException{
+  private HelperClasses.Tuple<Byte, Long> getPageIndexAndTypeOfRecord(final long recordPos) throws IOException{
     final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
     //here find records physical position
@@ -2441,21 +2442,45 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return new HelperClasses.Tuple<>(recordPhysicalPosition.recordType, positionEntry.getPageIndex());
   }
   
-  public HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> getPageIndexAndPagePositionAndTypeOfRecord(final long recordPos) throws IOException{
-    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-    OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
-    //here find records physical position
-    OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
-    //this means that node still not saved
-    if (recordPhysicalPosition == null){      
-      return null;
+  public HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> getPageIndexAndPagePositionAndTypeOfRecord(final long recordPos, boolean lock) throws IOException{
+    final OAtomicOperation atomicOperation;
+    if (lock){
+      atomicOperation = startAtomicOperation(true);
     }
-    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPhysicalPosition.clusterPosition, 1, atomicOperation);
-    HelperClasses.Tuple<Byte, Long> pageIndexType = new HelperClasses.Tuple<>(recordPhysicalPosition.recordType, positionEntry.getPageIndex());
-    return new HelperClasses.Tuple<>(pageIndexType, positionEntry.getRecordPosition());
-  }
+    else{
+      atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    }
+    try{
+      if (lock){
+        acquireExclusiveLock();
+      }
+      try{
+        OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
+        //here find records physical position
+        OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+        //this means that node still not saved
+        if (recordPhysicalPosition == null){
+          recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+          return null;
+        }
+        OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPhysicalPosition.clusterPosition, 1, atomicOperation);
+        HelperClasses.Tuple<Byte, Long> pageIndexType = new HelperClasses.Tuple<>(recordPhysicalPosition.recordType, positionEntry.getPageIndex());
+        return new HelperClasses.Tuple<>(pageIndexType, positionEntry.getRecordPosition());
+      }
+      finally{
+        if (lock){
+          releaseExclusiveLock();
+        }
+      }
+    }
+    finally{
+      if (lock){
+        endAtomicOperation(false);
+      }
+    }
+  }    
   
-  public byte getTypeOfRecord(final long recordPos) throws IOException{    
+  private byte getTypeOfRecord(final long recordPos) throws IOException{    
     OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
     //here find records physical position
     OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
@@ -2469,13 +2494,13 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @return
    * @throws IOException 
    */
-  public HelperClasses.Tuple<Long, Integer> getPageIndexAndPagePositionOfRecord(final long recordPos) throws IOException{
+  private HelperClasses.Tuple<Long, Integer> getPageIndexAndPagePositionOfRecord(final long recordPos) throws IOException{
     final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(recordPos, 1, atomicOperation);
     return new HelperClasses.Tuple<>(positionEntry.getPageIndex(), positionEntry.getRecordPosition());
   }
   
-  public int getFreeSpace(final long pageIndex) throws IOException{    
+  private int getFreeSpace(final long pageIndex) throws IOException{    
     OCacheEntry cacheEntry = null;
     final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     try{      
@@ -2491,16 +2516,25 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }
   
-  public boolean checkIfNewContentFitsInPage(final int length, long pageIndex) throws IOException {
-    Integer freeSpace = getFreeSpace(pageIndex);        
-    //three ints are header for record content in page
-    return freeSpace >= length + 3 * OIntegerSerializer.INT_SIZE;
+  private boolean checkIfNewContentFitsInPage(final int length, long pageIndex) throws IOException {
+    OCacheEntry cacheEntry = null;
+    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    try{      
+      cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false);
+      OClusterPage localPage = new OClusterPage(cacheEntry, false);
+      return localPage.canContentFitIntoPage(length);
+    }
+    finally{
+      if (cacheEntry != null){
+        releasePageFromRead(atomicOperation, cacheEntry);
+      }      
+    }
   }
   
-  public HelperClasses.Tuple<Long, Long> getNodePreviousNextNodePositons(long position) throws IOException{
-    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-    return clusterPositionMap.getPreviousNextNodeInfo(position, atomicOperation);
-  }
+//  public HelperClasses.Tuple<Long, Long> getNodePreviousNextNodePositons(long position) throws IOException{
+//    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+//    return clusterPositionMap.getPreviousNextNodeInfo(position, atomicOperation);
+//  }
   
   /**
    * checks if all array node slots are set 
@@ -2518,20 +2552,40 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return currentIndex >= capacity - 1;
   }
   
-  public ORID[] getAllRidsFromNode(long nodeClusterPosition) throws IOException{
-    byte type = getTypeOfRecord(nodeClusterPosition);    
-    if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
-      return getAllRidsFromLinkedNode(nodeClusterPosition);
+  public ORID[] getAllRidsFromNode(long nodeClusterPosition, boolean lock) throws IOException{
+    if (lock){
+      startAtomicOperation(true);
     }
-    else if (type == OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE){
-      return getAllRidsFromArrayNode(nodeClusterPosition);
+    try{
+      if (lock){
+        acquireExclusiveLock();
+      }
+      try{
+        byte type = getTypeOfRecord(nodeClusterPosition);    
+        if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
+          return getAllRidsFromLinkedNode(nodeClusterPosition);
+        }
+        else if (type == OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE){
+          return getAllRidsFromArrayNode(nodeClusterPosition);
+        }
+        else{
+          throw new ODatabaseException("Invalid ridbag node type: " + type);
+        }
+      }
+      finally{
+        if (lock){
+          releaseExclusiveLock();
+        }
+      }
     }
-    else{
-      throw new ODatabaseException("Invalid ridbag node type: " + type);
+    finally{
+      if (lock){
+        endAtomicOperation(false);
+      }
     }
   }
   
-  public ORID[] getAllRidsFromLinkedNode(long nodeClusterPosition) throws IOException{
+  private ORID[] getAllRidsFromLinkedNode(long nodeClusterPosition) throws IOException{
     HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
     final long pageIndex = pageIndexPagePosition.getFirstVal();
     //this is entry position on page
@@ -2558,7 +2612,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return ret;
   }
   
-  public ORID[] getAllRidsFromArrayNode(long nodeClusterPosition) throws IOException{
+  private ORID[] getAllRidsFromArrayNode(long nodeClusterPosition) throws IOException{
     final HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = getPageIndexAndPagePositionOfRecord(nodeClusterPosition);
     final long pageIndex = pageIndexPagePosition.getFirstVal();
     //this is entry position on page
@@ -2576,37 +2630,80 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return ret;
   }
   
-  public int getNodeSize(long nodeClusterPosition) throws IOException{
-    HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> nodeTypePageIndexPagePosition = getPageIndexAndPagePositionAndTypeOfRecord(nodeClusterPosition);    
-    HelperClasses.Tuple<Byte, Long> nodeTypePageIndex = nodeTypePageIndexPagePosition.getFirstVal();
-    byte type = nodeTypePageIndex.getFirstVal();
-    long pageIndex = nodeTypePageIndex.getSecondVal();    
-    int pagePosition = nodeTypePageIndexPagePosition.getSecondVal();
-    byte[] entry = getRidEntry(pageIndex, pagePosition);
-    if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
-      int pos = getRidEntrySize();
-      int size = OIntegerSerializer.INSTANCE.deserialize(entry, pos);
-      return size;
+  public int getNodeSize(long nodeClusterPosition, boolean lock) throws IOException{
+    if (lock){
+      startAtomicOperation(true);
     }
-    else if (type == OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE){
-      //read last valid index info
-      int size = OIntegerSerializer.INSTANCE.deserialize(entry, OByteSerializer.BYTE_SIZE);
-      return size + 1;
+    try{
+      if (lock){
+        acquireExclusiveLock();
+      }
+      try{
+        HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> nodeTypePageIndexPagePosition = getPageIndexAndPagePositionAndTypeOfRecord(nodeClusterPosition, true);    
+        HelperClasses.Tuple<Byte, Long> nodeTypePageIndex = nodeTypePageIndexPagePosition.getFirstVal();
+        byte type = nodeTypePageIndex.getFirstVal();
+        long pageIndex = nodeTypePageIndex.getSecondVal();    
+        int pagePosition = nodeTypePageIndexPagePosition.getSecondVal();
+        byte[] entry = getRidEntry(pageIndex, pagePosition);
+        if (type == OLinkedListRidBag.RECORD_TYPE_LINKED_NODE){
+          int pos = getRidEntrySize();
+          int size = OIntegerSerializer.INSTANCE.deserialize(entry, pos);
+          return size;
+        }
+        else if (type == OLinkedListRidBag.RECORD_TYPE_ARRAY_NODE){
+          //read last valid index info
+          int size = OIntegerSerializer.INSTANCE.deserialize(entry, OByteSerializer.BYTE_SIZE);
+          return size + 1;
+        }
+        throw new ODatabaseException("Invalid ridbag node type: " + type);
+      }
+      finally{
+        if (lock){
+          releaseExclusiveLock();
+        }
+      }
     }
-    throw new ODatabaseException("Invalid ridbag node type: " + type);
+    finally{
+      if (lock){
+        endAtomicOperation(false);
+      }
+    }
   }
   
-  public Long getNextNode(long currentNodeClusterPosition) throws IOException{
-    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(currentNodeClusterPosition, 1, atomicOperation);
-    Long nextPos = positionEntry.getNextNodePosition();    
-    if (nextPos == -1){
-      nextPos = null;
+  public Long getNextNode(long currentNodeClusterPosition, boolean lock) throws IOException{    
+    OAtomicOperation atomicOperation;
+    if (lock){
+      atomicOperation = startAtomicOperation(true);
     }
-    return nextPos;
+    else{
+      atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    }
+    try{
+      if (lock){
+        acquireExclusiveLock();
+      }
+      try{
+        OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(currentNodeClusterPosition, 1, atomicOperation);
+        Long nextPos = positionEntry.getNextNodePosition();    
+        if (nextPos == -1){
+          nextPos = null;
+        }
+        return nextPos;
+      }
+      finally{
+        if (lock){
+          releaseExclusiveLock();
+        }
+      }
+    }
+    finally{
+      if (lock){
+        endAtomicOperation(false);
+      }      
+    }
   }
   
-  public Long getPreviousNode(long currentNodeClusterPosition) throws IOException{
+  private Long getPreviousNode(long currentNodeClusterPosition) throws IOException{
     OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(currentNodeClusterPosition, 1, atomicOperation);
     Long prevPos = positionEntry.getPreviousNodePosition();    
@@ -2751,9 +2848,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   public MegaMergeOutput nodesMegaMerge(Long currentRidbagNodeClusterPos, long firstRidBagNodeClusterPos, final int MAX_RIDBAG_NODE_SIZE,
-          boolean shouldSaveParentRecord) throws IOException {
+          boolean shouldSaveParentRecord, Set<Long> nodes, Set<Long> deletedNodes) throws IOException {    
     boolean rollback = false;
     startAtomicOperation(true);
+    boolean foundOne = false;
     try {
       acquireExclusiveLock();
       try {
@@ -2765,6 +2863,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         while (currentIteratingNode != null) {
           boolean fetchedNextNode = false;
           if (!isMaxSizeNodeFullNode(currentIteratingNode, MAX_RIDBAG_NODE_SIZE)) {
+            foundOne = true;
             final byte type = getTypeOfRecord(currentIteratingNode);
             final ORID[] nodeRids;
             if (type == RECORD_TYPE_LINKED_NODE) {
@@ -2776,8 +2875,9 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             }
             System.arraycopy(nodeRids, 0, mergedRids, currentOffset, nodeRids.length);
             long tmpCurrNodeClusterPos = currentIteratingNode;
-            currentIteratingNode = getNextNode(currentIteratingNode);
+            currentIteratingNode = getNextNode(currentIteratingNode, false);
             removeNode(tmpCurrNodeClusterPos);
+            deletedNodes.add(tmpCurrNodeClusterPos);
             currentOffset += nodeRids.length;
             if (tmpCurrNodeClusterPos == firstRidBagNodeClusterPos) {
               removedFirstNode = true;
@@ -2787,20 +2887,24 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             lastNonRemovedNode = currentIteratingNode;
           }
           if (!fetchedNextNode) {
-            currentIteratingNode = getNextNode(currentIteratingNode);
+            currentIteratingNode = getNextNode(currentIteratingNode, false);
           }
         }
         
-        OPhysicalPosition megaNodeAllocatedPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE);
-        long megaNodeClusterPosition = addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE - 1);
-        //set next node of previous node
-        if (lastNonRemovedNode != -1) {
-          updatePrevNextNodeinfo(lastNonRemovedNode, null, megaNodeClusterPosition);
-        }
-        currentRidbagNodeClusterPos = megaNodeClusterPosition;
-        if (removedFirstNode) {
-          firstRidBagNodeClusterPos = megaNodeClusterPosition;
-          shouldSaveParentRecord = true;
+        //need this flag because array node of size 600 can be allocated from another place than node mega merge
+        if (foundOne){
+          OPhysicalPosition megaNodeAllocatedPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE, false);
+          long megaNodeClusterPosition = addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE - 1);
+          nodes.add(megaNodeClusterPosition);
+          //set next node of previous node
+          if (lastNonRemovedNode != -1) {
+            updatePrevNextNodeinfo(lastNonRemovedNode, null, megaNodeClusterPosition);
+          }
+          currentRidbagNodeClusterPos = megaNodeClusterPosition;
+          if (removedFirstNode) {
+            firstRidBagNodeClusterPos = megaNodeClusterPosition;
+            shouldSaveParentRecord = true;
+          }
         }
         
         MegaMergeOutput ret = new MegaMergeOutput();
@@ -2822,7 +2926,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   private boolean isMaxSizeNodeFullNode(final long nodeClusterPosition, final int MAX_RIDBAG_NODE_SIZE) throws IOException{
     byte nodeType = getTypeOfRecord(nodeClusterPosition);
     if (nodeType == RECORD_TYPE_ARRAY_NODE){
-      return getNodeSize(nodeClusterPosition) == MAX_RIDBAG_NODE_SIZE;
+      return getNodeSize(nodeClusterPosition, false) == MAX_RIDBAG_NODE_SIZE;
     }
     return false;
   }
@@ -2830,7 +2934,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   public MegaMergeOutput addRidHighLevel(final OIdentifiable value, long pageIndex, int pagePosition, byte currentNodeType,
           final int ADDITIONAL_ALLOCATION_SIZE, final int MAX_RIDBAG_NODE_SIZE,
           long currentRidbagNodeClusterPos, long firstRidBagNodeClusterPos,
-          boolean shouldSaveParentRecord) throws IOException {
+          boolean shouldSaveParentRecord, Set<Long> nodes, Set<Long> deletedNodes) throws IOException {
     boolean rollback = false;
     startAtomicOperation(true);
     try {
@@ -2841,7 +2945,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
           //By this algorithm allways link node is followed with array node and vice versa
           if (currentNodeType == RECORD_TYPE_LINKED_NODE) {
             ORID[] currentNodeRids = getAllRidsFromLinkedNode(currentRidbagNodeClusterPos);
-            OPhysicalPosition newNodePhysicalPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE);
+            OPhysicalPosition newNodePhysicalPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE, false);
             int newNodePreallocatedSize = calculateArrayRidNodeAllocationSize(currentNodeRids.length,
                     ADDITIONAL_ALLOCATION_SIZE, MAX_RIDBAG_NODE_SIZE);
             ORID[] newNodePreallocatedRids = new ORID[newNodePreallocatedSize];
@@ -2852,16 +2956,19 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
                     -1l, currentNodeRids.length);
             updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
             removeNode(currentRidbagNodeClusterPos);
+            deletedNodes.add(currentRidbagNodeClusterPos);
             if (currentRidbagNodeClusterPos == firstRidBagNodeClusterPos) {
               firstRidBagNodeClusterPos = newNodeClusterPosition;
               shouldSaveParentRecord = true;
             }
             currentRidbagNodeClusterPos = newNodeClusterPosition;
+            nodes.add(newNodeClusterPosition);
           } else if (currentNodeType == RECORD_TYPE_ARRAY_NODE) {
-            OPhysicalPosition newNodePhysicalPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE);
+            OPhysicalPosition newNodePhysicalPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE, false);
             long newNodeClusterPosition = addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
             updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
             currentRidbagNodeClusterPos = newNodeClusterPosition;
+            nodes.add(newNodeClusterPosition);
           } else {
             throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
           }
@@ -2924,7 +3031,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     try {
       acquireExclusiveLock();
       try {
-        final OPhysicalPosition allocatedPos = allocatePosition(RECORD_TYPE_ARRAY_NODE);
+        final OPhysicalPosition allocatedPos = allocatePosition(RECORD_TYPE_ARRAY_NODE, false);
         final int size = calculateArrayRidNodeAllocationSize(rids.length, ADDITIONAL_ALLOCATION_SIZE,
                 MAX_RIDBAG_NODE_SIZE);
         final ORID[] toAllocate = new ORID[size];

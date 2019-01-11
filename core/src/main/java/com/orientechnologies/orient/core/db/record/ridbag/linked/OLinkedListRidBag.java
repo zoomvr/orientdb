@@ -73,11 +73,17 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private final UUID uuid = UUID.randomUUID();
   
   private static Map<UUID, Set<Long>> nodesInRidbags = new ConcurrentHashMap<>();
+  private static Map<UUID, Set<Long>> deletedNodesInRidbags = new ConcurrentHashMap<>();
+  
+  private final boolean deserialized;
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster){
     this.cluster = cluster;
     Set<Long> nodes = new HashSet<>();
     nodesInRidbags.put(uuid, nodes);
+    Set<Long> deleted = new HashSet<>();
+    deletedNodesInRidbags.put(uuid, deleted);
+    deserialized = true;
   }  
   
   public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID[] rids) throws IOException{    
@@ -93,6 +99,9 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     Set<Long> nodes = new HashSet<>();
     nodes.add(firstRidBagNodeClusterPos);
     nodesInRidbags.put(uuid, nodes);
+    Set<Long> deleted = new HashSet<>();
+    deletedNodesInRidbags.put(uuid, deleted);
+    deserialized = false;
   }
   
   @Override
@@ -115,7 +124,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     int pagePosition;
     
     try{
-      HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> currentNodeTypeAndPageIndexAndPagePosition = cluster.getPageIndexAndPagePositionAndTypeOfRecord(currentRidbagNodeClusterPos);
+      HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> currentNodeTypeAndPageIndexAndPagePosition = 
+              cluster.getPageIndexAndPagePositionAndTypeOfRecord(currentRidbagNodeClusterPos, true);
       currentNodeType = currentNodeTypeAndPageIndexAndPagePosition.getFirstVal().getFirstVal();
       pageIndex = currentNodeTypeAndPageIndexAndPagePosition.getFirstVal().getSecondVal();
       pagePosition = currentNodeTypeAndPageIndexAndPagePosition.getSecondVal();    
@@ -125,6 +135,9 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       throw new ODatabaseException(exc.getMessage());
     }
     long previousCurrentNodeClusterPos = currentRidbagNodeClusterPos;
+    
+    Set<Long> nodes = nodesInRidbags.get(uuid);
+    Set<Long> deletedNodes = deletedNodesInRidbags.get(uuid);
     
     while (addedInvalidRidsIter.hasNext()){
       OIdentifiable value = addedInvalidRidsIter.next();
@@ -144,15 +157,18 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         }
 
         if (previousCurrentNodeClusterPos != currentRidbagNodeClusterPos){
-          HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> currentNodeTypeAndPageIndexAndPagePosition = cluster.getPageIndexAndPagePositionAndTypeOfRecord(currentRidbagNodeClusterPos);
+          HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> currentNodeTypeAndPageIndexAndPagePosition = 
+                  cluster.getPageIndexAndPagePositionAndTypeOfRecord(currentRidbagNodeClusterPos, true);
           currentNodeType = currentNodeTypeAndPageIndexAndPagePosition.getFirstVal().getFirstVal();
           pageIndex = currentNodeTypeAndPageIndexAndPagePosition.getFirstVal().getSecondVal();
           pagePosition = currentNodeTypeAndPageIndexAndPagePosition.getSecondVal();    
           previousCurrentNodeClusterPos = currentRidbagNodeClusterPos;
         }
         
-        OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.addRidHighLevel(value, pageIndex, pagePosition, currentNodeType, ADDITIONAL_ALLOCATION_SIZE, MAX_RIDBAG_NODE_SIZE, 
-                currentRidbagNodeClusterPos, firstRidBagNodeClusterPos, shouldSaveParentRecord);
+        OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.addRidHighLevel(value, pageIndex, 
+                pagePosition, currentNodeType, ADDITIONAL_ALLOCATION_SIZE, MAX_RIDBAG_NODE_SIZE, 
+                currentRidbagNodeClusterPos, firstRidBagNodeClusterPos, shouldSaveParentRecord,
+                nodes, deletedNodes);
         firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
         currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
         shouldSaveParentRecord = output.shouldSaveParentRecord;
@@ -165,8 +181,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       addedInvalidRidsIter.remove();            
       if (ret == null){
         ret = value;
-      }
-      Set<Long> nodes = nodesInRidbags.get(uuid);
+      }      
       nodes.add(firstRidBagNodeClusterPos);
       nodes.add(currentRidbagNodeClusterPos);
     }    
@@ -199,11 +214,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
    * @throws IOException 
    */
   private void nodesMegaMerge() throws IOException{
+    Set<Long> nodes = nodesInRidbags.get(uuid);
+    Set<Long> deletedNodes = deletedNodesInRidbags.get(uuid);
     OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.nodesMegaMerge(currentRidbagNodeClusterPos, 
-            firstRidBagNodeClusterPos, MAX_RIDBAG_NODE_SIZE, shouldSaveParentRecord);
+            firstRidBagNodeClusterPos, MAX_RIDBAG_NODE_SIZE, shouldSaveParentRecord, nodes, deletedNodes);
     currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
     firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
     shouldSaveParentRecord = output.shouldSaveParentRecord;
+    nodes.add(firstRidBagNodeClusterPos);
+    nodes.add(currentRidbagNodeClusterPos);
   }
   
   @Override
@@ -243,12 +262,17 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   public int deserialize(byte[] stream, int offset) {
     currentRidbagNodeClusterPos = firstRidBagNodeClusterPos = OLongSerializer.INSTANCE.deserialize(stream, offset);
     //find last node
+    
+    Set<Long> nodes = nodesInRidbags.get(uuid);
+    nodes.add(firstRidBagNodeClusterPos);
+    
     boolean exit = false;
     try{
       while (exit == false) {
-        Long nextNode = cluster.getNextNode(currentRidbagNodeClusterPos);
+        Long nextNode = cluster.getNextNode(currentRidbagNodeClusterPos, true);
         if (nextNode != null){
           currentRidbagNodeClusterPos = nextNode;
+          nodes.add(nextNode);
         }
         else{
           exit = true;
@@ -389,8 +413,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     long size = 0;
     Long iteratingNode = firstRidBagNodeClusterPos;
     while (iteratingNode != null){
-      size += cluster.getNodeSize(iteratingNode);
-      iteratingNode = cluster.getNextNode(iteratingNode);
+      size += cluster.getNodeSize(iteratingNode, true);
+      iteratingNode = cluster.getNextNode(iteratingNode, true);
     }
     return size;
   }

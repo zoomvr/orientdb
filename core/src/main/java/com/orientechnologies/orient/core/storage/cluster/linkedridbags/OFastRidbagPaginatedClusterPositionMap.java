@@ -26,6 +26,9 @@ import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedSt
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  *
@@ -33,6 +36,8 @@ import java.util.Arrays;
  */
 public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
   private long fileId;
+  
+  private static Set<Long> removedPositions = Collections.synchronizedSet(new HashSet<Long>());
 
   OFastRidbagPaginatedClusterPositionMap(OAbstractPaginatedStorage storage, String name, String lockName) {
     super(storage, name, DEF_EXTENSION, lockName);
@@ -285,6 +290,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
       final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
 
       bucket.remove(index);
+      removedPositions.add(clusterPosition);
     } finally {
       releasePageFromWrite(atomicOperation, cacheEntry);
     }

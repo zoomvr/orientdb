@@ -93,6 +93,7 @@ public final class OFastRidbagClusterPositionMapBucket extends ODurablePage {
     }
 
     int position = entryPosition(index);
+    byte val = getByteValue(position);
     if (getByteValue(position) != FILLED) {
       return null;
     }

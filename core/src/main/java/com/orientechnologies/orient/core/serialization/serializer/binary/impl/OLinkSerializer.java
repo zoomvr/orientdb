@@ -52,6 +52,10 @@ public class OLinkSerializer implements OBinarySerializer<OIdentifiable> {
   }
 
   public void serialize(final OIdentifiable rid, final byte[] stream, final int startPosition, Object... hints) {
+    if (rid == null){
+      int a = 0;
+      ++a;
+    }
     final ORID r = rid.getIdentity();
     short2bytes((short) r.getClusterId(), stream, startPosition);
     long2bytes(r.getClusterPosition(), stream, startPosition + OShortSerializer.SHORT_SIZE);

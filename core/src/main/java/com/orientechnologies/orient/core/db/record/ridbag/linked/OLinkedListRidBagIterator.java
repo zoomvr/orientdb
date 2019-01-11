@@ -58,13 +58,13 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
       try{
         if (currentNodeContent == null || currentNodeIteartionIndex == currentNodeContent.length - 1){
           if (currentNodeContent != null){
-            currentIterRidbagNode = ridbag.getCluster().getNextNode(currentIterRidbagNode);
+            currentIterRidbagNode = ridbag.getCluster().getNextNode(currentIterRidbagNode, true);
             if (currentIterRidbagNode == null){
               noMore = true;
               return false;
             }
           }
-          currentNodeContent = ridbag.getCluster().getAllRidsFromNode(currentIterRidbagNode);
+          currentNodeContent = ridbag.getCluster().getAllRidsFromNode(currentIterRidbagNode, true);
           currentNodeIteartionIndex = nodeStartIteratingIndex;
         }
       }

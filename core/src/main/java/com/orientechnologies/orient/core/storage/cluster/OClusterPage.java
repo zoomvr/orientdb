@@ -312,6 +312,11 @@ public final class OClusterPage extends ODurablePage {
   public final int getFreeSpace() {
     return getIntValue(FREE_SPACE_COUNTER_OFFSET);
   }
+  
+  public final boolean canContentFitIntoPage(int contentLength){
+    int entrySize = contentLength + 3 * OIntegerSerializer.INT_SIZE + INDEX_ITEM_SIZE;
+    return getFreeSpace() >= entrySize;
+  }
 
   public int getMaxRecordSize() {
     final int freeListHeader = getIntValue(FREELIST_HEADER_OFFSET);
