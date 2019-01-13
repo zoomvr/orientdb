@@ -27,16 +27,21 @@ import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
 import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
+import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidbagPaginatedClusterPositionMap;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,8 +55,8 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   public static final byte RECORD_TYPE_LINKED_NODE = 'l';
   public static final byte RECORD_TYPE_ARRAY_NODE = 'a';
   
-  private Long firstRidBagNodeClusterPos;
-  private Long currentRidbagNodeClusterPos;
+  private long firstRidBagNodeClusterPos;
+  private long currentRidbagNodeClusterPos;
     
   private OFastRidBagPaginatedCluster cluster = null;
       
@@ -69,7 +74,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private boolean shouldSaveParentRecord = false;
   
   private final List<OIdentifiable> addedStillInvalidRids = new LinkedList<>();
-  private final UUID uuid = UUID.randomUUID();
+  private final UUID uuid;
   
   private static Map<UUID, Set<Long>> nodesInRidbags = new ConcurrentHashMap<>();
   private static Map<UUID, Set<Long>> deletedNodesInRidbags = new ConcurrentHashMap<>();
@@ -77,31 +82,74 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private final boolean deserialized;
   private boolean additionsAfterDeserialization = false;
   
-  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster){
+  private static Map<UUID, HelperClasses.Tuple<Long, List<Long>>> ownersFirstNodes = new ConcurrentHashMap<>();
+  private boolean checkedOwner = false;
+  
+  private List<Long> deserializedNodes;
+  
+  private static Map<Long, UUID> assignedNodes = Collections.synchronizedMap(new HashMap<Long, UUID>());
+  
+  private static Map<UUID, List<WeakReference<OLinkedListRidBag>>> allInstancesByUUID = new ConcurrentHashMap<>();
+  
+  private static Object[] lockObjects = new Object[64];
+  static {
+    for (int i = 0; i < lockObjects.length; i++){
+      lockObjects[i] = new Object();
+    }
+  }
+  
+  private static Object getLockObject(UUID uuid){
+    int hash = uuid.hashCode();
+    if (hash == Integer.MIN_VALUE){
+      hash++;
+    }
+    hash = Math.abs(hash);
+    return lockObjects[hash % lockObjects.length];
+  }
+  
+  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, UUID uuid){
     this.cluster = cluster;
-    Set<Long> nodes = new HashSet<>();
-    nodesInRidbags.put(uuid, nodes);
-    Set<Long> deleted = new HashSet<>();
-    deletedNodesInRidbags.put(uuid, deleted);
-    deserialized = true;
+    this.uuid = uuid;
+    synchronized(getLockObject(uuid)){
+      Set<Long> nodes = new HashSet<>();
+      nodesInRidbags.put(uuid, nodes);
+      Set<Long> deleted = new HashSet<>();
+      deletedNodesInRidbags.put(uuid, deleted);
+      deserialized = true;
+      List<WeakReference<OLinkedListRidBag>> containerList = allInstancesByUUID.get(uuid);
+      if (containerList == null){
+        containerList = new ArrayList<>();
+        allInstancesByUUID.put(uuid, containerList);
+      }
+      containerList.add(new WeakReference<>(this));
+    }
   }  
   
-  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID[] rids) throws IOException{    
+  public OLinkedListRidBag(OFastRidBagPaginatedCluster cluster, ORID[] rids, UUID uuid) throws IOException{    
     this.cluster = cluster;
     this.size = rids.length;
-    OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.firstNodeAllocation(rids, ADDITIONAL_ALLOCATION_SIZE, MAX_RIDBAG_NODE_SIZE);
-    firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
-    currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
-    shouldSaveParentRecord = output.shouldSaveParentRecord;
-    for (ORID inputRid : rids){
-      addedStillInvalidRids.add(inputRid);
-    }
-    Set<Long> nodes = new HashSet<>();
-    nodes.add(firstRidBagNodeClusterPos);
-    nodesInRidbags.put(uuid, nodes);
-    Set<Long> deleted = new HashSet<>();
-    deletedNodesInRidbags.put(uuid, deleted);
-    deserialized = false;
+    this.uuid = uuid;
+    synchronized(getLockObject(uuid)){
+      OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.firstNodeAllocation(rids, ADDITIONAL_ALLOCATION_SIZE, MAX_RIDBAG_NODE_SIZE);
+      firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
+      currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
+      shouldSaveParentRecord = output.shouldSaveParentRecord;
+      for (ORID inputRid : rids){
+        addedStillInvalidRids.add(inputRid);
+      }
+      Set<Long> nodes = new HashSet<>();
+      nodes.add(firstRidBagNodeClusterPos);
+      nodesInRidbags.put(uuid, nodes);
+      Set<Long> deleted = new HashSet<>();
+      deletedNodesInRidbags.put(uuid, deleted);
+      deserialized = false;
+      List<WeakReference<OLinkedListRidBag>> containerList = allInstancesByUUID.get(uuid);
+      if (containerList == null){
+        containerList = new ArrayList<>();
+        allInstancesByUUID.put(uuid, containerList);
+      }
+      containerList.add(new WeakReference<>(this));
+    }    
   }
   
   @Override
@@ -189,33 +237,59 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     return ret;
   }
   
+  private List<OLinkedListRidBag> getAllLiveInstacesForUUID(){    
+    List<WeakReference<OLinkedListRidBag>> allUUIDInstances = allInstancesByUUID.get(uuid);
+    List<OLinkedListRidBag> liveInstances = new ArrayList<>();
+    for (WeakReference<OLinkedListRidBag> instance : allUUIDInstances){
+      OLinkedListRidBag ins = instance.get();
+      if (ins != null){
+        liveInstances.add(ins);
+      }
+    }
+    return liveInstances;
+  }
+  
   @Override
   public void add(OIdentifiable valToAdd) {
-    if (valToAdd == null) {
-      throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
+    synchronized(getLockObject(uuid)){
+      if (deserialized && !checkedOwner){
+        List<Long> currentNodes = getCurrentNodes(false);
+        HelperClasses.Tuple<Long, List<Long>> compareObject = new HelperClasses.Tuple<>(storedSize, currentNodes);
+        if (Objects.equals(ownersFirstNodes.get(uuid), compareObject) == false){
+          List<OLinkedListRidBag> sameUUIDLiveInstances = getAllLiveInstacesForUUID();
+          int a = 0;
+          ++a;
+        }
+        checkedOwner = true;
+      }
+
+      if (valToAdd == null) {
+        throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
+      }
+
+      addedStillInvalidRids.add(valToAdd);          
+
+      try{
+        analyzeFutureShouldSaveRecord();
+      }
+      catch (IOException exc){
+        throw new ODatabaseException(exc.getMessage());
+      }
+
+      ++size;    
+
+      if (this.owner != null) {
+        ORecordInternal.track(this.owner, valToAdd);
+      }
+
+      fireCollectionChangedEvent(
+                  new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, shouldSaveParentRecord));
+      if (shouldSaveParentRecord){
+        int a = 0;
+        ++a;
+      }
     }
     
-    addedStillInvalidRids.add(valToAdd);          
-    
-    ++size;    
-    
-    if (this.owner != null) {
-      ORecordInternal.track(this.owner, valToAdd);
-    }
-    
-    try{
-      analyzeFutureShouldSaveRecord();
-    }
-    catch (IOException exc){
-      throw new ODatabaseException(exc.getMessage());
-    }
-    fireCollectionChangedEvent(
-                new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, shouldSaveParentRecord));
-    if (shouldSaveParentRecord){
-      int a = 0;
-      ++a;
-    }
-    shouldSaveParentRecord = false;
     //TODO add it to index
   }  
 
@@ -235,7 +309,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
   
   private boolean analyzeFutureChangeOfFirstMoving() throws IOException{
-    if (currentRidbagNodeClusterPos.equals(firstRidBagNodeClusterPos)){
+    if (currentRidbagNodeClusterPos == firstRidBagNodeClusterPos){
       byte type = cluster.getTypeOfRecord(currentRidbagNodeClusterPos, true);
       if (type == RECORD_TYPE_LINKED_NODE){
         HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos, true);
@@ -282,41 +356,108 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     return OLongSerializer.LONG_SIZE;
   }
   
+  private List<Long> getCurrentNodes(boolean fromDeserialized){
+    List<Long> ret = new ArrayList<>();
+    Long currentIteratingNode = firstRidBagNodeClusterPos;
+    while (currentIteratingNode != null){
+      if (fromDeserialized){
+        if (assignedNodes.keySet().contains(currentIteratingNode)){
+          UUID prevuuid = assignedNodes.get(currentIteratingNode);
+          if (!uuid.equals(prevuuid)){
+            int a = 0;
+            ++a;
+          }
+        }
+        assignedNodes.put(currentIteratingNode, uuid);
+        
+        if (OFastRidbagPaginatedClusterPositionMap.removedPositions.containsKey(currentIteratingNode)){
+          int a = 0;
+          ++a;
+        }
+      }
+      if (deletedNodesInRidbags.get(uuid).contains(currentIteratingNode) ||
+          OFastRidbagPaginatedClusterPositionMap.removedPositions.containsKey(currentIteratingNode)){
+        int a = 0;
+        ++a;
+      }
+      ret.add(currentIteratingNode);
+      try{
+        currentIteratingNode = cluster.getNextNode(currentIteratingNode, true);
+      }
+      catch (IOException exc){
+        throw new ODatabaseException(exc.getMessage());
+      }
+    }
+    return ret;
+  }
+  
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
-    processInvalidRidsReferences();            
-    OLongSerializer.INSTANCE.serialize(firstRidBagNodeClusterPos, stream, offset);
-    return offset + OLongSerializer.LONG_SIZE;
+    synchronized(getLockObject(uuid)){
+      processInvalidRidsReferences(); 
+      shouldSaveParentRecord = false;
+      OLongSerializer.INSTANCE.serialize(firstRidBagNodeClusterPos, stream, offset);
+      ownersFirstNodes.put(uuid, new HelperClasses.Tuple<>(storedSize, getCurrentNodes(false)));
+      try{
+        long sz = getSize();
+        if (sz != storedSize){
+          int a = 0;
+          ++a;
+        }
+        if (sz != size){
+          int a = 0;
+          ++a;
+        }
+        if (size != storedSize){
+          int a = 0;
+          ++a;
+        }
+      }
+      catch (IOException exc){
+        throw new ODatabaseException(exc.getMessage());
+      }
+      
+      return offset + OLongSerializer.LONG_SIZE;
+    }
   }
 
   @Override
   public int deserialize(byte[] stream, int offset) {
-    currentRidbagNodeClusterPos = firstRidBagNodeClusterPos = OLongSerializer.INSTANCE.deserialize(stream, offset);
-    //find last node
-    
-    Set<Long> nodes = nodesInRidbags.get(uuid);
-    nodes.add(firstRidBagNodeClusterPos);
-    
-    boolean exit = false;
-    try{
-      while (exit == false) {
-        Long nextNode = cluster.getNextNode(currentRidbagNodeClusterPos, true);
-        if (nextNode != null){
-          currentRidbagNodeClusterPos = nextNode;
-          nodes.add(nextNode);
+    synchronized(getLockObject(uuid)){
+      currentRidbagNodeClusterPos = firstRidBagNodeClusterPos = OLongSerializer.INSTANCE.deserialize(stream, offset);
+      //find last node
+
+      Set<Long> nodes = nodesInRidbags.get(uuid);
+      nodes.add(firstRidBagNodeClusterPos);
+
+      boolean exit = false;
+      try{
+        while (exit == false) {
+          Long nextNode = cluster.getNextNode(currentRidbagNodeClusterPos, true);
+          if (nextNode != null){
+            currentRidbagNodeClusterPos = nextNode;
+            nodes.add(nextNode);
+          }
+          else{
+            exit = true;
+          }
         }
-        else{
-          exit = true;
-        }
+        storedSize = size = getSize();
       }
-      storedSize = size = getSize();
+      catch (IOException exc){
+        OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
+        throw new ODatabaseException(exc.getMessage());
+      }
+
+      deserializedNodes = getCurrentNodes(true);      
+      HelperClasses.Tuple<Long, List<Long>> compareObject = new HelperClasses.Tuple<>(storedSize, deserializedNodes);
+      if (Objects.equals(ownersFirstNodes.get(uuid), compareObject) == false){
+        List<OLinkedListRidBag> sameUUIDLiveInstances = getAllLiveInstacesForUUID();
+        int a = 0;
+        ++a;
+      }      
+      return offset + OLongSerializer.LONG_SIZE;
     }
-    catch (IOException exc){
-      OLogManager.instance().errorStorage(this, exc.getMessage(), exc, (Object[])null);
-      throw new ODatabaseException(exc.getMessage());
-    }
-    
-    return offset + OLongSerializer.LONG_SIZE;
   }
   
   @Override

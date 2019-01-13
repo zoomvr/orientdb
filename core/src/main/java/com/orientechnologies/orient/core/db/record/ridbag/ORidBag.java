@@ -219,12 +219,21 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
     checkAndConvert();
 
     final UUID oldUuid = uuid;
-    final OSBTreeCollectionManager sbTreeCollectionManager = ODatabaseRecordThreadLocal.instance().get()
-        .getSbTreeCollectionManager();
-    if (sbTreeCollectionManager != null)
-      uuid = sbTreeCollectionManager.listenForChanges(this);
-    else
-      uuid = null;
+    if (isLinkedListRidBag()){
+      if (uuid == null){
+        uuid = UUID.randomUUID();
+      }
+    }
+    else{
+      final OSBTreeCollectionManager sbTreeCollectionManager = ODatabaseRecordThreadLocal.instance().get()
+          .getSbTreeCollectionManager();
+      if (sbTreeCollectionManager != null){
+        uuid = sbTreeCollectionManager.listenForChanges(this);
+      }
+      else{
+        uuid = null;
+      }
+    }
 
     boolean hasUuid = uuid != null;
 
@@ -284,7 +293,10 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
         }
 
         try{
-          delegate = new OLinkedListRidBag(linkedListRidbagsCluster, oldDelegateRids);
+          if (uuid == null){
+            uuid = UUID.randomUUID();
+          }
+          delegate = new OLinkedListRidBag(linkedListRidbagsCluster, oldDelegateRids, uuid);
         }
         catch (IOException exc){
           OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
@@ -375,7 +387,12 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
 
   public void fromStream(BytesContainer stream) {
     final byte first = stream.bytes[stream.offset++];        
-        
+    
+    if ((first & 2) == 2) {
+      uuid = OUUIDSerializer.INSTANCE.deserialize(stream.bytes, stream.offset);
+      stream.skip(OUUIDSerializer.UUID_SIZE);
+    }
+    
     if ((first & 4) == 4){      
       ODatabaseInternal database = ODatabaseRecordThreadLocal.instance().getIfDefined(); 
       boolean supportsLinkedListRidbag = false;
@@ -389,7 +406,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
         }
       }
       if (supportsLinkedListRidbag){
-        delegate = new OLinkedListRidBag(linkedListRidbagsCluster);
+        delegate = new OLinkedListRidBag(linkedListRidbagsCluster, uuid);
       }
       else{
         throw new ODatabaseException("Linked list ridbags cluster not found");
@@ -402,12 +419,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
       else{
         delegate = new OSBTreeRidBag();
       }
-    }
-
-    if ((first & 2) == 2) {
-      uuid = OUUIDSerializer.INSTANCE.deserialize(stream.bytes, stream.offset);
-      stream.skip(OUUIDSerializer.UUID_SIZE);
-    }
+    }    
 
     stream.skip(delegate.deserialize(stream.bytes, stream.offset) - stream.offset);
   }
@@ -450,6 +462,9 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
    * @return UUID
    */
   public UUID getTemporaryId() {
+    if (isEmbedded() || isLinkedListRidBag()){
+      return null;
+    }
     return uuid;
   }
 
@@ -472,7 +487,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
   }
 
   public OBonsaiCollectionPointer getPointer() {
-    if (isEmbedded()) {
+    if (isEmbedded() || isLinkedListRidBag()) {
       return OBonsaiCollectionPointer.INVALID;
     } else {
       return ((OSBTreeRidBag) delegate).getCollectionPointer();

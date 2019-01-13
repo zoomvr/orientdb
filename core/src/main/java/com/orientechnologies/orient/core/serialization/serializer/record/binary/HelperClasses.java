@@ -26,6 +26,7 @@ import com.orientechnologies.orient.core.metadata.schema.OType;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Calendar;
+import java.util.Objects;
 import java.util.TimeZone;
 
 /**
@@ -53,6 +54,37 @@ public class HelperClasses {
     public T2 getSecondVal() {
       return secondVal;
     }
+
+    @Override
+    public int hashCode() {
+      int hash = 3;
+      hash = 79 * hash + Objects.hashCode(this.firstVal);
+      hash = 79 * hash + Objects.hashCode(this.secondVal);
+      return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null) {
+        return false;
+      }
+      if (getClass() != obj.getClass()) {
+        return false;
+      }
+      final Tuple<?, ?> other = (Tuple<?, ?>) obj;
+      if (!Objects.equals(this.firstVal, other.firstVal)) {
+        return false;
+      }
+      if (!Objects.equals(this.secondVal, other.secondVal)) {
+        return false;
+      }
+      return true;
+    }
+    
+    
   }
 
   public static class Triple<T1, T2, T3> {// extends Tuple<T1, T2>{

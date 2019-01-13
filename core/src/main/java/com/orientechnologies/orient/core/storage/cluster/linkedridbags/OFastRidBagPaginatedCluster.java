@@ -65,6 +65,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -93,7 +95,9 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   private volatile int                                   id;
   private          long                                  fileId;
   private          OStoragePaginatedClusterConfiguration config;
-  private          ORecordConflictStrategy               recordConflictStrategy;    
+  private          ORecordConflictStrategy               recordConflictStrategy;   
+  
+  private static Set<Long> allocatedPositions = Collections.synchronizedSet(new HashSet<Long>());
 
   private static final class AddEntryResult {
     private final long pageIndex;
@@ -413,7 +417,12 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       try{
         final OPhysicalPosition pos = createPhysicalPosition(recordType, clusterPositionMap.allocate(atomicOperation), -1);
         addAtomicOperationMetadata(new ORecordId(id, pos.clusterPosition), atomicOperation);
-        return pos;      
+        if (allocatedPositions.contains(pos.clusterPosition)){
+          int a = 0;
+          ++a;
+        }
+        allocatedPositions.add(pos.clusterPosition);
+        return pos;        
       }
       finally{
         if (lock){
@@ -1048,32 +1057,33 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 
   @Override
   public boolean hideRecord(long position) throws IOException {
-    boolean rollback = false;
-    final OAtomicOperation atomicOperation = startAtomicOperation(true);
-    try {
-      acquireExclusiveLock();
-      try {
-        OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(position, 1, atomicOperation);
-
-        if (positionEntry == null) {
-          return false;
-        }
-
-        updateClusterState(-1, 0, atomicOperation);
-        clusterPositionMap.remove(position, atomicOperation);
-
-        addAtomicOperationMetadata(new ORecordId(id, position), atomicOperation);
-
-        return true;
-      } finally {
-        releaseExclusiveLock();
-      }
-    } catch (Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
-    }
+    throw new UnsupportedOperationException("not implemented");
+//    boolean rollback = false;
+//    final OAtomicOperation atomicOperation = startAtomicOperation(true);
+//    try {
+//      acquireExclusiveLock();
+//      try {
+//        OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(position, 1, atomicOperation);
+//
+//        if (positionEntry == null) {
+//          return false;
+//        }
+//
+//        updateClusterState(-1, 0, atomicOperation);
+//        clusterPositionMap.remove(position, atomicOperation);
+//
+//        addAtomicOperationMetadata(new ORecordId(id, position), atomicOperation);
+//
+//        return true;
+//      } finally {
+//        releaseExclusiveLock();
+//      }
+//    } catch (Exception e) {
+//      rollback = true;
+//      throw e;
+//    } finally {
+//      endAtomicOperation(rollback);
+//    }
   }
 
   @Override
