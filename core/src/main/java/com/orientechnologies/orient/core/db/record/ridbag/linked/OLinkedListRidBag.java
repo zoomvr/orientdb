@@ -342,11 +342,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       }
 
       fireCollectionChangedEvent(
-                  new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, shouldSaveParentRecord));
-      if (shouldSaveParentRecord){
-        int a = 0;
-        ++a;
-      }
+                  new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, shouldSaveParentRecord));      
       
       info = new CurrentPosSizeStoredSize(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size, storedSize);
       mappedRidbagInfo.put(uuid, info);
