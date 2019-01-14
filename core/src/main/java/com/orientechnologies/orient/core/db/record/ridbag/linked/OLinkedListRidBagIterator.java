@@ -21,84 +21,117 @@ import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.id.ORID;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  *
  * @author marko
  */
-public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
+public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{      
   
-  private static final int nodeStartIteratingIndex = -1;
-  
-  private final OLinkedListRidBag ridbag;
-  private Long currentIterRidbagNode;
-  private ORID[] currentNodeContent;
-  private int currentNodeIteartionIndex = nodeStartIteratingIndex;
-  
-  private boolean noMore = false;
-  
-  private boolean calledNextAfterHasNext = true;
+  private final OLinkedListRidBag ridbag;      
+  private ORID prevDetectedValue = null;
+  private boolean calledNextAfterHasNext = true;  
+  private int lastDetectedIndex = -1;
   
   public OLinkedListRidBagIterator(OLinkedListRidBag ridbag){
-    this.ridbag = ridbag;
-    currentIterRidbagNode = ridbag.getFirstNodeClusterPos();
+    this.ridbag = ridbag;    
+  }
+  
+  /**
+   * caller should take care of synchronization
+   * @param index
+   * @param firstNode
+   * @return 
+   */
+  private ORID getElementAt(int index, Long iteratingNode, List<OIdentifiable> pendingElements) throws IOException{
+    int size = ridbag.size();
+    if (index >= size){
+      return null;
+    }
+    Object adequateContainer = null;
+    size = 0;
+    int indexDiff = 0;
+    while (adequateContainer == null){
+      if (iteratingNode == null){
+        int tmpSize = pendingElements.size();        
+        if (size + tmpSize <= index){
+          return null;
+        }
+        adequateContainer = pendingElements;        
+      }
+      else{
+        int tmpSz = ridbag.getCluster().getNodeSize(iteratingNode, true);        
+        if (size + tmpSz > index){
+          adequateContainer = iteratingNode;          
+        }
+        else{
+          iteratingNode = ridbag.getCluster().getNextNode(iteratingNode, true);
+          size += tmpSz;
+        }
+      }
+      if (adequateContainer != null){
+        indexDiff = index - size;
+      }
+    }
+    
+    if (adequateContainer instanceof Long){
+      long nodePosition = (Long)adequateContainer;
+      ORID[] nodeRids = ridbag.getCluster().getAllRidsFromNode(nodePosition, true);
+      return nodeRids[indexDiff];
+    }
+    else if (adequateContainer instanceof List){
+      return ((List<OIdentifiable>)adequateContainer).get(indexDiff).getIdentity();
+    }
+    else{
+      throw new ODatabaseException("Illegal state of iterator");
+    }
   }
   
   @Override
   public boolean hasNext() {
-    try{
-      if (noMore){
+    if (!calledNextAfterHasNext){
+      if (prevDetectedValue == null){
         return false;
       }
-
-      if (!calledNextAfterHasNext){
+      else{
         return true;
       }
-      
+    }
+    
+    boolean detectedRetrnVal;
+    synchronized(OLinkedListRidBag.getLockObject(ridbag.getUUID())){
       try{
-        if (currentNodeContent == null || currentNodeIteartionIndex == currentNodeContent.length - 1){
-          if (currentNodeContent != null){
-            currentIterRidbagNode = ridbag.getCluster().getNextNode(currentIterRidbagNode, true);
-            if (currentIterRidbagNode == null){
-              noMore = true;
-              return false;
-            }
-          }
-          currentNodeContent = ridbag.getCluster().getAllRidsFromNode(currentIterRidbagNode, true);
-          currentNodeIteartionIndex = nodeStartIteratingIndex;
+        ++lastDetectedIndex;
+        OLinkedListRidBag.CurrentPosSizeStoredSize info = ridbag.getCurrentMetadataState();
+        long firstNodePosition = info.getFirstNodeClusterPosition();
+        List<OIdentifiable> pendingElements = ridbag.getPendingRids();
+        prevDetectedValue = getElementAt(lastDetectedIndex, firstNodePosition, pendingElements);
+        if (prevDetectedValue == null){
+          detectedRetrnVal = false;
+        }
+        else{
+          detectedRetrnVal = true;
         }
       }
       catch (IOException exc){
         OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
-        throw new ODatabaseException(exc.getMessage());
+        throw new ODatabaseException("Illegal state of iterator");
       }
-
-      ++currentNodeIteartionIndex;
-      //this should never happen, bu just in case
-      if (currentNodeIteartionIndex >= currentNodeContent.length){
-        noMore = true;
-        return false;
-      }
-
-      return true;
     }
-    finally{
-      calledNextAfterHasNext = false;
-    }
+        
+    calledNextAfterHasNext = false;
+    
+    return detectedRetrnVal;
   }
 
   @Override
   public OIdentifiable next() {
-    try{
-      if (noMore){
-        throw new IllegalStateException("No more elements");
-      }
-
-      return currentNodeContent[currentNodeIteartionIndex];
-    }
-    finally{
-      calledNextAfterHasNext = true;
-    }
+    calledNextAfterHasNext = true;
+    
+    return prevDetectedValue;
+    
+    
   }
   
   @Override

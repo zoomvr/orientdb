@@ -52,7 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class OLinkedListRidBag implements ORidBagDelegate{           
   
-  private class CurrentPosSizeStoredSize extends HelperClasses.Triple<Long, Long, Long>{
+  protected static class CurrentPosSizeStoredSize extends HelperClasses.Triple<Long, Long, Long>{
     private final long firstNode;
     
     public CurrentPosSizeStoredSize(long firstNode, long currentPos, long size, long storedSize) {
@@ -126,7 +126,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     }
   }
   
-  private static Object getLockObject(UUID uuid){
+  protected static Object getLockObject(UUID uuid){
     int hash = uuid.hashCode();
     if (hash == Integer.MIN_VALUE){
       hash++;
@@ -622,9 +622,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public int size() {
-    CurrentPosSizeStoredSize info = mappedRidbagInfo.get(uuid);    
-    long size = info.getSize();    
-    return Long.valueOf(size).intValue();
+    synchronized(getLockObject(uuid)){
+      CurrentPosSizeStoredSize info = mappedRidbagInfo.get(uuid);    
+      long size = info.getSize();    
+      return Long.valueOf(size).intValue();
+    }
   }
 
   @Override
@@ -685,6 +687,22 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   protected OFastRidBagPaginatedCluster getCluster(){
     return cluster;
+  }
+  
+  protected List<OIdentifiable> getPendingRids(){
+    return addedStillInvalidRids;
+  }
+  
+  protected UUID getUUID(){
+    return uuid;
+  }
+  
+  /**
+   * caller should take care of synchronization
+   * @return 
+   */
+  protected CurrentPosSizeStoredSize getCurrentMetadataState(){
+    return mappedRidbagInfo.get(uuid);
   }
  
 }
