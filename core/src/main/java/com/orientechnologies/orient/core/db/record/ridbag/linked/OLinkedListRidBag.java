@@ -269,7 +269,13 @@ public class OLinkedListRidBag implements ORidBagDelegate{
                 currentRidbagNodeClusterPos, firstRidBagNodeClusterPos, shouldSaveParentRecord,
                 nodes, deletedNodes);
         firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
-        currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;        
+        currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
+
+        if (OFastRidbagPaginatedClusterPositionMap.removedPositions.containsKey(firstRidBagNodeClusterPos) ||
+                OFastRidbagPaginatedClusterPositionMap.removedPositions.containsKey(currentRidbagNodeClusterPos)){
+            int a = 0;
+            ++a;
+        }
       } catch (IOException exc) {
         OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
         throw new ODatabaseException(exc.getMessage());
@@ -285,6 +291,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       additionsAfterDeserialization = true;
       info = new CurrentPosSizeStoredSize(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size, storedSize);
       mappedRidbagInfo.put(uuid, info);
+      if (OFastRidbagPaginatedClusterPositionMap.removedPositions.containsKey(firstRidBagNodeClusterPos) ||
+              OFastRidbagPaginatedClusterPositionMap.removedPositions.containsKey(currentRidbagNodeClusterPos)){
+          int a = 0;
+          ++a;
+      }
     }    
         
     return ret;
@@ -473,6 +484,12 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       long storedSize = info.getStoredSize();
       long firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();
       
+      if (OFastRidbagPaginatedClusterPositionMap.removedPositions.containsKey(firstRidBagNodeClusterPos) ||
+              OFastRidbagPaginatedClusterPositionMap.removedPositions.containsKey(currentRidbagNodeClusterPos)){
+          int a = 0;
+          ++a;
+      }
+      
       shouldSaveParentRecord = false;
       OLongSerializer.INSTANCE.serialize(firstRidBagNodeClusterPos, stream, offset);
       ownersFirstNodes.put(uuid, new HelperClasses.Tuple<>(storedSize, getCurrentNodes(firstRidBagNodeClusterPos, false)));
@@ -503,6 +520,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       Set<Long> nodes = nodesInRidbags.get(uuid);
       nodes.add(firstRidBagNodeClusterPos);
 
+      boolean iterated = false;
       CurrentPosSizeStoredSize info = mappedRidbagInfo.get(uuid);
       if (info != null){
         currentRidbagNodeClusterPos = info.getCurrentNodeClusterPosition();
@@ -532,6 +550,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         
         info = new CurrentPosSizeStoredSize(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size, storedSize);
         mappedRidbagInfo.put(uuid, info);
+        iterated = true;
       }
 
       deserializedNodes = getCurrentNodes(firstRidBagNodeClusterPos, true);      
