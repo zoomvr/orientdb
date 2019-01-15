@@ -85,7 +85,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   private boolean shouldSaveParentRecord = false;
   
-  private final List<OIdentifiable> addedStillInvalidRids = new LinkedList<>();
+  private final List<OIdentifiable> pendingRids = new LinkedList<>();
   private final UUID uuid;
     
   private static Map<UUID, RidbagMetadata> mappedRidbagInfo = new ConcurrentHashMap<>();
@@ -122,7 +122,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       long currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
       shouldSaveParentRecord = output.shouldSaveParentRecord;
       for (ORID inputRid : rids){
-        addedStillInvalidRids.add(inputRid);
+        pendingRids.add(inputRid);
       }      
       RidbagMetadata info = mappedRidbagInfo.get(uuid);
       if (info == null){
@@ -149,7 +149,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private OIdentifiable processInvalidRidsReferences(){        
     OIdentifiable ret = null;
     //go through collection of invalid rids and check if some become valid
-    Iterator<OIdentifiable> addedInvalidRidsIter = addedStillInvalidRids.iterator();
+    Iterator<OIdentifiable> addedInvalidRidsIter = pendingRids.iterator();
     
     byte currentNodeType;
     long pageIndex;
@@ -235,48 +235,47 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   
   @Override
   public void add(OIdentifiable valToAdd) {
+    if (valToAdd == null) {
+      throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
+    }
+    
+    if (this.owner != null) {
+      ORecordInternal.track(this.owner, valToAdd);
+    }
+    
     synchronized(getLockObject(uuid)){
       RidbagMetadata info = mappedRidbagInfo.get(uuid);
       long currentRidbagNodeClusterPos = info.getCurrentNodeClusterPosition();
       long size = info.getSize();
       long storedSize = info.getStoredSize();
-      long firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();            
+      long firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();                  
 
-      if (valToAdd == null) {
-        throw new IllegalArgumentException("Impossible to add a null identifiable in a ridbag");
-      }
-
-      addedStillInvalidRids.add(valToAdd);          
+      pendingRids.add(valToAdd);          
 
       try{
-        analyzeFutureShouldSaveRecord(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size);
+        analyzeFutureChangeOfFirstMegamerge(firstRidBagNodeClusterPos, size);
       }
       catch (IOException exc){
         throw new ODatabaseException(exc.getMessage());
       }
 
-      ++size;    
-
-      if (this.owner != null) {
-        ORecordInternal.track(this.owner, valToAdd);
-      }
-
-      fireCollectionChangedEvent(
-                  new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, shouldSaveParentRecord));      
+      ++size;            
       
       info = new RidbagMetadata(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size, storedSize);
       mappedRidbagInfo.put(uuid, info);
     }
     
+    fireCollectionChangedEvent(
+                  new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, shouldSaveParentRecord));
     //TODO add it to index
   }  
 
-  private void analyzeFutureShouldSaveRecord(long firstRidBagNodeClusterPos, long currentRidbagNodeClusterPos, long size) throws IOException{
-    if (!shouldSaveParentRecord){
-      shouldSaveParentRecord = analyzeFutureChangeOfFirstMoving(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos) | 
-              analyzeFutureChangeOfFirstMegamerge(firstRidBagNodeClusterPos, size);
-    }
-  }
+//  private void analyzeFutureShouldSaveRecord(long firstRidBagNodeClusterPos, long currentRidbagNodeClusterPos, long size) throws IOException{
+//    if (!shouldSaveParentRecord){
+//      shouldSaveParentRecord = analyzeFutureChangeOfFirstMoving(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos) | 
+//              analyzeFutureChangeOfFirstMegamerge(firstRidBagNodeClusterPos, size);
+//    }
+//  }
   
   private boolean analyzeFutureChangeOfFirstMegamerge(long firstRidBagNodeClusterPos, long size) throws IOException{
     if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0){      
@@ -287,18 +286,18 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     return false;
   }
   
-  private boolean analyzeFutureChangeOfFirstMoving(long firstRidBagNodeClusterPos, long currentRidbagNodeClusterPos) throws IOException{
-    if (currentRidbagNodeClusterPos == firstRidBagNodeClusterPos){
-      byte type = cluster.getTypeOfRecord(currentRidbagNodeClusterPos, true);
-      if (type == RECORD_TYPE_LINKED_NODE){
-        HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos, true);
-        if (cluster.isCurrentNodeFullNodeAtomic(pageIndexPagePosition.getFirstVal(), pageIndexPagePosition.getSecondVal(), type)){
-          return true;
-        }
-      }
-    }
-    return false;
-  }
+//  private boolean analyzeFutureChangeOfFirstMoving(long firstRidBagNodeClusterPos, long currentRidbagNodeClusterPos) throws IOException{
+//    if (currentRidbagNodeClusterPos == firstRidBagNodeClusterPos){
+//      byte type = cluster.getTypeOfRecord(currentRidbagNodeClusterPos, true);
+//      if (type == RECORD_TYPE_LINKED_NODE){
+//        HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos, true);
+//        if (cluster.isCurrentNodeFullNodeAtomic(pageIndexPagePosition.getFirstVal(), pageIndexPagePosition.getSecondVal(), type)){
+//          return true;
+//        }
+//      }
+//    }
+//    return false;
+//  }
   
   /**
    * merges all tailing node in node of maximum length. Caller should take care of counting tail rids
@@ -546,7 +545,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   }
   
   protected List<OIdentifiable> getPendingRids(){
-    return addedStillInvalidRids;
+    return pendingRids;
   }
   
   protected UUID getUUID(){

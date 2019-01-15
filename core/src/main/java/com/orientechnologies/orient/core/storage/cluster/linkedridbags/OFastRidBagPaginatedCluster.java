@@ -95,9 +95,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   private volatile int                                   id;
   private          long                                  fileId;
   private          OStoragePaginatedClusterConfiguration config;
-  private          ORecordConflictStrategy               recordConflictStrategy;   
-  
-  private static Set<Long> allocatedPositions = Collections.synchronizedSet(new HashSet<Long>());
+  private          ORecordConflictStrategy               recordConflictStrategy;      
 
   private static final class AddEntryResult {
     private final long pageIndex;
@@ -416,12 +414,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       }
       try{
         final OPhysicalPosition pos = createPhysicalPosition(recordType, clusterPositionMap.allocate(atomicOperation), -1);
-        addAtomicOperationMetadata(new ORecordId(id, pos.clusterPosition), atomicOperation);
-        if (allocatedPositions.contains(pos.clusterPosition)){
-          int a = 0;
-          ++a;
-        }
-        allocatedPositions.add(pos.clusterPosition);
+        addAtomicOperationMetadata(new ORecordId(id, pos.clusterPosition), atomicOperation);        
         return pos;        
       }
       finally{
