@@ -35,9 +35,7 @@ import java.util.Map;
  * @author mdjurovi
  */
 public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
-  private long fileId;
-  
-  public static Map<Long, Exception> removedPositions = Collections.synchronizedMap(new HashMap<Long, Exception>());
+  private long fileId;    
 
   OFastRidbagPaginatedClusterPositionMap(OAbstractPaginatedStorage storage, String name, String lockName) {
     super(storage, name, DEF_EXTENSION, lockName);
@@ -262,11 +260,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
 //  }
 
   public OFastRidbagClusterPositionMapBucket.PositionEntry get(final long clusterPosition, final int pageCount,
-      final OAtomicOperation atomicOperation) throws IOException {            
-    if (removedPositions.containsKey(clusterPosition)){
-      Exception exc = removedPositions.get(clusterPosition);
-      exc.printStackTrace();
-    }
+      final OAtomicOperation atomicOperation) throws IOException {
     
     final long pageIndex = clusterPosition / OFastRidbagClusterPositionMapBucket.MAX_ENTRIES + 1;
     final int index = (int) (clusterPosition % OFastRidbagClusterPositionMapBucket.MAX_ENTRIES);
@@ -294,8 +288,7 @@ public class OFastRidbagPaginatedClusterPositionMap extends OClusterPositionMap{
     try {
       final OFastRidbagClusterPositionMapBucket bucket = new OFastRidbagClusterPositionMapBucket(cacheEntry, false);
 
-      bucket.remove(index);
-      removedPositions.put(clusterPosition, new Exception("for debug"));
+      bucket.remove(index);      
     } finally {
       releasePageFromWrite(atomicOperation, cacheEntry);
     }

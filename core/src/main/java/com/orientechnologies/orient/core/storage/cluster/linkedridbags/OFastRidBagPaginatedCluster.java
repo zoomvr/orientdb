@@ -2912,7 +2912,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   public MegaMergeOutput nodesMegaMerge(Long currentRidbagNodeClusterPos, long firstRidBagNodeClusterPos, final int MAX_RIDBAG_NODE_SIZE,
-          boolean shouldSaveParentRecord, Set<Long> nodes, Set<Long> deletedNodes) throws IOException {    
+          boolean shouldSaveParentRecord) throws IOException {    
     boolean rollback = false;
     startAtomicOperation(true);
     boolean foundOne = false;
@@ -2940,8 +2940,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             System.arraycopy(nodeRids, 0, mergedRids, currentOffset, nodeRids.length);
             long tmpCurrNodeClusterPos = currentIteratingNode;
             currentIteratingNode = getNextNode(currentIteratingNode, false);
-            removeNode(tmpCurrNodeClusterPos);
-            deletedNodes.add(tmpCurrNodeClusterPos);
+            removeNode(tmpCurrNodeClusterPos);            
             currentOffset += nodeRids.length;
             if (tmpCurrNodeClusterPos == firstRidBagNodeClusterPos) {
               removedFirstNode = true;
@@ -2958,8 +2957,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         //need this flag because array node of size 600 can be allocated from another place than node mega merge
         if (foundOne){
           OPhysicalPosition megaNodeAllocatedPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE, false);
-          long megaNodeClusterPosition = addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE - 1);
-          nodes.add(megaNodeClusterPosition);
+          long megaNodeClusterPosition = addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE - 1);          
           //set next node of previous node
           if (lastNonRemovedNode != -1) {
             updatePrevNextNodeinfo(lastNonRemovedNode, null, megaNodeClusterPosition);
@@ -2998,7 +2996,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   public MegaMergeOutput addRidHighLevel(final OIdentifiable value, long pageIndex, int pagePosition, byte currentNodeType,
           final int ADDITIONAL_ALLOCATION_SIZE, final int MAX_RIDBAG_NODE_SIZE,
           long currentRidbagNodeClusterPos, long firstRidBagNodeClusterPos,
-          boolean shouldSaveParentRecord, Set<Long> nodes, Set<Long> deletedNodes) throws IOException {
+          boolean shouldSaveParentRecord) throws IOException {
     boolean rollback = false;
     startAtomicOperation(true);
     try {
@@ -3019,20 +3017,17 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             long newNodeClusterPosition = addRids(newNodePreallocatedRids, newNodePhysicalPosition, currentRidbagNodeClusterPos,
                     -1l, currentNodeRids.length);
             updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
-            removeNode(currentRidbagNodeClusterPos);
-            deletedNodes.add(currentRidbagNodeClusterPos);
+            removeNode(currentRidbagNodeClusterPos);            
             if (currentRidbagNodeClusterPos == firstRidBagNodeClusterPos) {
               firstRidBagNodeClusterPos = newNodeClusterPosition;
               shouldSaveParentRecord = true;
             }
-            currentRidbagNodeClusterPos = newNodeClusterPosition;
-            nodes.add(newNodeClusterPosition);
+            currentRidbagNodeClusterPos = newNodeClusterPosition;            
           } else if (currentNodeType == RECORD_TYPE_ARRAY_NODE) {
             OPhysicalPosition newNodePhysicalPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE, false);
             long newNodeClusterPosition = addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
             updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
-            currentRidbagNodeClusterPos = newNodeClusterPosition;
-            nodes.add(newNodeClusterPosition);
+            currentRidbagNodeClusterPos = newNodeClusterPosition;            
           } else {
             throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
           }

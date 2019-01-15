@@ -103,7 +103,7 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
     synchronized(OLinkedListRidBag.getLockObject(ridbag.getUUID())){
       try{
         ++lastDetectedIndex;
-        OLinkedListRidBag.CurrentPosSizeStoredSize info = ridbag.getCurrentMetadataState();
+        OLinkedListRidBag.RidbagMetadata info = ridbag.getCurrentMetadataState();
         long firstNodePosition = info.getFirstNodeClusterPosition();
         List<OIdentifiable> pendingElements = ridbag.getPendingRids();
         prevDetectedValue = getElementAt(lastDetectedIndex, firstNodePosition, pendingElements);
