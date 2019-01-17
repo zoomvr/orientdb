@@ -19,6 +19,8 @@ import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses;
+import com.orientechnologies.orient.core.storage.cluster.linkedridbags.OFastRidBagPaginatedCluster;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -45,6 +47,7 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
    * @return 
    */
   private ORID getElementAt(int index, Long iteratingNode, List<OIdentifiable> pendingElements) throws IOException{
+    OFastRidBagPaginatedCluster cluster = ridbag.getCluster();
     int size = ridbag.size();
     if (index >= size){
       return null;
@@ -61,7 +64,12 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
         adequateContainer = pendingElements;        
       }
       else{
-        int tmpSz = ridbag.getCluster().getNodeSize(iteratingNode, true);        
+        HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> typePageIndexPagePosition = 
+                cluster.getPageIndexAndPagePositionAndTypeOfRecord(iteratingNode, true);
+        byte type = typePageIndexPagePosition.getFirstVal().getFirstVal();
+        long pageIndex = typePageIndexPagePosition.getFirstVal().getSecondVal();
+        int pagePosition = typePageIndexPagePosition.getSecondVal();
+        int tmpSz = ridbag.getCluster().getNodeSize(pageIndex, pagePosition, type, true);        
         if (size + tmpSz > index){
           adequateContainer = iteratingNode;          
         }
@@ -77,7 +85,12 @@ public class OLinkedListRidBagIterator implements Iterator<OIdentifiable>{
     
     if (adequateContainer instanceof Long){
       long nodePosition = (Long)adequateContainer;
-      ORID[] nodeRids = ridbag.getCluster().getAllRidsFromNode(nodePosition, true);
+      HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> typePageIndexPagePosition = 
+              cluster.getPageIndexAndPagePositionAndTypeOfRecord(nodePosition, true);
+      byte type = typePageIndexPagePosition.getFirstVal().getFirstVal();
+      long pageIndex = typePageIndexPagePosition.getFirstVal().getSecondVal();
+      int pagePosition = typePageIndexPagePosition.getSecondVal();
+      ORID[] nodeRids = ridbag.getCluster().getAllRidsFromNode(pageIndex, pagePosition, type, true);
       return nodeRids[indexDiff];
     }
     else if (adequateContainer instanceof List){

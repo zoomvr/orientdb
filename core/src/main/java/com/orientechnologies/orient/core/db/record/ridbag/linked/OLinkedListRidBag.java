@@ -244,12 +244,12 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       long storedSize = info.getStoredSize();
       long firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();
 
-      try{
-        analyzeFutureChangeOfFirstMegamerge(firstRidBagNodeClusterPos, size);
-      }
-      catch (IOException exc){
-        throw new ODatabaseException(exc.getMessage());
-      }
+//      try{
+//        analyzeFutureChangeOfFirstMegamerge(firstRidBagNodeClusterPos, size);
+//      }
+//      catch (IOException exc){
+//        throw new ODatabaseException(exc.getMessage());
+//      }
 
       ++size;            
       
@@ -259,7 +259,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
     pendingRids.add(valToAdd);
     fireCollectionChangedEvent(
-                  new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, shouldSaveParentRecord));
+                  new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, false));
     //TODO add it to index
   }  
 
@@ -270,14 +270,22 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 //    }
 //  }
   
-  private boolean analyzeFutureChangeOfFirstMegamerge(long firstRidBagNodeClusterPos, long size) throws IOException{
-    if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0){      
-      if (!cluster.isMaxSizeNodeFullNode(firstRidBagNodeClusterPos, MAX_RIDBAG_NODE_SIZE, true)) {
-        return true;
-      }
-    }
-    return false;
-  }
+//  private boolean analyzeFutureChangeOfFirstMegamerge(final long clusterPosition, final long size) throws IOException{
+//    HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> pageIndexPagePositionType = cluster.getPageIndexAndPagePositionAndTypeOfRecord(clusterPosition, autoConvertToRecord);
+//    final long pageIndex = pageIndexPagePositionType.getFirstVal().getSecondVal();
+//    final int pagePosition = pageIndexPagePositionType.getSecondVal();
+//    final byte type = pageIndexPagePositionType.getFirstVal().getFirstVal();
+//    return analyzeFutureChangeOfFirstMegamerge(pageIndex, pagePosition, type, size);
+//  }
+//  
+//  private boolean analyzeFutureChangeOfFirstMegamerge(final long pageIndex, final int pagePosition, final byte type, final long size) throws IOException{
+//    if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0){      
+//      if (!cluster.isMaxSizeNodeFullNode(pageIndex, pagePosition, type, MAX_RIDBAG_NODE_SIZE, true)) {
+//        return true;
+//      }
+//    }
+//    return false;
+//  }
   
 //  private boolean analyzeFutureChangeOfFirstMoving(long firstRidBagNodeClusterPos, long currentRidbagNodeClusterPos) throws IOException{
 //    if (currentRidbagNodeClusterPos == firstRidBagNodeClusterPos){
@@ -520,7 +528,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     long size = 0;
     Long iteratingNode = firstRidBagNodeClusterPos;
     while (iteratingNode != null){
-      size += cluster.getNodeSize(iteratingNode, true);
+      HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> typePageIndexPagePosition = cluster.getPageIndexAndPagePositionAndTypeOfRecord(iteratingNode, autoConvertToRecord);
+      byte type = typePageIndexPagePosition.getFirstVal().getFirstVal();
+      long pageIndex = typePageIndexPagePosition.getFirstVal().getSecondVal();
+      int pagePosition = typePageIndexPagePosition.getSecondVal();
+      size += cluster.getNodeSize(pageIndex, pagePosition, type, true);
       iteratingNode = cluster.getNextNode(iteratingNode, true);
     }
     return size;
