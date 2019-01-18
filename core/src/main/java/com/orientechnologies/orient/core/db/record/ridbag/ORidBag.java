@@ -270,7 +270,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
     ODatabaseInternal database = ODatabaseRecordThreadLocal.instance().getIfDefined();    
     
     if (database != null && !database.getStorage().isRemote()) {
-      /*boolean supportsLinkedListRidbag = false;
+      boolean supportsLinkedListRidbag = false;
       OFastRidBagPaginatedCluster linkedListRidbagsCluster = null;
       if (database.getStorage() != null && database.getStorage() instanceof OAbstractPaginatedStorage){
         OAbstractPaginatedStorage aStorage = (OAbstractPaginatedStorage)database.getStorage();
@@ -314,7 +314,7 @@ public class ORidBag implements OStringBuilderSerializable, Iterable<OIdentifiab
         oldDelegate.setAutoConvertToRecord(oldAutoConvert);
         oldDelegate.requestDelete();
       }
-      else */if (isEmbedded() && ODatabaseRecordThreadLocal.instance().get().getSbTreeCollectionManager() != null
+      else if (isEmbedded() && ODatabaseRecordThreadLocal.instance().get().getSbTreeCollectionManager() != null
           && delegate.size() >= topThreshold) {
         ORidBagDelegate oldDelegate = delegate;
         delegate = new OSBTreeRidBag();

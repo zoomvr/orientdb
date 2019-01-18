@@ -586,11 +586,12 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       currentIndex = revertBytes(currentIndex);
       ++currentIndex;
       pos += OIntegerSerializer.INT_SIZE;
-      int capacity = getRecordContentAsInteger(currentNodePageIndex, currentRidPagePosition, pos);
-      capacity = revertBytes(capacity);
-      if (currentIndex >= capacity){
-        throw new ArrayIndexOutOfBoundsException(currentIndex);
-      }
+      //let caller take care of capacity, so following lines will be commented
+//      int capacity = getRecordContentAsInteger(currentNodePageIndex, currentRidPagePosition, pos);
+//      capacity = revertBytes(capacity);
+//      if (currentIndex >= capacity){
+//        throw new ArrayIndexOutOfBoundsException(currentIndex);
+//      }
       //serialize current index after record type info
 //        OIntegerSerializer.INSTANCE.serialize(currentIndex, ridEntry, OByteSerializer.BYTE_SIZE);
       replaceRecordContent(currentNodePageIndex, currentRidPagePosition, revertBytes(currentIndex), OByteSerializer.BYTE_SIZE);
@@ -1525,46 +1526,45 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 //    }
   }
 
+  public OPhysicalPosition getPhysicalPositionInternal(OPhysicalPosition position) throws IOException{
+    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+    long clusterPosition = position.clusterPosition;
+    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(clusterPosition, 1, atomicOperation);
+
+    if (positionEntry == null) {
+      return null;
+    }
+
+    long pageIndex = positionEntry.getPageIndex();
+    int recordPosition = positionEntry.getRecordPosition();
+
+    OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false);
+    try {
+      final OClusterPage localPage = new OClusterPage(cacheEntry, false);
+      if (localPage.isDeleted(recordPosition)) {
+        return null;
+      }
+
+      final OPhysicalPosition physicalPosition = new OPhysicalPosition();
+      physicalPosition.recordSize = -1;
+
+      physicalPosition.recordType = localPage.getRecordByteValue(recordPosition, 0);
+      physicalPosition.recordVersion = localPage.getRecordVersion(recordPosition);
+      physicalPosition.clusterPosition = position.clusterPosition;
+
+      return physicalPosition;
+    } finally {
+      releasePageFromRead(atomicOperation, cacheEntry);
+    }
+  }
+  
   @Override
   public OPhysicalPosition getPhysicalPosition(OPhysicalPosition position) throws IOException {
     atomicOperationsManager.acquireReadLock(this);
     try {
       acquireSharedLock();
-      try {
-        final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-        long clusterPosition = position.clusterPosition;
-        OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(clusterPosition, 1, atomicOperation);
-
-        if (positionEntry == null) {
-          return null;
-        }
-
-        long pageIndex = positionEntry.getPageIndex();
-        int recordPosition = positionEntry.getRecordPosition();
-
-        OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false);
-        try {
-          final OClusterPage localPage = new OClusterPage(cacheEntry, false);
-          if (localPage.isDeleted(recordPosition)) {
-            return null;
-          }
-
-          //do not know what is this, in this cluster no negative offsets are used so suppose that this shouldn't be here
-//          if (localPage.getRecordByteValue(recordPosition, -OLongSerializer.LONG_SIZE - OByteSerializer.BYTE_SIZE) == 0) {
-//            return null;
-//          }
-
-          final OPhysicalPosition physicalPosition = new OPhysicalPosition();
-          physicalPosition.recordSize = -1;
-
-          physicalPosition.recordType = localPage.getRecordByteValue(recordPosition, 0);
-          physicalPosition.recordVersion = localPage.getRecordVersion(recordPosition);
-          physicalPosition.clusterPosition = position.clusterPosition;
-
-          return physicalPosition;
-        } finally {
-          releasePageFromRead(atomicOperation, cacheEntry);
-        }
+      try {        
+        return getPhysicalPositionInternal(position);
       } finally {
         releaseSharedLock();
       }
@@ -2444,7 +2444,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
     //here find records physical position
-    OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+    OPhysicalPosition recordPhysicalPosition = getPhysicalPositionInternal(ridsPPos);
     //this means that node still not saved
     if (recordPhysicalPosition == null){
       return null;
@@ -2469,7 +2469,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       try{
         OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
         //here find records physical position
-        OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+        OPhysicalPosition recordPhysicalPosition = getPhysicalPositionInternal(ridsPPos);
         //this means that node still not saved
         if (recordPhysicalPosition == null){          
           return null;
@@ -2491,38 +2491,38 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }    
   
-  private byte getTypeOfRecord(final long recordPos, boolean lock) throws IOException{    
-    boolean rollback = false;
-    if (lock){
-      atomicOperationsManager.acquireReadLock(this);
-    }
-    try{
-      if (lock){
-        acquireSharedLock();
-      }
-      try{
-        OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
-        //here find records physical position
-        OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
-        //this means that node still not saved    
-        return recordPhysicalPosition.recordType;
-      }
-      finally{
-        if (lock){
-          releaseSharedLock();
-        }
-      }
-    }
-    catch (Exception e){
-      rollback = true;
-      throw e;
-    }
-    finally{
-      if (lock){
-        atomicOperationsManager.releaseReadLock(this);
-      }
-    }
-  }
+//  private byte getTypeOfRecord(final long recordPos, boolean lock) throws IOException{    
+//    boolean rollback = false;
+//    if (lock){
+//      atomicOperationsManager.acquireReadLock(this);
+//    }
+//    try{
+//      if (lock){
+//        acquireSharedLock();
+//      }
+//      try{
+//        OPhysicalPosition ridsPPos = new OPhysicalPosition(recordPos);
+//        //here find records physical position
+//        OPhysicalPosition recordPhysicalPosition = getPhysicalPosition(ridsPPos);
+//        //this means that node still not saved    
+//        return recordPhysicalPosition.recordType;
+//      }
+//      finally{
+//        if (lock){
+//          releaseSharedLock();
+//        }
+//      }
+//    }
+//    catch (Exception e){
+//      rollback = true;
+//      throw e;
+//    }
+//    finally{
+//      if (lock){
+//        atomicOperationsManager.releaseReadLock(this);
+//      }
+//    }
+//  }
   
   /**
    * 
@@ -3053,13 +3053,13 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   private static void fillRestOfArrayWithDummyRids(final ORID[] array, final int lastValidIndex){
+    ORID dummy = new ORecordId(-1, -1);
     for (int i = lastValidIndex + 1; i < array.length; i++){
-      array[i] = new ORecordId(-1, -1);
+      array[i] = dummy;
     }
   }
   
   public boolean isCurrentNodeFullNodeAtomic(long pageIndex, int pagePosition, byte type) throws IOException{
-    boolean rollback = false;
     atomicOperationsManager.acquireReadLock(this);
     try{
       acquireSharedLock();
@@ -3077,7 +3077,6 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       }
     }
     catch (Exception e){
-      rollback = true;
       throw e;
     }
     finally{

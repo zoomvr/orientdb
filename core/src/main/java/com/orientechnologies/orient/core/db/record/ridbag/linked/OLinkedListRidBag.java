@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -170,7 +171,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
     RidbagMetadata info = mappedRidbagInfo.get(uuid);
     long currentRidbagNodeClusterPos = info.getCurrentNodeClusterPosition();
-    long size;
     long storedSize;
     long firstRidBagNodeClusterPos;
     
@@ -190,7 +190,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     while (addedInvalidRidsIter.hasNext()){
       info = mappedRidbagInfo.get(uuid);
       currentRidbagNodeClusterPos = info.getCurrentNodeClusterPosition();
-      size = info.getSize();
       storedSize = info.getStoredSize();
       firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();
       
@@ -206,7 +205,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
             nodesMegaMerge();
             info = mappedRidbagInfo.get(uuid);
             currentRidbagNodeClusterPos = info.getCurrentNodeClusterPosition();
-            size = info.getSize();
             storedSize = info.getStoredSize();
             firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();
           } catch (IOException exc) {
@@ -236,8 +234,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
       ++storedSize;
       addedInvalidRidsIter.remove();
-//      info = new RidbagMetadata(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size, storedSize);
-//      mappedRidbagInfo.put(uuid, info);
       info.setCurrentNode(currentRidbagNodeClusterPos);
       info.setFirstNode(firstRidBagNodeClusterPos);
       info.setStoredSize(storedSize);
@@ -256,21 +252,10 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
     synchronized(getLockObject(uuid)){
       RidbagMetadata info = mappedRidbagInfo.get(uuid);
-//      long currentRidbagNodeClusterPos = info.getCurrentNodeClusterPosition();
       long size = info.getSize();
-//      long storedSize = info.getStoredSize();
-//      long firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();
-
-//      try{
-//        analyzeFutureChangeOfFirstMegamerge(firstRidBagNodeClusterPos, size);
-//      }
-//      catch (IOException exc){
-//        throw new ODatabaseException(exc.getMessage());
-//      }
 
       ++size;            
-      
-//      info = new RidbagMetadata(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size, storedSize);
+    
       info.setSize(size);
     }
     
@@ -279,43 +264,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
                   new OMultiValueChangeEvent<>(OMultiValueChangeEvent.OChangeType.ADD, valToAdd, valToAdd, null, false));
     //TODO add it to index
   }  
-
-//  private void analyzeFutureShouldSaveRecord(long firstRidBagNodeClusterPos, long currentRidbagNodeClusterPos, long size) throws IOException{
-//    if (!shouldSaveParentRecord){
-//      shouldSaveParentRecord = analyzeFutureChangeOfFirstMoving(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos) | 
-//              analyzeFutureChangeOfFirstMegamerge(firstRidBagNodeClusterPos, size);
-//    }
-//  }
-  
-//  private boolean analyzeFutureChangeOfFirstMegamerge(final long clusterPosition, final long size) throws IOException{
-//    HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> pageIndexPagePositionType = cluster.getPageIndexAndPagePositionAndTypeOfRecord(clusterPosition, autoConvertToRecord);
-//    final long pageIndex = pageIndexPagePositionType.getFirstVal().getSecondVal();
-//    final int pagePosition = pageIndexPagePositionType.getSecondVal();
-//    final byte type = pageIndexPagePositionType.getFirstVal().getFirstVal();
-//    return analyzeFutureChangeOfFirstMegamerge(pageIndex, pagePosition, type, size);
-//  }
-//  
-//  private boolean analyzeFutureChangeOfFirstMegamerge(final long pageIndex, final int pagePosition, final byte type, final long size) throws IOException{
-//    if (size > 0 && size % MAX_RIDBAG_NODE_SIZE == 0){      
-//      if (!cluster.isMaxSizeNodeFullNode(pageIndex, pagePosition, type, MAX_RIDBAG_NODE_SIZE, true)) {
-//        return true;
-//      }
-//    }
-//    return false;
-//  }
-  
-//  private boolean analyzeFutureChangeOfFirstMoving(long firstRidBagNodeClusterPos, long currentRidbagNodeClusterPos) throws IOException{
-//    if (currentRidbagNodeClusterPos == firstRidBagNodeClusterPos){
-//      byte type = cluster.getTypeOfRecord(currentRidbagNodeClusterPos, true);
-//      if (type == RECORD_TYPE_LINKED_NODE){
-//        HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = cluster.getPageIndexAndPagePositionOfRecord(currentRidbagNodeClusterPos, true);
-//        if (cluster.isCurrentNodeFullNodeAtomic(pageIndexPagePosition.getFirstVal(), pageIndexPagePosition.getSecondVal(), type)){
-//          return true;
-//        }
-//      }
-//    }
-//    return false;
-//  }
   
   /**
    * merges all tailing node in node of maximum length. Caller should take care of counting tail rids
@@ -324,8 +272,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private void nodesMegaMerge() throws IOException{
     RidbagMetadata info = mappedRidbagInfo.get(uuid);
     long currentRidbagNodeClusterPos = info.getCurrentNodeClusterPosition();
-    long size = info.getSize();
-    long storedSize = info.getStoredSize();
     long firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();
         
     OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.nodesMegaMerge(currentRidbagNodeClusterPos, 
@@ -333,8 +279,6 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPos;
     firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;    
     
-//    info = new RidbagMetadata(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size, storedSize);
-//    mappedRidbagInfo.put(uuid, info);
     info.setCurrentNode(currentRidbagNodeClusterPos);
     info.setFirstNode(firstRidBagNodeClusterPos);
   }
@@ -379,15 +323,15 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
   @Override
   public int deserialize(byte[] stream, int offset) {
-    synchronized(getLockObject(uuid)){            
-      //find last node      
-      if (mappedRidbagInfo.containsKey(uuid)){
-        //potentionaly we can have followed situation here
-        //if T1 done serialization to stream, but still didn't persist it onto disk
-        //and at that moment T2 tries to read firstNodeInfo from disk
-        //than actual first node info can differs from on disk (deserialized) first node info
-      }
-      else{
+    if (mappedRidbagInfo.containsKey(uuid)){
+      //potentionaly we can have followed situation here
+      //if T1 done serialization to stream, but still didn't persist it onto disk
+      //and at that moment T2 tries to read firstNodeInfo from disk
+      //than actual first node info can differs from on disk (deserialized) first node info
+    }
+    else{
+      synchronized(getLockObject(uuid)){            
+        //find last node            
         long currentRidbagNodeClusterPos;
         long size;
         long storedSize;
@@ -410,7 +354,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
           OLogManager.instance().errorStorage(this, exc.getMessage(), exc);
           throw new ODatabaseException(exc.getMessage());
         }
-        
+
         RidbagMetadata info = new RidbagMetadata(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, size, storedSize);
         mappedRidbagInfo.put(uuid, info);
       }
