@@ -467,7 +467,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @throws IOException 
    */
   private void addRidToLinkedNode(final ORID rid, final long pageIndex, final int pagePosition) throws IOException{
-    addRidToLinkedNodePartialUpdate(rid, pageIndex, pagePosition);
+    addRidToLinkedNodeUpdateAtOnce(rid, pageIndex, pagePosition);
   }
   
   private int prevReadSize = 0;
