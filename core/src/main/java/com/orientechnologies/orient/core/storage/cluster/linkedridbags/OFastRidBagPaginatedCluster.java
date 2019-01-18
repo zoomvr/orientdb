@@ -92,7 +92,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   private volatile int                                   id;
   private          long                                  fileId;
   private          OStoragePaginatedClusterConfiguration config;
-  private          ORecordConflictStrategy               recordConflictStrategy;      
+  private          ORecordConflictStrategy               recordConflictStrategy;
 
   private static final class AddEntryResult {
     private final long pageIndex;
@@ -755,7 +755,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
    * @return
    * @throws IOException 
    */
-  private Long addRid(final ORID rid, final OPhysicalPosition allocatedPosition,
+  private HelperClasses.Tuple<Long, Integer> addRid(final ORID rid, final OPhysicalPosition allocatedPosition,
           final Long previousNodePosition, final Long nextNodePosition) throws IOException {
 
     //only in first node entry, besides rid entry, want to have info about currentSize, info about last added entry
@@ -793,10 +793,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     //write info about last added entry (actually this one)
     OIntegerSerializer.INSTANCE.serialize(addEntryResult.pagePosition, content, pos);
     replaceContent(addEntryResult.pageIndex, addEntryResult.pagePosition, content);                
-    return clusterPosition;      
+    return new HelperClasses.Tuple<Long, Integer>(addEntryResult.pageIndex, addEntryResult.pagePosition);      
   }
   
-  private long addRids(final ORID[] rids, final OPhysicalPosition allocatedPosition,
+  private HelperClasses.Tuple<Long, Integer> addRids(final ORID[] rids, final OPhysicalPosition allocatedPosition,
           final Long previousNodePosition, final Long nextNodePosition, int lastRealRidIndex) throws IOException {
 
     byte[] content = new byte[OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE * 2 + OLinkSerializer.RID_SIZE * rids.length];
@@ -828,7 +828,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
               atomicOperation, previousNodePosition, nextNodePosition);
     }
 
-    return clusterPosition;      
+    return new HelperClasses.Tuple<>(addEntryResult.pageIndex, addEntryResult.pagePosition);      
   }
 
   private void addAtomicOperationMetadata(ORID rid, OAtomicOperation atomicOperation) {
@@ -2453,7 +2453,8 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     return new HelperClasses.Tuple<>(recordPhysicalPosition.recordType, positionEntry.getPageIndex());
   }
   
-  public HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> getPageIndexAndPagePositionAndTypeOfRecord(final long recordPos, boolean lock) throws IOException{
+  public HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> getPageIndexAndPagePositionAndTypeOfRecord(final long recordPos, 
+          boolean lock) throws IOException{
     final OAtomicOperation atomicOperation;
     if (lock){
       atomicOperationsManager.acquireReadLock(this);
@@ -2761,6 +2762,16 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
   }
   
+  @Override
+  public OAtomicOperation startAtomicOperation(boolean trackNonTxOperations) throws IOException {
+    return super.startAtomicOperation(trackNonTxOperations);
+  }
+  
+  @Override
+  public void endAtomicOperation(boolean rollback) throws IOException {
+    super.endAtomicOperation(rollback);
+  }
+  
 //  private Long getPreviousNode(long currentNodeClusterPosition) throws IOException{
 //    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
 //    OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(currentNodeClusterPosition, 1, atomicOperation);
@@ -2894,12 +2905,16 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }    
   
   public static class MegaMergeOutput{
-    public long currentRidbagNodeClusterPos;
+    public long currentRidbagNodePageIndex;
+    public int currentRidbagNodePagePosition;
+    public byte currentRidbagNodeType;
+    public long currentRidbagNodeClusterPosition;
     public long firstRidBagNodeClusterPos;
     public boolean shouldSaveParentRecord;
   }
   
-  public MegaMergeOutput nodesMegaMerge(Long currentRidbagNodeClusterPos, long firstRidBagNodeClusterPos, final int MAX_RIDBAG_NODE_SIZE,
+  public MegaMergeOutput nodesMegaMerge(long currentRidbagNodePageIndex, int currentRidbagNodePagePosition, byte currentRidbagNodeType, 
+          long currentRidbagNodeClusterPosition, long firstRidBagNodeClusterPos, final int MAX_RIDBAG_NODE_SIZE,
           boolean shouldSaveParentRecord) throws IOException {    
     boolean rollback = false;
     startAtomicOperation(true);
@@ -2942,12 +2957,16 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         //need this flag because array node of size 600 can be allocated from another place than node mega merge
         if (foundOne){
           OPhysicalPosition megaNodeAllocatedPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE, false);
-          long megaNodeClusterPosition = addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE - 1);          
+          HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = addRids(mergedRids, megaNodeAllocatedPosition, lastNonRemovedNode, -1l, MAX_RIDBAG_NODE_SIZE - 1);          
+          long megaNodeClusterPosition = megaNodeAllocatedPosition.clusterPosition;
           //set next node of previous node
           if (lastNonRemovedNode != -1) {
             updatePrevNextNodeinfo(lastNonRemovedNode, null, megaNodeClusterPosition);
           }
-          currentRidbagNodeClusterPos = megaNodeClusterPosition;
+          currentRidbagNodePageIndex = pageIndexPagePosition.getFirstVal();
+          currentRidbagNodePagePosition = pageIndexPagePosition.getSecondVal();
+          currentRidbagNodeType = RECORD_TYPE_ARRAY_NODE;
+          currentRidbagNodeClusterPosition = megaNodeClusterPosition;
           if (removedFirstNode) {
             firstRidBagNodeClusterPos = megaNodeClusterPosition;
             shouldSaveParentRecord = true;
@@ -2955,7 +2974,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
         }
         
         MegaMergeOutput ret = new MegaMergeOutput();
-        ret.currentRidbagNodeClusterPos = currentRidbagNodeClusterPos;
+        ret.currentRidbagNodePageIndex = currentRidbagNodePageIndex;
+        ret.currentRidbagNodePagePosition = currentRidbagNodePagePosition;
+        ret.currentRidbagNodeType = currentRidbagNodeType;
+        ret.currentRidbagNodeClusterPosition = currentRidbagNodeClusterPosition;
         ret.firstRidBagNodeClusterPos = firstRidBagNodeClusterPos;
         ret.shouldSaveParentRecord = shouldSaveParentRecord;
         return ret;
@@ -2999,20 +3021,26 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             System.arraycopy(currentNodeRids, 0, newNodePreallocatedRids, 0, currentNodeRids.length);
             newNodePreallocatedRids[currentNodeRids.length] = value.getIdentity();
             fillRestOfArrayWithDummyRids(newNodePreallocatedRids, currentNodeRids.length);
-            long newNodeClusterPosition = addRids(newNodePreallocatedRids, newNodePhysicalPosition, currentRidbagNodeClusterPos,
+            HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = addRids(newNodePreallocatedRids, newNodePhysicalPosition, currentRidbagNodeClusterPos,
                     -1l, currentNodeRids.length);
-            updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
-            removeNode(currentRidbagNodeClusterPos, pageIndex, pagePosition);            
+            updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodePhysicalPosition.clusterPosition);
+            removeNode(currentRidbagNodeClusterPos, pageIndex, pagePosition);
             if (currentRidbagNodeClusterPos == firstRidBagNodeClusterPos) {
-              firstRidBagNodeClusterPos = newNodeClusterPosition;
+              firstRidBagNodeClusterPos = newNodePhysicalPosition.clusterPosition;
               shouldSaveParentRecord = true;
             }
-            currentRidbagNodeClusterPos = newNodeClusterPosition;            
+            pageIndex = pageIndexPagePosition.getFirstVal();
+            pagePosition = pageIndexPagePosition.getSecondVal();
+            currentNodeType = RECORD_TYPE_ARRAY_NODE;
+            currentRidbagNodeClusterPos = newNodePhysicalPosition.clusterPosition;
           } else if (currentNodeType == RECORD_TYPE_ARRAY_NODE) {
-            OPhysicalPosition newNodePhysicalPosition = allocatePosition(RECORD_TYPE_ARRAY_NODE, false);
-            long newNodeClusterPosition = addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
-            updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodeClusterPosition);
-            currentRidbagNodeClusterPos = newNodeClusterPosition;            
+            OPhysicalPosition newNodePhysicalPosition = allocatePosition(RECORD_TYPE_LINKED_NODE, false);
+            HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = addRid(value.getIdentity(), newNodePhysicalPosition, currentRidbagNodeClusterPos, -1l);
+            updatePrevNextNodeinfo(currentRidbagNodeClusterPos, null, newNodePhysicalPosition.clusterPosition);
+            pageIndex = pageIndexPagePosition.getFirstVal();
+            pagePosition = pageIndexPagePosition.getSecondVal();
+            currentNodeType = RECORD_TYPE_LINKED_NODE;
+            currentRidbagNodeClusterPos = newNodePhysicalPosition.clusterPosition;
           } else {
             throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
           }
@@ -3039,7 +3067,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     }
     
     MegaMergeOutput ret = new MegaMergeOutput();
-    ret.currentRidbagNodeClusterPos = currentRidbagNodeClusterPos;
+    ret.currentRidbagNodePageIndex = pageIndex;
+    ret.currentRidbagNodePagePosition = pagePosition;
+    ret.currentRidbagNodeType = currentNodeType;
+    ret.currentRidbagNodeClusterPosition = currentRidbagNodeClusterPos;
     ret.firstRidBagNodeClusterPos = firstRidBagNodeClusterPos;
     ret.shouldSaveParentRecord = shouldSaveParentRecord;
     return ret;
@@ -3106,14 +3137,14 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
                 MAX_RIDBAG_NODE_SIZE);
         final ORID[] toAllocate = new ORID[size];
         fillRestOfArrayWithDummyRids(toAllocate, -1);
-        long clusterPosition = addRids(toAllocate, allocatedPos, -1l, -1l, -1);
-        long firstRidBagNodeClusterPos;
-        long currentRidbagNodeClusterPos;
-        firstRidBagNodeClusterPos = currentRidbagNodeClusterPos = clusterPosition;        
+        HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = addRids(toAllocate, allocatedPos, -1l, -1l, -1);       
         boolean shouldSaveParentRecord = true;
         MegaMergeOutput ret = new MegaMergeOutput();
-        ret.currentRidbagNodeClusterPos = currentRidbagNodeClusterPos;
-        ret.firstRidBagNodeClusterPos = firstRidBagNodeClusterPos;
+        ret.currentRidbagNodePageIndex = pageIndexPagePosition.getFirstVal();
+        ret.currentRidbagNodePagePosition = pageIndexPagePosition.getSecondVal();
+        ret.currentRidbagNodeType = RECORD_TYPE_ARRAY_NODE;
+        ret.firstRidBagNodeClusterPos = allocatedPos.clusterPosition;
+        ret.currentRidbagNodeClusterPosition = allocatedPos.clusterPosition;
         ret.shouldSaveParentRecord = shouldSaveParentRecord;
         return ret;
       } finally {
