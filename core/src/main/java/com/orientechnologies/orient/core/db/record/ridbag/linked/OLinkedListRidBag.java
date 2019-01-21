@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -136,7 +137,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
   private List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> changeListeners;
   private ORecord owner = null;  
   
-  private boolean shouldSaveParentRecord = false;
+//  private boolean shouldSaveParentRecord = false;
   
   private final List<OIdentifiable> pendingRids = new LinkedList<>();
   private final UUID uuid;
@@ -176,7 +177,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       int currentRidbagNodePagePosition = output.currentRidbagNodePagePosition;
       byte currentRidbagNodeType = output.currentRidbagNodeType;
       long currentRidbagNodeClusterPosition = output.currentRidbagNodeClusterPosition;
-      shouldSaveParentRecord = output.shouldSaveParentRecord;
+//      shouldSaveParentRecord = output.shouldSaveParentRecord;
       if (mappedRidbagInfo.containsKey(uuid) == false){
         RidbagMetadata info  = new RidbagMetadata(firstRidBagNodeClusterPos, currentRidbagNodeClusterPosition,
                 currentRidbagNodePageIndex, currentRidbagNodePagePosition, currentRidbagNodeType, 
@@ -238,7 +239,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
         OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.addRidHighLevel(value, currentRidbagNodePageIndex, 
                 currentRidbagNodePagePosition, currentNodeType, ADDITIONAL_ALLOCATION_SIZE, MAX_RIDBAG_NODE_SIZE, 
-                currentRidbagNodeClusterPosition, firstRidBagNodeClusterPos, shouldSaveParentRecord);
+                currentRidbagNodeClusterPosition, firstRidBagNodeClusterPos);
         firstRidBagNodeClusterPos = output.firstRidBagNodeClusterPos;
         currentRidbagNodePageIndex = output.currentRidbagNodePageIndex;
         currentRidbagNodePagePosition = output.currentRidbagNodePagePosition;
@@ -299,7 +300,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     
     OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.nodesMegaMerge(currentRidbagNodePageIndex, 
             currentRidbagNodePagePosition, currentRidbagNodeType, currentRidbagNodeClusterPos, firstRidBagNodeClusterPos, 
-            MAX_RIDBAG_NODE_SIZE, shouldSaveParentRecord);
+            MAX_RIDBAG_NODE_SIZE);
     
     currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPosition;
     currentRidbagNodePageIndex = output.currentRidbagNodePageIndex;
@@ -347,8 +348,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       
       OLongSerializer.INSTANCE.serialize(firstRidBagNodeClusterPos, stream, offset);
     }
-    
-    shouldSaveParentRecord = false;
+   
     return offset + OLongSerializer.LONG_SIZE;
   }
 
