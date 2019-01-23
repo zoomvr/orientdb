@@ -2482,6 +2482,10 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     try{
       acquireSharedLock();
       try{
+        OCacheEntry cacheEntry = null;
+        OClusterPage localPage = null;
+        long prevPageIndex = -1l;
+        
         while (currentIteratingNode != null) {
           boolean fetchedNextNode = false;
           HelperClasses.Tuple<HelperClasses.Tuple<Byte, Long>, Integer> typePageIndexPagePosition = 
@@ -2489,8 +2493,14 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
           final byte type = typePageIndexPagePosition.getFirstVal().getFirstVal();
           final long pageIndex = typePageIndexPagePosition.getFirstVal().getSecondVal();
           final int pagePosition = typePageIndexPagePosition.getSecondVal();
-          OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false);
-          OClusterPage localPage = new OClusterPage(cacheEntry, false);
+          if (prevPageIndex != pageIndex){
+            if (localPage != null){
+              releasePageFromRead(atomicOperation, cacheEntry);
+            }
+            cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false);
+            localPage = new OClusterPage(cacheEntry, false);
+            prevPageIndex = pageIndex;
+          }
           try{
             if (!isMaxSizeNodeFullNode(localPage, pagePosition, type, MAX_RIDBAG_NODE_SIZE, false)) {
               foundOne = true;
@@ -2515,6 +2525,9 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
           finally{
             releasePageFromRead(atomicOperation, cacheEntry);
           }
+        }
+        if (localPage != null){
+          releasePageFromRead(atomicOperation, cacheEntry);
         }
       }
       finally{
@@ -2543,6 +2556,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
               }
               cacheEntry = loadPageForWrite(atomicOperation, fileId, nodeToRemove.nodePageIndex, false);
               localPage = new OClusterPage(cacheEntry, false);
+              prevPageIndex = nodeToRemove.nodePageIndex;
             }
             removeNode(nodeToRemove.nodeClusterPosition, localPage, nodeToRemove.nodePageIndex, 
                     nodeToRemove.nodePagePosition, nodeToRemove.nodeType,
