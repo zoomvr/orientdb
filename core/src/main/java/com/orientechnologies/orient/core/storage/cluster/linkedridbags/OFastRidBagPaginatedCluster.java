@@ -375,7 +375,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 
   @Override
   public OPhysicalPosition allocatePosition(byte recordType) throws IOException{
-    return allocatePosition(recordType, true);
+    throw new UnsupportedOperationException("Not implemented");
   }
   
   private OPhysicalPosition allocatePosition(byte recordType, boolean lock) throws IOException {
