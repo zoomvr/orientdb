@@ -1053,7 +1053,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     throw new UnsupportedOperationException("not implemented");
   }
 
-  public OPhysicalPosition getPhysicalPositionInternal(OPhysicalPosition position) throws IOException{
+  private OPhysicalPosition getPhysicalPositionInternal(OPhysicalPosition position) throws IOException{
     final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
     long clusterPosition = position.clusterPosition;
     OFastRidbagClusterPositionMapBucket.PositionEntry positionEntry = clusterPositionMap.get(clusterPosition, 1, atomicOperation);
@@ -1076,7 +1076,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       physicalPosition.recordSize = -1;
 
       physicalPosition.recordType = localPage.getRecordByteValue(recordPosition, 0);
-      physicalPosition.recordVersion = localPage.getRecordVersion(recordPosition);
+//      physicalPosition.recordVersion = localPage.getRecordVersion(recordPosition);
       physicalPosition.clusterPosition = position.clusterPosition;
 
       return physicalPosition;
@@ -2493,7 +2493,8 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
           final byte type = typePageIndexPagePosition.getFirstVal().getFirstVal();
           final long pageIndex = typePageIndexPagePosition.getFirstVal().getSecondVal();
           final int pagePosition = typePageIndexPagePosition.getSecondVal();
-          if (prevPageIndex != pageIndex){
+          //load (and release local page) only if it is different from previous
+          if (prevPageIndex != pageIndex){            
             if (localPage != null){
               releasePageFromRead(atomicOperation, cacheEntry);
             }
@@ -2526,6 +2527,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             releasePageFromRead(atomicOperation, cacheEntry);
           }
         }
+        //release last loaded page
         if (localPage != null){
           releasePageFromRead(atomicOperation, cacheEntry);
         }
