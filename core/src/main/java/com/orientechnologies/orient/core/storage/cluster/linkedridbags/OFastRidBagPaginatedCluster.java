@@ -2705,6 +2705,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
               throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
             }
           } else {            
+            //first synchronize than exit atomic operation. synchronize is needed because of findFreePage
             synchronized(getLockObject(pageIndex)){
               //release resources because we are ending current atomic operation
               //and atomic operation is ended because here we want to lock only for current page
