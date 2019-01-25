@@ -93,6 +93,19 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   private          long                                  fileId;
   private          OStoragePaginatedClusterConfiguration config;
   private          ORecordConflictStrategy               recordConflictStrategy; 
+  
+  private static Object[] lockObjects = new Object[64];
+  static {
+    for (int i = 0; i < lockObjects.length; i++){
+      lockObjects[i] = new Object();
+    }
+  }
+  
+  private final static Object getLockObject(long pageIndex){
+    int index = Long.valueOf(pageIndex % lockObjects.length).intValue();
+    index = Math.abs(index);
+    return lockObjects[index];
+  }
 
   private static final class AddEntryResult {
     private final long pageIndex;
@@ -1657,7 +1670,23 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
       OFastRidbagPaginatedClusterState freePageLists = new OFastRidbagPaginatedClusterState(pinnedStateEntry);
       do {
         pageIndex = freePageLists.getFreeListPage(freePageIndex);
+        if (pageIndex >= 0){
+          //OK here we want to do double check, because in addRidHighLevel editing node want to be outside atomic operation
+          synchronized(getLockObject(pageIndex)){            
+            OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false);
+            try{
+              OClusterPage localPage = new OClusterPage(cacheEntry, false);
+              if (!localPage.canContentFitIntoPage(contentSize)){
+                pageIndex = -pageIndex;
+              }
+            }
+            finally{
+              releasePageFromRead(atomicOperation, cacheEntry);
+            }
+          }
+        }
         freePageIndex++;
+        
       } while (pageIndex < 0 && freePageIndex < FREE_LIST_SIZE);
 
     } finally {
@@ -2641,6 +2670,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = null;
     boolean rollback = false;
     OAtomicOperation atomicOperation = startAtomicOperation(true);
+    boolean releasedResources = false;
     try {
       acquireExclusiveLock();
       try {
@@ -2674,30 +2704,53 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             } else {
               throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
             }
-          } else {
-            switch (currentNodeType) {
-              case RECORD_TYPE_LINKED_NODE:
-                addRidToLinkedNode(value.getIdentity(), localPage, pageIndex, pagePosition);
-                break;
-              case RECORD_TYPE_ARRAY_NODE:
-                addRidToArrayNodeUpdateAtOnce(value.getIdentity(), localPage, pagePosition);
-                break;
-              default:
-                throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
+          } else {            
+            synchronized(getLockObject(pageIndex)){
+              //release resources because we are ending current atomic operation
+              //and atomic operation is ended because here we want to lock only for current page
+              releasePageFromWrite(atomicOperation, cacheEntry);
+              releaseExclusiveLock();
+              endAtomicOperation(rollback);
+              releasedResources = true;
+              
+              atomicOperation = OAtomicOperationsManager.getCurrentOperation();
+              cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
+              try{
+                localPage = new OClusterPage(cacheEntry, false);
+                switch (currentNodeType) {
+                  case RECORD_TYPE_LINKED_NODE:
+                    addRidToLinkedNode(value.getIdentity(), localPage, pageIndex, pagePosition);
+                    break;
+                  case RECORD_TYPE_ARRAY_NODE:
+                    addRidToArrayNodeUpdateAtOnce(value.getIdentity(), localPage, pagePosition);
+                    break;
+                  default:
+                    throw new ODatabaseException("Invalid record type in cluster position: " + currentRidbagNodeClusterPos);
+                }
+              }
+              finally{
+                releasePageFromWrite(atomicOperation, cacheEntry);
+              }
             }
           }
         }
         finally{
-          releasePageFromWrite(atomicOperation, cacheEntry);
+          if (!releasedResources){
+            releasePageFromWrite(atomicOperation, cacheEntry);
+          }
         }
       } finally {
-        releaseExclusiveLock();
+        if (!releasedResources){
+          releaseExclusiveLock();
+        }
       }
     } catch (Exception exc) {
       rollback = true;
       throw exc;
     } finally {
-      endAtomicOperation(rollback);
+      if (!releasedResources){
+        endAtomicOperation(rollback);
+      }
     }
     
     if (isCurrentNodeFull){
