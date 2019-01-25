@@ -92,30 +92,16 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   private volatile int                                   id;
   private          long                                  fileId;
   private          OStoragePaginatedClusterConfiguration config;
-  private          ORecordConflictStrategy               recordConflictStrategy;
-  
-  private static String[] lockObjects = new String[64];
-  static{
-    for (int i = 0; i < lockObjects.length; i++){
-      lockObjects[i] = Integer.toString(i);
-    }
-  }
-  
-  private static String getLockObject(long pageIndex){
-    return lockObjects[Long.valueOf(pageIndex % lockObjects.length).intValue()];
-  }
+  private          ORecordConflictStrategy               recordConflictStrategy; 
 
   private static final class AddEntryResult {
     private final long pageIndex;
-    private final int  pagePosition;
-
-    private final int recordVersion;
+    private final int  pagePosition;    
     private final int recordsSizeDiff;
 
     AddEntryResult(long pageIndex, int pagePosition, int recordVersion, int recordsSizeDiff) {
       this.pageIndex = pageIndex;
-      this.pagePosition = pagePosition;
-      this.recordVersion = recordVersion;
+      this.pagePosition = pagePosition;      
       this.recordsSizeDiff = recordsSizeDiff;
     }
   }
@@ -943,9 +929,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
 
   @Override
   public boolean deleteRecord(long clusterPosition) throws IOException {
-    HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = getPageIndexAndPagePositionOfRecord(clusterPosition, true);
-    return deleteRecord(clusterPosition, pageIndexPagePosition.getFirstVal(),
-            pageIndexPagePosition.getSecondVal(), true);
+    throw new UnsupportedOperationException("Not supported");
   }
   
   private boolean deleteRecord(final long clusterPosition, final OClusterPage localPage, final long pageIndex,
@@ -2466,7 +2450,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     public int currentRidbagNodePagePosition;
     public byte currentRidbagNodeType;
     public long currentRidbagNodeClusterPosition;
-    public long firstRidBagNodeClusterPos;
+    public long firstRidBagNodeClusterPos;    
   }
   
   class NodeToRemove{
@@ -2486,10 +2470,18 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   public MegaMergeOutput nodesMegaMerge(long currentRidbagNodePageIndex, int currentRidbagNodePagePosition, byte currentRidbagNodeType, 
-          long currentRidbagNodeClusterPosition, long firstRidBagNodeClusterPos, final int MAX_RIDBAG_NODE_SIZE) throws IOException {    
+          long currentRidbagNodeClusterPosition, long firstRidBagNodeClusterPos, final int MAX_RIDBAG_NODE_SIZE,
+          long lastNodeMadeByMerge) throws IOException {    
+    
     final ORID[] mergedRids = new ORID[MAX_RIDBAG_NODE_SIZE];
     int currentOffset = 0;
-    Long currentIteratingNode = firstRidBagNodeClusterPos;
+    Long currentIteratingNode;
+    if (lastNodeMadeByMerge == -1){
+      currentIteratingNode = firstRidBagNodeClusterPos;
+    }
+    else{
+      currentIteratingNode = lastNodeMadeByMerge;
+    }
     boolean removedFirstNode = false;
     long lastNonRemovedNode = -1;
     HelperClasses.Tuple<Long, Integer> pageIndexPagePosition = null;
@@ -2525,7 +2517,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
             prevPageIndex = pageIndex;
           }
           try{
-            if (!isMaxSizeNodeFullNode(localPage, pagePosition, type, MAX_RIDBAG_NODE_SIZE, false)) {
+            if (!isMaxSizeNodeFullNode(localPage, pagePosition, type, MAX_RIDBAG_NODE_SIZE)) {
               foundOne = true;
               final ORID[] nodeRids = getAllRidsFromNode(localPage, pagePosition, type, false);
               System.arraycopy(nodeRids, 0, mergedRids, currentOffset, nodeRids.length);
@@ -2621,7 +2613,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
     ret.currentRidbagNodePagePosition = currentRidbagNodePagePosition;
     ret.currentRidbagNodeType = currentRidbagNodeType;
     ret.currentRidbagNodeClusterPosition = currentRidbagNodeClusterPosition;
-    ret.firstRidBagNodeClusterPos = firstRidBagNodeClusterPos;
+    ret.firstRidBagNodeClusterPos = firstRidBagNodeClusterPos;    
     return ret;
   }
   
@@ -2634,7 +2626,7 @@ public class OFastRidBagPaginatedCluster extends OPaginatedCluster{
   }
   
   private boolean isMaxSizeNodeFullNode(final OClusterPage localPage, final int pagePosition, 
-          final byte type, final int MAX_RIDBAG_NODE_SIZE, boolean lock) throws IOException{
+          final byte type, final int MAX_RIDBAG_NODE_SIZE) throws IOException{
     if (type == RECORD_TYPE_ARRAY_NODE){
       return getNodeSize(localPage, pagePosition, type) == MAX_RIDBAG_NODE_SIZE;
     }

@@ -53,9 +53,10 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     private int currentNodePagePosition;
     private byte currentNodeType;
     private long currentNodeClusterPosition;
+    private long lastNodeMadeByMerge;
     
     public RidbagMetadata(long firstNode, long currentNodeClusterPosition, long currentNodePageIndex, int currentNodePagePosition, 
-            byte currentNodeType, long size, long storedSize) {
+            byte currentNodeType, long size, long storedSize, long lastNodeMadeByMerge) {
       this.size = size;
       this.storedSize = storedSize;
       this.currentNodePageIndex = currentNodePageIndex;
@@ -63,6 +64,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       this.currentNodeType = currentNodeType;
       this.firstNode = firstNode;
       this.currentNodeClusterPosition = currentNodeClusterPosition;
+      this.lastNodeMadeByMerge = lastNodeMadeByMerge;
     }
     
     public long getSize(){
@@ -119,6 +121,14 @@ public class OLinkedListRidBag implements ORidBagDelegate{
 
     public void setCurrentNodeClusterPosition(long currentNodeClusterPosition) {
       this.currentNodeClusterPosition = currentNodeClusterPosition;
+    }
+
+    public long getLastNodeMadeByMerge() {
+      return lastNodeMadeByMerge;
+    }
+
+    public void setLastNodeMadeByMerge(long lastNodeMadeByMerge) {
+      this.lastNodeMadeByMerge = lastNodeMadeByMerge;
     }
     
   }
@@ -180,7 +190,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
       if (mappedRidbagInfo.containsKey(uuid) == false){
         RidbagMetadata info  = new RidbagMetadata(firstRidBagNodeClusterPos, currentRidbagNodeClusterPosition,
                 currentRidbagNodePageIndex, currentRidbagNodePagePosition, currentRidbagNodeType, 
-                size, storedSize);
+                size, storedSize, -1l);
         mappedRidbagInfo.put(uuid, info);
       }
     } 
@@ -296,10 +306,11 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     byte currentRidbagNodeType = info.getCurrentNodeType();
     long currentRidbagNodeClusterPos = info.getCurrentNodeClusterPosition();
     long firstRidBagNodeClusterPos = info.getFirstNodeClusterPosition();
+    long lastNodeMadeByMerge = info.getLastNodeMadeByMerge();
     
     OFastRidBagPaginatedCluster.MegaMergeOutput output = cluster.nodesMegaMerge(currentRidbagNodePageIndex, 
             currentRidbagNodePagePosition, currentRidbagNodeType, currentRidbagNodeClusterPos, firstRidBagNodeClusterPos, 
-            MAX_RIDBAG_NODE_SIZE);
+            MAX_RIDBAG_NODE_SIZE, lastNodeMadeByMerge);
     
     currentRidbagNodeClusterPos = output.currentRidbagNodeClusterPosition;
     currentRidbagNodePageIndex = output.currentRidbagNodePageIndex;
@@ -312,6 +323,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
     info.setCurrentNodePagePosition(currentRidbagNodePagePosition);
     info.setCurrentNodeType(currentRidbagNodeType);
     info.setFirstNode(firstRidBagNodeClusterPos);
+    info.setLastNodeMadeByMerge(currentRidbagNodeClusterPos);
   }
   
   @Override
@@ -389,7 +401,7 @@ public class OLinkedListRidBag implements ORidBagDelegate{
         RidbagMetadata info = new RidbagMetadata(firstRidBagNodeClusterPos, currentRidbagNodeClusterPos, 
                 typePageIndexPagePosition.getFirstVal().getFirstVal(), typePageIndexPagePosition.getSecondVal(), 
                 typePageIndexPagePosition.getFirstVal().getFirstVal(),
-                size, storedSize);
+                size, storedSize, -1l);
         mappedRidbagInfo.put(uuid, info);
         }
         catch (IOException exc){
