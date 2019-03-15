@@ -44,8 +44,6 @@ import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.storage.cache.OReadCache;
 import com.orientechnologies.orient.core.storage.cache.OWriteCache;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperationsManager;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OIndexRIDContainer;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey;
@@ -71,7 +69,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
 
-  protected static final String                    CONFIG_MAP_RID  = "mapRid";
+  static final String                    CONFIG_MAP_RID  = "mapRid";
   private static final   String                    CONFIG_CLUSTERS = "clusters";
   final                  String                    type;
   protected final        ODocument                 metadata;
@@ -113,7 +111,7 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
     }
   }
 
-  public static OIndexMetadata loadMetadataInternal(final ODocument config, final String type, final String algorithm,
+  static OIndexMetadata loadMetadataInternal(final ODocument config, final String type, final String algorithm,
       final String valueContainerAlgorithm) {
     final String indexName = config.field(OIndexInternal.CONFIG_NAME);
 
@@ -132,7 +130,6 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
     } else {
       // @COMPATIBILITY 1.0rc6 new index model was implemented
       final Boolean isAutomatic = config.field(OIndexInternal.CONFIG_AUTOMATIC);
-      OIndexFactory factory = OIndexes.getFactory(type, algorithm);
       if (Boolean.TRUE.equals(isAutomatic)) {
         final int pos = indexName.lastIndexOf('.');
         if (pos < 0)
@@ -696,7 +693,7 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
         if (op.value != null)
           removeFromSnapshot(entry.key, op.value, snapshot);
         else
-          removeFromSnapshot(entry.key, snapshot);
+          removeFromSnapshot(entry.key);
         break;
       case CLEAR:
         // SHOULD NEVER BE THE CASE HANDLE BY cleared FLAG
@@ -852,7 +849,7 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
     remove(key, value);
   }
 
-  private void removeFromSnapshot(Object key, Map<Object, Object> snapshot) {
+  private void removeFromSnapshot(Object key) {
     // storage will delay real operations till the end of tx
     remove(key);
   }
@@ -966,34 +963,18 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
 
   private void removeValuesContainer() {
     if (valueContainerAlgorithm.equals(ODefaultIndexFactory.SBTREE_BONSAI_VALUE_CONTAINER)) {
-
-      final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-
       final OReadCache readCache = storage.getReadCache();
       final OWriteCache writeCache = storage.getWriteCache();
 
-      if (atomicOperation == null) {
-        try {
-          final String fileName = getName() + OIndexRIDContainer.INDEX_FILE_EXTENSION;
-          if (writeCache.exists(fileName)) {
-            final long fileId = writeCache.loadFile(fileName);
-            readCache.deleteFile(fileId, writeCache);
-          }
-        } catch (IOException e) {
-          OLogManager.instance().error(this, "Cannot delete file for value containers", e);
+      try {
+        final String fileName = getName() + OIndexRIDContainer.INDEX_FILE_EXTENSION;
+        if (writeCache.exists(fileName)) {
+          final long fileId = writeCache.loadFile(fileName);
+          readCache.deleteFile(fileId, writeCache);
         }
-      } else {
-        try {
-          final String fileName = getName() + OIndexRIDContainer.INDEX_FILE_EXTENSION;
-          if (atomicOperation.isFileExists(fileName)) {
-            final long fileId = atomicOperation.loadFile(fileName);
-            atomicOperation.deleteFile(fileId);
-          }
-        } catch (IOException e) {
-          OLogManager.instance().error(this, "Cannot delete file for value containers", e);
-        }
+      } catch (IOException e) {
+        OLogManager.instance().error(this, "Cannot delete file for value containers", e);
       }
-
     }
   }
 
@@ -1019,10 +1000,10 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
     public boolean             clear         = false;
   }
 
-  protected static class IndexConfiguration {
+  static class IndexConfiguration {
     final ODocument document;
 
-    public IndexConfiguration(ODocument document) {
+    IndexConfiguration(ODocument document) {
       this.document = document;
     }
 

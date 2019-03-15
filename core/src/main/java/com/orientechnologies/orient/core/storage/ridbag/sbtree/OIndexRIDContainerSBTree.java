@@ -26,8 +26,6 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OCompactedLinkSerializer;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperationsManager;
 import com.orientechnologies.orient.core.storage.index.sbtree.OSBTreeMapEntryIterator;
 import com.orientechnologies.orient.core.storage.index.sbtree.OTreeInternal;
 import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OBonsaiBucketPointer;
@@ -61,18 +59,9 @@ public class OIndexRIDContainerSBTree implements Set<OIdentifiable> {
   private final OSBTreeBonsaiLocal<OIdentifiable, Boolean> tree;
 
   OIndexRIDContainerSBTree(long fileId, OAbstractPaginatedStorage storage) {
-    String fileName;
-
-    final OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-    if (atomicOperation == null) {
-      fileName = storage.getWriteCache().fileNameById(fileId);
-    } else {
-      fileName = atomicOperation.fileNameById(fileId);
-    }
-
+    String fileName = storage.getWriteCache().fileNameById(fileId);
     tree = new OSBTreeBonsaiLocal<>(fileName.substring(0, fileName.length() - INDEX_FILE_EXTENSION.length()), INDEX_FILE_EXTENSION,
         storage);
-
     try {
       tree.create(OCompactedLinkSerializer.INSTANCE, OBooleanSerializer.INSTANCE);
     } catch (IOException e) {
@@ -81,14 +70,7 @@ public class OIndexRIDContainerSBTree implements Set<OIdentifiable> {
   }
 
   public OIndexRIDContainerSBTree(long fileId, OBonsaiBucketPointer rootPointer, OAbstractPaginatedStorage storage) {
-    String fileName;
-
-    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-    if (atomicOperation == null) {
-      fileName = storage.getWriteCache().fileNameById(fileId);
-    } else {
-      fileName = atomicOperation.fileNameById(fileId);
-    }
+    String fileName = storage.getWriteCache().fileNameById(fileId);
 
     tree = new OSBTreeBonsaiLocal<>(fileName.substring(0, fileName.length() - INDEX_FILE_EXTENSION.length()), INDEX_FILE_EXTENSION,
         storage);
@@ -114,13 +96,13 @@ public class OIndexRIDContainerSBTree implements Set<OIdentifiable> {
     return o instanceof OIdentifiable && contains((OIdentifiable) o);
   }
 
-  public boolean contains(OIdentifiable o) {
+  private boolean contains(OIdentifiable o) {
     return tree.get(o) != null;
   }
 
   @Override
   public Iterator<OIdentifiable> iterator() {
-    return new TreeKeyIterator(tree, false);
+    return new TreeKeyIterator(tree);
   }
 
   @Override
@@ -156,7 +138,7 @@ public class OIndexRIDContainerSBTree implements Set<OIdentifiable> {
     return o instanceof OIdentifiable && remove((OIdentifiable) o);
   }
 
-  public boolean remove(OIdentifiable o) {
+  private boolean remove(OIdentifiable o) {
     try {
       return tree.remove(o) != null;
     } catch (IOException e) {
@@ -233,9 +215,9 @@ public class OIndexRIDContainerSBTree implements Set<OIdentifiable> {
     private final boolean                                         autoConvertToRecord;
     private final OSBTreeMapEntryIterator<OIdentifiable, Boolean> entryIterator;
 
-    TreeKeyIterator(OTreeInternal<OIdentifiable, Boolean> tree, boolean autoConvertToRecord) {
+    TreeKeyIterator(OTreeInternal<OIdentifiable, Boolean> tree) {
       entryIterator = new OSBTreeMapEntryIterator<>(tree);
-      this.autoConvertToRecord = autoConvertToRecord;
+      this.autoConvertToRecord = false;
     }
 
     @Override

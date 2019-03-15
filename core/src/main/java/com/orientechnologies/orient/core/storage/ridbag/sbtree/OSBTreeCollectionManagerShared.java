@@ -29,8 +29,6 @@ import com.orientechnologies.orient.core.db.record.ridbag.ORidBag;
 import com.orientechnologies.orient.core.exception.OAccessToSBtreeCollectionManagerIsProhibitedException;
 import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OLinkSerializer;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperationsManager;
 import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OSBTreeBonsai;
 import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OSBTreeBonsaiLocal;
 
@@ -52,7 +50,7 @@ public class OSBTreeCollectionManagerShared extends OSBTreeCollectionManagerAbst
       + "that following setting in your server configuration " + OGlobalConfiguration.RID_BAG_EMBEDDED_TO_SBTREEBONSAI_THRESHOLD
       .getKey() + " is set to " + Integer.MAX_VALUE;
 
-  private final OAbstractPaginatedStorage storage;
+  private final    OAbstractPaginatedStorage                        storage;
   private volatile ThreadLocal<Map<UUID, OBonsaiCollectionPointer>> collectionPointerChanges = new CollectionPointerChangesThreadLocal();
 
   /**
@@ -146,17 +144,10 @@ public class OSBTreeCollectionManagerShared extends OSBTreeCollectionManagerAbst
 
   @Override
   protected OSBTreeBonsai<OIdentifiable, Integer> loadTree(OBonsaiCollectionPointer collectionPointer) {
-    String fileName;
-    OAtomicOperation atomicOperation = OAtomicOperationsManager.getCurrentOperation();
-    if (atomicOperation == null) {
-      fileName = storage.getWriteCache().fileNameById(collectionPointer.getFileId());
-    } else {
-      fileName = atomicOperation.fileNameById(collectionPointer.getFileId());
-    }
+    String fileName = storage.getWriteCache().fileNameById(collectionPointer.getFileId());
 
     OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(
         fileName.substring(0, fileName.length() - DEFAULT_EXTENSION.length()), DEFAULT_EXTENSION, storage);
-
     if (tree.load(collectionPointer.getRootPointer())) {
       return tree;
     } else {

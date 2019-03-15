@@ -29,8 +29,6 @@ import com.orientechnologies.orient.core.OOrientListenerAbstract;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
-import com.orientechnologies.orient.core.storage.cache.OReadCache;
-import com.orientechnologies.orient.core.storage.cache.OWriteCache;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.OStorageTransaction;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
@@ -96,16 +94,12 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
   private final OWriteAheadLog                     writeAheadLog;
   private final OOneEntryPerKeyLockManager<String> lockManager = new OOneEntryPerKeyLockManager<>(true, -1,
       OGlobalConfiguration.COMPONENTS_LOCK_CACHE.getValueAsInteger());
-  private final OReadCache                         readCache;
-  private final OWriteCache                        writeCache;
 
   private final Map<OOperationUnitId, OPair<String, StackTraceElement[]>> activeAtomicOperations = new ConcurrentHashMap<>();
 
   public OAtomicOperationsManager(OAbstractPaginatedStorage storage) {
     this.storage = storage;
     this.writeAheadLog = storage.getWALInstance();
-    this.readCache = storage.getReadCache();
-    this.writeCache = storage.getWriteCache();
   }
 
   /**
@@ -179,7 +173,7 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
     final OOperationUnitId unitId = OOperationUnitId.generateId();
     final OLogSequenceNumber lsn = useWal ? writeAheadLog.logAtomicOperationStartRecord(true, unitId) : null;
 
-    operation = new OAtomicOperation(lsn, unitId, readCache, writeCache, storage.getId());
+    operation = new OAtomicOperation(lsn, unitId);
     currentOperation.set(operation);
 
     if (trackAtomicOperations) {
@@ -384,8 +378,8 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
         try {
           final boolean useWal = useWal();
 
-          if (!operation.isRollback()) {
-            lsn = operation.commitChanges(useWal ? writeAheadLog : null);
+          if (!operation.isRollback() && useWal && writeAheadLog != null) {
+            lsn = operation.finalizeTx(writeAheadLog);
           } else {
             lsn = null;
           }

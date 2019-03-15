@@ -27,7 +27,6 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cluster.OClusterPositionMap;
 import com.orientechnologies.orient.core.storage.cluster.OClusterPositionMapBucket;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -36,35 +35,35 @@ import java.util.Arrays;
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
  * @since 10/7/13
  */
-public final class OClusterPositionMapV1 extends OClusterPositionMap {
+final class OClusterPositionMapV1 extends OClusterPositionMap {
   private long fileId;
 
   OClusterPositionMapV1(final OAbstractPaginatedStorage storage, final String name, final String lockName, final String extension) {
     super(storage, name, extension, lockName);
   }
 
-  public void open(final OAtomicOperation atomicOperation) throws IOException {
-    fileId = openFile(atomicOperation, getFullName());
+  public void open() throws IOException {
+    fileId = openFile(getFullName());
   }
 
-  public void create(final OAtomicOperation atomicOperation) throws IOException {
-    fileId = addFile(atomicOperation, getFullName());
+  public void create() throws IOException {
+    fileId = addFile(getFullName());
 
-    if (getFilledUpTo(atomicOperation, fileId) == 0) {
-      final OCacheEntry cacheEntry = addPage(atomicOperation, fileId);
+    if (getFilledUpTo(fileId) == 0) {
+      final OCacheEntry cacheEntry = addPage(fileId);
       try {
         final MapEntryPoint mapEntryPoint = new MapEntryPoint(cacheEntry);
         mapEntryPoint.setFileSize(0);
       } finally {
-        releasePageFromWrite(atomicOperation, cacheEntry);
+        releasePageFromWrite(cacheEntry);
       }
     } else {
-      final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, 0, false, false);
+      final OCacheEntry cacheEntry = loadPageForWrite(fileId, 0, false, false);
       try {
         final MapEntryPoint mapEntryPoint = new MapEntryPoint(cacheEntry);
         mapEntryPoint.setFileSize(0);
       } finally {
-        releasePageFromWrite(atomicOperation, cacheEntry);
+        releasePageFromWrite(cacheEntry);
       }
     }
   }
@@ -77,18 +76,18 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     readCache.closeFile(fileId, flush, writeCache);
   }
 
-  public void truncate(final OAtomicOperation atomicOperation) throws IOException {
-    final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, 0, false, true);
+  public void truncate() throws IOException {
+    final OCacheEntry cacheEntry = loadPageForWrite(fileId, 0, false, true);
     try {
       final MapEntryPoint mapEntryPoint = new MapEntryPoint(cacheEntry);
       mapEntryPoint.setFileSize(0);
     } finally {
-      releasePageFromWrite(atomicOperation, cacheEntry);
+      releasePageFromWrite(cacheEntry);
     }
   }
 
-  public void delete(final OAtomicOperation atomicOperation) throws IOException {
-    deleteFile(atomicOperation, fileId);
+  public void delete() throws IOException {
+    deleteFile(fileId);
   }
 
   void rename(final String newName) throws IOException {
@@ -96,43 +95,43 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     setName(newName);
   }
 
-  public long add(final long pageIndex, final int recordPosition, final OAtomicOperation atomicOperation) throws IOException {
+  public long add(final long pageIndex, final int recordPosition) throws IOException {
     OCacheEntry cacheEntry;
     boolean clear = false;
 
-    final OCacheEntry entryPointEntry = loadPageForWrite(atomicOperation, fileId, 0, false, true);
+    final OCacheEntry entryPointEntry = loadPageForWrite(fileId, 0, false, true);
     try {
       final MapEntryPoint mapEntryPoint = new MapEntryPoint(entryPointEntry);
       final int lastPage = mapEntryPoint.getFileSize();
-      long filledUpTo = getFilledUpTo(atomicOperation, fileId);
+      long filledUpTo = getFilledUpTo(fileId);
 
       assert lastPage <= filledUpTo - 1;
 
       if (lastPage == 0) {
         if (lastPage == filledUpTo - 1) {
-          cacheEntry = addPage(atomicOperation, fileId);
+          cacheEntry = addPage(fileId);
           filledUpTo++;
         } else {
-          cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage + 1, false, false);
+          cacheEntry = loadPageForWrite(fileId, lastPage + 1, false, false);
         }
 
         mapEntryPoint.setFileSize(lastPage + 1);
         clear = true;
       } else {
-        cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage, false, true);
+        cacheEntry = loadPageForWrite(fileId, lastPage, false, true);
       }
 
       try {
         OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, clear);
         if (bucket.isFull()) {
-          releasePageFromWrite(atomicOperation, cacheEntry);
+          releasePageFromWrite(cacheEntry);
 
           assert lastPage <= filledUpTo - 1;
 
           if (lastPage == filledUpTo - 1) {
-            cacheEntry = addPage(atomicOperation, fileId);
+            cacheEntry = addPage(fileId);
           } else {
-            cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage + 1, false, false);
+            cacheEntry = loadPageForWrite(fileId, lastPage + 1, false, false);
           }
 
           mapEntryPoint.setFileSize(lastPage + 1);
@@ -143,63 +142,63 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
         final long index = bucket.add(pageIndex, recordPosition);
         return index + (cacheEntry.getPageIndex() - 1) * OClusterPositionMapBucket.MAX_ENTRIES;
       } finally {
-        releasePageFromWrite(atomicOperation, cacheEntry);
+        releasePageFromWrite(cacheEntry);
       }
     } finally {
-      releasePageFromWrite(atomicOperation, entryPointEntry);
+      releasePageFromWrite(entryPointEntry);
     }
   }
 
-  private long getLastPage(final OAtomicOperation atomicOperation) throws IOException {
+  private long getLastPage() throws IOException {
     long lastPage;
-    final OCacheEntry entryPointEntry = loadPageForRead(atomicOperation, fileId, 0, false);
+    final OCacheEntry entryPointEntry = loadPageForRead(fileId, 0, false);
     try {
       final MapEntryPoint mapEntryPoint = new MapEntryPoint(entryPointEntry);
       lastPage = mapEntryPoint.getFileSize();
     } finally {
-      releasePageFromRead(atomicOperation, entryPointEntry);
+      releasePageFromRead(entryPointEntry);
     }
     return lastPage;
   }
 
-  public long allocate(final OAtomicOperation atomicOperation) throws IOException {
+  public long allocate() throws IOException {
     OCacheEntry cacheEntry;
     boolean clear = false;
 
-    final OCacheEntry entryPointEntry = loadPageForWrite(atomicOperation, fileId, 0, false, true);
+    final OCacheEntry entryPointEntry = loadPageForWrite(fileId, 0, false, true);
     try {
       final MapEntryPoint mapEntryPoint = new MapEntryPoint(entryPointEntry);
       final int lastPage = mapEntryPoint.getFileSize();
 
-      long filledUpTo = getFilledUpTo(atomicOperation, fileId);
+      long filledUpTo = getFilledUpTo(fileId);
 
       assert lastPage <= filledUpTo - 1;
 
       if (lastPage == 0) {
         if (lastPage == filledUpTo - 1) {
-          cacheEntry = addPage(atomicOperation, fileId);
+          cacheEntry = addPage(fileId);
           filledUpTo++;
         } else {
-          cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage + 1, false, false);
+          cacheEntry = loadPageForWrite(fileId, lastPage + 1, false, false);
         }
         mapEntryPoint.setFileSize(lastPage + 1);
 
         clear = true;
       } else {
-        cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage, false, true);
+        cacheEntry = loadPageForWrite(fileId, lastPage, false, true);
       }
 
       try {
         OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, clear);
         if (bucket.isFull()) {
-          releasePageFromWrite(atomicOperation, cacheEntry);
+          releasePageFromWrite(cacheEntry);
 
           assert lastPage <= filledUpTo - 1;
 
           if (lastPage == filledUpTo - 1) {
-            cacheEntry = addPage(atomicOperation, fileId);
+            cacheEntry = addPage(fileId);
           } else {
-            cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage + 1, false, false);
+            cacheEntry = loadPageForWrite(fileId, lastPage + 1, false, false);
           }
 
           mapEntryPoint.setFileSize(lastPage + 1);
@@ -210,62 +209,59 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
         final long index = bucket.allocate();
         return index + (cacheEntry.getPageIndex() - 1) * OClusterPositionMapBucket.MAX_ENTRIES;
       } finally {
-        releasePageFromWrite(atomicOperation, cacheEntry);
+        releasePageFromWrite(cacheEntry);
       }
     } finally {
-      releasePageFromWrite(atomicOperation, entryPointEntry);
+      releasePageFromWrite(entryPointEntry);
     }
 
   }
 
-  public void update(final long clusterPosition, final OClusterPositionMapBucket.PositionEntry entry,
-      final OAtomicOperation atomicOperation) throws IOException {
+  public void update(final long clusterPosition, final OClusterPositionMapBucket.PositionEntry entry) throws IOException {
 
     final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
     final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
-    final long lastPage = getLastPage(atomicOperation);
+    final long lastPage = getLastPage();
     if (pageIndex > lastPage) {
       throw new OClusterPositionMapException(
           "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
     }
 
-    final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, true);
+    final OCacheEntry cacheEntry = loadPageForWrite(fileId, pageIndex, false, true);
     try {
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
       bucket.set(index, entry);
     } finally {
-      releasePageFromWrite(atomicOperation, cacheEntry);
+      releasePageFromWrite(cacheEntry);
     }
   }
 
-  void resurrect(final long clusterPosition, final OClusterPositionMapBucket.PositionEntry entry,
-      final OAtomicOperation atomicOperation) throws IOException {
+  void resurrect(final long clusterPosition, final OClusterPositionMapBucket.PositionEntry entry) throws IOException {
     final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
     final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
-    final long lastPage = getLastPage(atomicOperation);
+    final long lastPage = getLastPage();
 
     if (pageIndex > lastPage) {
       throw new OClusterPositionMapException(
           "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
     }
 
-    final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, true);
+    final OCacheEntry cacheEntry = loadPageForWrite(fileId, pageIndex, false, true);
     try {
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
       bucket.resurrect(index, entry);
     } finally {
-      releasePageFromWrite(atomicOperation, cacheEntry);
+      releasePageFromWrite(cacheEntry);
     }
   }
 
-  public OClusterPositionMapBucket.PositionEntry get(final long clusterPosition, int pageCount,
-      final OAtomicOperation atomicOperation) throws IOException {
+  public OClusterPositionMapBucket.PositionEntry get(final long clusterPosition, int pageCount) throws IOException {
     final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
     final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
-    final long lastPage = getLastPage(atomicOperation);
+    final long lastPage = getLastPage();
 
     if (pageIndex > lastPage) {
       return null;
@@ -273,38 +269,38 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
 
     pageCount = (int) Math.min(lastPage - pageIndex + 1, pageCount);
 
-    final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, pageCount);
+    final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false, pageCount);
     try {
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
       return bucket.get(index);
     } finally {
-      releasePageFromRead(atomicOperation, cacheEntry);
+      releasePageFromRead(cacheEntry);
     }
   }
 
-  public void remove(final long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
+  public void remove(final long clusterPosition) throws IOException {
     final long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
     final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
-    final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, true);
+    final OCacheEntry cacheEntry = loadPageForWrite(fileId, pageIndex, false, true);
     try {
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
 
       bucket.remove(index);
     } finally {
-      releasePageFromWrite(atomicOperation, cacheEntry);
+      releasePageFromWrite(cacheEntry);
     }
   }
 
-  long[] higherPositions(final long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
+  long[] higherPositions(final long clusterPosition) throws IOException {
     if (clusterPosition == Long.MAX_VALUE) {
       return OCommonConst.EMPTY_LONG_ARRAY;
     }
 
-    return ceilingPositions(clusterPosition + 1, atomicOperation);
+    return ceilingPositions(clusterPosition + 1);
   }
 
-  OClusterPositionEntry[] higherPositionsEntries(final long clusterPosition, final OAtomicOperation atomicOperation)
+  OClusterPositionEntry[] higherPositionsEntries(final long clusterPosition)
       throws IOException {
     if (clusterPosition == Long.MAX_VALUE) {
       return new OClusterPositionEntry[] {};
@@ -320,7 +316,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     long pageIndex = realPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
     int index = (int) (realPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
-    final long lastPage = getLastPage(atomicOperation);
+    final long lastPage = getLastPage();
 
     if (pageIndex > lastPage) {
       return new OClusterPositionEntry[] {};
@@ -328,13 +324,13 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
 
     OClusterPositionEntry[] result = null;
     do {
-      final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
+      final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false, 1);
 
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
       final int resultSize = bucket.getSize() - index;
 
       if (resultSize <= 0) {
-        releasePageFromRead(atomicOperation, cacheEntry);
+        releasePageFromRead(cacheEntry);
         pageIndex++;
         index = 0;
       } else {
@@ -359,7 +355,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
           result = Arrays.copyOf(result, entriesCount);
         }
 
-        releasePageFromRead(atomicOperation, cacheEntry);
+        releasePageFromRead(cacheEntry);
       }
     } while (result == null && pageIndex <= lastPage);
 
@@ -370,7 +366,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     return result;
   }
 
-  long[] ceilingPositions(long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
+  long[] ceilingPositions(long clusterPosition) throws IOException {
     if (clusterPosition < 0) {
       clusterPosition = 0;
     }
@@ -378,7 +374,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
     int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
-    final long lastPage = getLastPage(atomicOperation);
+    final long lastPage = getLastPage();
 
     if (pageIndex > lastPage) {
       return OCommonConst.EMPTY_LONG_ARRAY;
@@ -386,13 +382,13 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
 
     long[] result = null;
     do {
-      final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
+      final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false, 1);
 
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
       final int resultSize = bucket.getSize() - index;
 
       if (resultSize <= 0) {
-        releasePageFromRead(atomicOperation, cacheEntry);
+        releasePageFromRead(cacheEntry);
         pageIndex++;
         index = 0;
       } else {
@@ -415,7 +411,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
           result = Arrays.copyOf(result, entriesCount);
         }
 
-        releasePageFromRead(atomicOperation, cacheEntry);
+        releasePageFromRead(cacheEntry);
       }
     } while (result == null && pageIndex <= lastPage);
 
@@ -426,15 +422,15 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     return result;
   }
 
-  long[] lowerPositions(final long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
+  long[] lowerPositions(final long clusterPosition) throws IOException {
     if (clusterPosition == 0) {
       return OCommonConst.EMPTY_LONG_ARRAY;
     }
 
-    return floorPositions(clusterPosition - 1, atomicOperation);
+    return floorPositions(clusterPosition - 1);
   }
 
-  long[] floorPositions(final long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
+  long[] floorPositions(final long clusterPosition) throws IOException {
     if (clusterPosition < 0) {
       return OCommonConst.EMPTY_LONG_ARRAY;
     }
@@ -442,7 +438,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     long pageIndex = clusterPosition / OClusterPositionMapBucket.MAX_ENTRIES + 1;
     int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
-    final long lastPage = getLastPage(atomicOperation);
+    final long lastPage = getLastPage();
     long[] result;
 
     if (pageIndex > lastPage) {
@@ -455,7 +451,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     }
 
     do {
-      final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
+      final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false, 1);
 
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
       if (index == Integer.MIN_VALUE) {
@@ -483,7 +479,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
         result = Arrays.copyOf(result, entriesCount);
       }
 
-      releasePageFromRead(atomicOperation, cacheEntry);
+      releasePageFromRead(cacheEntry);
     } while (result == null && pageIndex >= 0);
 
     if (result == null) {
@@ -493,11 +489,11 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
     return result;
   }
 
-  long getFirstPosition(final OAtomicOperation atomicOperation) throws IOException {
-    final long lastPage = getLastPage(atomicOperation);
+  long getFirstPosition() throws IOException {
+    final long lastPage = getLastPage();
 
     for (long pageIndex = 1; pageIndex <= lastPage; pageIndex++) {
-      final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
+      final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false, 1);
       try {
         final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
         final int bucketSize = bucket.getSize();
@@ -508,38 +504,38 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
           }
         }
       } finally {
-        releasePageFromRead(atomicOperation, cacheEntry);
+        releasePageFromRead(cacheEntry);
       }
     }
 
     return ORID.CLUSTER_POS_INVALID;
   }
 
-  public byte getStatus(final long clusterPosition, final OAtomicOperation atomicOperation) throws IOException {
+  public byte getStatus(final long clusterPosition) throws IOException {
     final long pageIndex = (clusterPosition + OClusterPositionMapBucket.MAX_ENTRIES) / OClusterPositionMapBucket.MAX_ENTRIES;
     final int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
-    final long lastPage = getLastPage(atomicOperation);
+    final long lastPage = getLastPage();
     if (pageIndex > lastPage) {
       return OClusterPositionMapBucket.NOT_EXISTENT;
     }
 
-    final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
+    final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false, 1);
     try {
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
 
       return bucket.getStatus(index);
 
     } finally {
-      releasePageFromRead(atomicOperation, cacheEntry);
+      releasePageFromRead(cacheEntry);
     }
   }
 
-  public long getLastPosition(final OAtomicOperation atomicOperation) throws IOException {
-    final long lastPage = getLastPage(atomicOperation);
+  public long getLastPosition() throws IOException {
+    final long lastPage = getLastPage();
 
     for (long pageIndex = lastPage; pageIndex >= 1; pageIndex--) {
-      final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
+      final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false, 1);
       try {
         final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
         final int bucketSize = bucket.getSize();
@@ -550,7 +546,7 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
           }
         }
       } finally {
-        releasePageFromRead(atomicOperation, cacheEntry);
+        releasePageFromRead(cacheEntry);
       }
     }
 
@@ -560,15 +556,15 @@ public final class OClusterPositionMapV1 extends OClusterPositionMap {
   /**
    * Returns the next position available.
    */
-  long getNextPosition(final OAtomicOperation atomicOperation) throws IOException {
-    final long pageIndex = getLastPage(atomicOperation);
-    final OCacheEntry cacheEntry = loadPageForRead(atomicOperation, fileId, pageIndex, false, 1);
+  long getNextPosition() throws IOException {
+    final long pageIndex = getLastPage();
+    final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false, 1);
     try {
       final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry, false);
       final int bucketSize = bucket.getSize();
       return pageIndex * OClusterPositionMapBucket.MAX_ENTRIES + bucketSize;
     } finally {
-      releasePageFromRead(atomicOperation, cacheEntry);
+      releasePageFromRead(cacheEntry);
     }
   }
 

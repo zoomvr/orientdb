@@ -232,6 +232,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   }
 
   private final   OSimpleRWLockManager<ORID>     lockManager;
+  @SuppressWarnings("WeakerAccess")
   protected final OSBTreeCollectionManagerShared sbTreeCollectionManager;
 
   /**
@@ -710,7 +711,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         postDeleteSteps();
       } finally {
         stateLock.releaseWriteLock();
-        //noinspection ResultOfMethodCallIgnored
         Orient.instance().getProfiler().stopChrono("db." + name + ".drop", "Drop a database", timer, "db.*.drop");
       }
     } catch (final RuntimeException ee) {
@@ -1171,9 +1171,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       } finally {
         stateLock.releaseReadLock();
       }
-      OBackgroundDelta b = new OBackgroundDelta(this,  outputListener, sortedRids, lsn, endLsn);
 
-      return b;
+      return new OBackgroundDelta(this,  outputListener, sortedRids, lsn, endLsn);
     } catch (final RuntimeException e) {
       throw logAndPrepareForRethrow(e);
     } catch (final Error e) {
@@ -1183,6 +1182,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
+  @SuppressWarnings("WeakerAccess")
   protected void serializeDeltaContent(OutputStream stream, OCommandOutputListener outputListener, SortedSet<ORID> sortedRids,
       OLogSequenceNumber lsn) {
     try {
@@ -1199,9 +1199,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
           long exportedRecord = 1;
 
-          Iterator<ORID> ridIterator = sortedRids.iterator();
-          while (ridIterator.hasNext()) {
-            final ORID rid = ridIterator.next();
+          for (final ORID rid : sortedRids) {
             final OCluster cluster = clusters.get(rid.getClusterId());
 
             dataOutputStream.writeInt(rid.getClusterId());
@@ -3550,7 +3548,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         } finally {
           atomicOperationsManager.releaseAtomicOperations(lockId);
-          //noinspection ResultOfMethodCallIgnored
           Orient.instance().getProfiler().stopChrono("db." + name + ".synch", "Synch a database", timer, "db.*.synch");
         }
       } finally {
@@ -4007,7 +4004,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           if (db != null) {
             final OSecurityUser user = db.getUser();
             final String userString = user != null ? user.toString() : null;
-            //noinspection ResultOfMethodCallIgnored
             Orient.instance().getProfiler()
                 .stopChrono("db." + ODatabaseRecordThreadLocal.instance().get().getName() + ".command." + iCommand,
                     "Command executed against the database", beginTime, "db.*.command.*", null, userString);
@@ -4302,7 +4298,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   /**
    * Checks if the storage is open. If it's closed an exception is raised.
    */
-  @SuppressWarnings("WeakerAccess")
   protected final void checkOpenness() {
     if (status != STATUS.OPEN) {
       throw new OStorageException("Storage " + name + " is not opened.");
@@ -4429,7 +4424,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   protected void postCloseStepsAfterLock(final Map<String, Object> params) {
   }
 
-  @SuppressWarnings({ "EmptyMethod", "WeakerAccess" })
+  @SuppressWarnings({ "EmptyMethod" })
   protected Map<String, Object> preCloseSteps() {
     return new HashMap<>(2);
   }
@@ -5065,7 +5060,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       throw OException.wrapException(new OStorageException(message), e);
 
     } finally {
-      //noinspection ResultOfMethodCallIgnored
       Orient.instance().getProfiler().stopChrono("db." + name + ".close", "Close a database", timer, "db.*.close");
       stateLock.releaseWriteLock();
     }
@@ -5667,7 +5661,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         try {
           final ODurablePage durablePage = new ODurablePage(cacheEntry);
-          durablePage.restoreChanges(updatePageRecord.getChanges());
           durablePage.setLsn(updatePageRecord.getLsn());
         } finally {
           readCache.releaseFromWrite(cacheEntry, writeCache);
