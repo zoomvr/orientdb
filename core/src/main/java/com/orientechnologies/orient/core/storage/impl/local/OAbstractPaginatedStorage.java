@@ -296,6 +296,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   private final AtomicLong txCommit       = new AtomicLong(0);
   private final AtomicLong txRollback     = new AtomicLong(0);
 
+  private final AtomicInteger sessionCount  = new AtomicInteger(0);
+  private final AtomicLong    lastCloseTime = new AtomicLong(System.currentTimeMillis());
+
   public OAbstractPaginatedStorage(final String name, final String filePath, final String mode, final int id) {
     super(name, filePath, mode);
 
@@ -1058,13 +1061,13 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
    * the current moment. Deleted records are written in output stream first, then created/updated records. All records are sorted by
    * record id. Data format: <ol> <li>Amount of records (single entry) - 8 bytes</li> <li>Record's cluster id - 4 bytes</li>
    * <li>Record's cluster position - 8 bytes</li> <li>Delete flag, 1 if record is deleted - 1 byte</li> <li>Record version , only
-   * if record is not deleted - 4 bytes</li> <li>Record type, only if record is not deleted - 1 byte</li> <li>Length of binary
+   * if
+   * record is not deleted - 4 bytes</li> <li>Record type, only if record is not deleted - 1 byte</li> <li>Length of binary
    * presentation of record, only if record is not deleted - 4 bytes</li> <li>Binary presentation of the record, only if record is
    * not deleted - length of content is provided in above entity</li> </ol>
    *
-   * @param lsn    LSN from which we should find changed records
-   * @return Last LSN processed during examination of changed records, or <code>null</code> if it was impossible to find changed
-   * records: write ahead log is absent, record with start LSN was not found in WAL, etc.
+   * @param lsn LSN from which we should find changed records
+   *
    *
    * @see OGlobalConfiguration#STORAGE_TRACK_CHANGED_RECORDS_IN_WAL
    */
@@ -1171,8 +1174,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       } finally {
         stateLock.releaseReadLock();
       }
+      OBackgroundDelta b = new OBackgroundDelta(this, outputListener, sortedRids, lsn, endLsn);
 
-      return new OBackgroundDelta(this,  outputListener, sortedRids, lsn, endLsn);
+      return b;
     } catch (final RuntimeException e) {
       throw logAndPrepareForRethrow(e);
     } catch (final Error e) {
@@ -4958,6 +4962,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
   private void doClose(final boolean force, final boolean onDelete) {
     if (!force && !onDelete) {
+      decOnClose();
       return;
     }
 
@@ -6345,5 +6350,22 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         walVacuumInProgress.set(false);
       }
     }
+  }
+
+  public void incOnOpen() {
+    sessionCount.incrementAndGet();
+  }
+
+  public void decOnClose() {
+    lastCloseTime.set(System.currentTimeMillis());
+    sessionCount.decrementAndGet();
+  }
+
+  public int getSessionCount() {
+    return sessionCount.get();
+  }
+
+  public long getLastCloseTime() {
+    return lastCloseTime.get();
   }
 }

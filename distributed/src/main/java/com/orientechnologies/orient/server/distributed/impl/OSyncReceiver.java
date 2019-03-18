@@ -10,7 +10,10 @@ import com.orientechnologies.orient.server.distributed.ODistributedResponse;
 import com.orientechnologies.orient.server.distributed.ODistributedServerLog;
 import com.orientechnologies.orient.server.distributed.impl.task.OCopyDatabaseChunkTask;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -55,15 +58,21 @@ public class OSyncReceiver implements Runnable {
               new OCopyDatabaseChunkTask(chunk.filePath, chunkNum, chunk.offset + chunk.buffer.length, false),
               distributed.getNextMessageIdCounter(), ODistributedRequest.EXECUTION_MODE.RESPONSE, null, null, null);
 
-          final Object result = response.getPayload();
-          if (result instanceof Boolean)
-            continue;
-          else if (result instanceof Exception) {
-            ODistributedServerLog.error(this, distributed.nodeName, iNode, ODistributedServerLog.DIRECTION.IN,
-                "error on installing database %s in %s (chunk #%d)", (Exception) result, databaseName, dbPath, chunkNum);
-          } else if (result instanceof ODistributedDatabaseChunk) {
-            chunk = (ODistributedDatabaseChunk) result;
-            fileSize += writeDatabaseChunk(chunkNum, chunk, output);
+          if (response == null) {
+            output.close();
+            done.countDown();
+            return;
+          } else {
+            final Object result = response.getPayload();
+            if (result instanceof Boolean)
+              continue;
+            else if (result instanceof Exception) {
+              ODistributedServerLog.error(this, distributed.nodeName, iNode, ODistributedServerLog.DIRECTION.IN,
+                  "error on installing database %s in %s (chunk #%d)", (Exception) result, databaseName, dbPath, chunkNum);
+            } else if (result instanceof ODistributedDatabaseChunk) {
+              chunk = (ODistributedDatabaseChunk) result;
+              fileSize += writeDatabaseChunk(chunkNum, chunk, output);
+            }
           }
         }
 
