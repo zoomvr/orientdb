@@ -17,7 +17,7 @@ public class OCacheEntryChanges implements OCacheEntry {
 
   private OLogSequenceNumber changeLSN;
 
-  boolean verifyCheckSum;
+  private boolean verifyCheckSum;
 
   public OCacheEntryChanges(final OCacheEntry entry) {
     delegate = entry;

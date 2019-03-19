@@ -1171,9 +1171,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       } finally {
         stateLock.releaseReadLock();
       }
-      OBackgroundDelta b = new OBackgroundDelta(this, outputListener, sortedRids, lsn, endLsn);
 
-      return b;
+      return new OBackgroundDelta(this, outputListener, sortedRids, lsn, endLsn);
     } catch (final RuntimeException e) {
       throw logAndPrepareForRethrow(e);
     } catch (final Error e) {
@@ -4160,7 +4159,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  public final void acquireWriteLock(final ORID rid) {
+  private void acquireWriteLock(final ORID rid) {
     if (!modificationLock) {
       throw new ODatabaseException(
           "Record write locks are off by configuration, set the configuration \"storage.pessimisticLock\" to \""
@@ -4190,7 +4189,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  public final void acquireReadLock(final ORID rid) {
+  private void acquireReadLock(final ORID rid) {
     if (!readLock) {
       throw new ODatabaseException(
           "Record read locks are off by configuration, set the configuration \"storage.pessimisticLock\" to \""
@@ -4299,7 +4298,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   /**
    * Checks if the storage is open. If it's closed an exception is raised.
    */
-  protected final void checkOpenness() {
+  private void checkOpenness() {
     if (status != STATUS.OPEN) {
       throw new OStorageException("Storage " + name + " is not opened.");
     }
@@ -6315,7 +6314,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     sessionCount.incrementAndGet();
   }
 
-  public void decOnClose() {
+  private void decOnClose() {
     lastCloseTime.set(System.currentTimeMillis());
     sessionCount.decrementAndGet();
   }

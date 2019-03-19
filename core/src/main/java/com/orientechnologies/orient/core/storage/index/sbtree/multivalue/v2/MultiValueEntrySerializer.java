@@ -7,8 +7,8 @@ import com.orientechnologies.common.serialization.types.OShortSerializer;
 import java.nio.ByteBuffer;
 
 public class MultiValueEntrySerializer implements OBinarySerializer<OMultiValueEntry> {
-  public static final int                       ID       = 27;
-  public static final MultiValueEntrySerializer INSTANCE = new MultiValueEntrySerializer();
+  private static final int                       ID       = 27;
+  public static final  MultiValueEntrySerializer INSTANCE = new MultiValueEntrySerializer();
 
   @Override
   public int getObjectSize(final OMultiValueEntry object, final Object... hints) {
