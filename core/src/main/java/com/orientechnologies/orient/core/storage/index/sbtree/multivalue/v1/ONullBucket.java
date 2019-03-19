@@ -24,7 +24,7 @@ import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.common.serialization.types.OShortSerializer;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 import java.util.ArrayList;
@@ -51,7 +51,7 @@ final class ONullBucket extends ODurablePage {
   private static final int RIDS_SIZE_OFFSET = NEXT_OFFSET + OIntegerSerializer.INT_SIZE;
   private static final int RIDS_OFFSET      = RIDS_SIZE_OFFSET + OIntegerSerializer.INT_SIZE;
 
-  ONullBucket(final OCacheEntry cacheEntry, final boolean isNew) {
+  ONullBucket(final OCacheEntryImpl cacheEntry, final boolean isNew) {
     super(cacheEntry);
 
     if (isNew) {

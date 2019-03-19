@@ -20,10 +20,8 @@
 
 package com.orientechnologies.orient.core.storage.index.sbtreebonsai.local;
 
-import java.io.IOException;
-
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 /**
@@ -37,8 +35,8 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODura
  * 
  * @author Artem Orobets (enisher-at-gmail.com)
  */
-public class OBonsaiBucketAbstract extends ODurablePage {
-  public OBonsaiBucketAbstract(OCacheEntry cacheEntry) {
+class OBonsaiBucketAbstract extends ODurablePage {
+  OBonsaiBucketAbstract(OCacheEntryImpl cacheEntry) {
     super(cacheEntry);
   }
 
@@ -49,9 +47,8 @@ public class OBonsaiBucketAbstract extends ODurablePage {
    *          where to write
    * @param value
    *          - pointer to write
-   * @throws IOException
    */
-  protected void setBucketPointer(int pageOffset, OBonsaiBucketPointer value) throws IOException {
+  void setBucketPointer(int pageOffset, OBonsaiBucketPointer value) {
     setLongValue(pageOffset, value.getPageIndex());
     setIntValue(pageOffset + OLongSerializer.LONG_SIZE, value.getPageOffset());
   }
@@ -63,7 +60,7 @@ public class OBonsaiBucketAbstract extends ODurablePage {
    *          where the pointer should be read from
    * @return bucket pointer
    */
-  protected OBonsaiBucketPointer getBucketPointer(int offset) {
+  OBonsaiBucketPointer getBucketPointer(int offset) {
     final long pageIndex = getLongValue(offset);
     final int pageOffset = getIntValue(offset + OLongSerializer.LONG_SIZE);
     return new OBonsaiBucketPointer(pageIndex, pageOffset);

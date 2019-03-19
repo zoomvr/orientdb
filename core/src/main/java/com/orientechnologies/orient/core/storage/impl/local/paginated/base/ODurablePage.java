@@ -26,7 +26,7 @@ import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.common.serialization.types.OShortSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 
@@ -61,11 +61,11 @@ public class ODurablePage {
 
   public static final int NEXT_FREE_POSITION = WAL_POSITION_OFFSET + OLongSerializer.LONG_SIZE;
 
-  private final OCacheEntry cacheEntry;
+  private final OCacheEntryImpl cacheEntry;
 
   private final OCachePointer pointer;
 
-  public ODurablePage(final OCacheEntry cacheEntry) {
+  protected ODurablePage(final OCacheEntryImpl cacheEntry) {
     assert cacheEntry != null;
 
     this.cacheEntry = cacheEntry;

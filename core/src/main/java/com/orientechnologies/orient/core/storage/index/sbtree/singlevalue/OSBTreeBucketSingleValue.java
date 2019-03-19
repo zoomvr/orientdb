@@ -30,7 +30,7 @@ import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 import java.util.ArrayList;
@@ -63,7 +63,7 @@ final class OSBTreeBucketSingleValue<K> extends ODurablePage {
 
   private final OEncryption encryption;
 
-  OSBTreeBucketSingleValue(final OCacheEntry cacheEntry, final boolean isLeaf, final OBinarySerializer<K> keySerializer,
+  OSBTreeBucketSingleValue(final OCacheEntryImpl cacheEntry, final boolean isLeaf, final OBinarySerializer<K> keySerializer,
       final OType[] keyTypes, final OEncryption encryption) {
     super(cacheEntry);
 
@@ -80,7 +80,7 @@ final class OSBTreeBucketSingleValue<K> extends ODurablePage {
     setLongValue(RIGHT_SIBLING_OFFSET, -1);
   }
 
-  OSBTreeBucketSingleValue(final OCacheEntry cacheEntry, final OBinarySerializer<K> keySerializer, final OType[] keyTypes,
+  OSBTreeBucketSingleValue(final OCacheEntryImpl cacheEntry, final OBinarySerializer<K> keySerializer, final OType[] keyTypes,
       final OEncryption encryption) {
     super(cacheEntry);
     this.keyTypes = keyTypes;

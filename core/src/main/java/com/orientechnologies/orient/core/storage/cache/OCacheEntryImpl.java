@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Created by tglman on 23/06/16.
  */
-public class OCacheEntryImpl implements OCacheEntry {
+public final class OCacheEntryImpl {
   private static final int FROZEN = -1;
   private static final int DEAD   = -2;
 
@@ -19,8 +19,8 @@ public class OCacheEntryImpl implements OCacheEntry {
   private final AtomicInteger usagesCount = new AtomicInteger();
   private final AtomicInteger state       = new AtomicInteger();
 
-  private OCacheEntry next;
-  private OCacheEntry prev;
+  private OCacheEntryImpl next;
+  private OCacheEntryImpl prev;
 
   private LRUList container;
 
@@ -31,57 +31,46 @@ public class OCacheEntryImpl implements OCacheEntry {
     this.dataPointer = dataPointer;
   }
 
-  @Override
   public OCachePointer getCachePointer() {
     return dataPointer;
   }
 
-  @Override
   public void clearCachePointer() {
     dataPointer = null;
   }
 
-  @Override
   public void setCachePointer(final OCachePointer cachePointer) {
     this.dataPointer = cachePointer;
   }
 
-  @Override
   public long getFileId() {
     return fileId;
   }
 
-  @Override
   public long getPageIndex() {
     return pageIndex;
   }
 
-  @Override
   public void acquireExclusiveLock() {
     dataPointer.acquireExclusiveLock();
   }
 
-  @Override
   public void releaseExclusiveLock() {
     dataPointer.releaseExclusiveLock();
   }
 
-  @Override
   public void acquireSharedLock() {
     dataPointer.acquireSharedLock();
   }
 
-  @Override
   public void releaseSharedLock() {
     dataPointer.releaseSharedLock();
   }
 
-  @Override
   public int getUsagesCount() {
     return usagesCount.get();
   }
 
-  @Override
   public void incrementUsages() {
     usagesCount.incrementAndGet();
   }
@@ -91,27 +80,23 @@ public class OCacheEntryImpl implements OCacheEntry {
    *
    * @return Whether lock acquired on current entry
    */
-  @Override
+  @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   public boolean isLockAcquiredByCurrentThread() {
     return dataPointer.isLockAcquiredByCurrentThread();
   }
 
-  @Override
   public void decrementUsages() {
     usagesCount.decrementAndGet();
   }
 
-  @Override
   public OLogSequenceNumber getEndLSN() {
     return dataPointer.getEndLSN();
   }
 
-  @Override
   public void setEndLSN(final OLogSequenceNumber endLSN) {
     dataPointer.setEndLSN(endLSN);
   }
 
-  @Override
   public boolean acquireEntry() {
     int state = this.state.get();
 
@@ -126,7 +111,6 @@ public class OCacheEntryImpl implements OCacheEntry {
     return false;
   }
 
-  @Override
   public void releaseEntry() {
     int state = this.state.get();
 
@@ -143,17 +127,14 @@ public class OCacheEntryImpl implements OCacheEntry {
     }
   }
 
-  @Override
   public boolean isReleased() {
     return state.get() == 0;
   }
 
-  @Override
   public boolean isAlive() {
     return state.get() >= 0;
   }
 
-  @Override
   public boolean freeze() {
     int state = this.state.get();
     while (state == 0) {
@@ -167,12 +148,10 @@ public class OCacheEntryImpl implements OCacheEntry {
     return false;
   }
 
-  @Override
   public boolean isFrozen() {
     return this.state.get() == FROZEN;
   }
 
-  @Override
   public void makeDead() {
     int state = this.state.get();
 
@@ -187,37 +166,30 @@ public class OCacheEntryImpl implements OCacheEntry {
     throw new IllegalStateException("Cache entry " + fileId + ":" + pageIndex + " has invalid state " + state);
   }
 
-  @Override
   public boolean isDead() {
     return this.state.get() == DEAD;
   }
 
-  @Override
-  public OCacheEntry getNext() {
+  public OCacheEntryImpl getNext() {
     return next;
   }
 
-  @Override
-  public OCacheEntry getPrev() {
+  public OCacheEntryImpl getPrev() {
     return prev;
   }
 
-  @Override
-  public void setPrev(final OCacheEntry prev) {
+  public void setPrev(final OCacheEntryImpl prev) {
     this.prev = prev;
   }
 
-  @Override
-  public void setNext(final OCacheEntry next) {
+  public void setNext(final OCacheEntryImpl next) {
     this.next = next;
   }
 
-  @Override
   public void setContainer(final LRUList lruList) {
     this.container = lruList;
   }
 
-  @Override
   public LRUList getContainer() {
     return container;
   }

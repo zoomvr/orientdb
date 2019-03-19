@@ -20,11 +20,9 @@
 
 package com.orientechnologies.orient.core.storage.index.sbtree.local;
 
-import java.io.IOException;
-
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 /**
@@ -53,7 +51,7 @@ public class OSBTreeValuePage extends ODurablePage {
 
   public static final int  MAX_BINARY_VALUE_SIZE      = MAX_PAGE_SIZE_BYTES - BINARY_CONTENT_OFFSET;
 
-  public OSBTreeValuePage(OCacheEntry cacheEntry, boolean isNew) throws IOException {
+  public OSBTreeValuePage(OCacheEntryImpl cacheEntry, boolean isNew) {
     super(cacheEntry);
 
     if (isNew) {
@@ -63,7 +61,7 @@ public class OSBTreeValuePage extends ODurablePage {
 
   }
 
-  public void setNextPage(long nextPage) throws IOException {
+  public void setNextPage(long nextPage) {
     setLongValue(NEXT_VALUE_PAGE_OFFSET, nextPage);
   }
 
@@ -71,7 +69,7 @@ public class OSBTreeValuePage extends ODurablePage {
     return getIntValue(WHOLE_VALUE_SIZE_OFFSET);
   }
 
-  public int fillBinaryContent(byte[] data, int offset) throws IOException {
+  public int fillBinaryContent(byte[] data, int offset) {
     setIntValue(WHOLE_VALUE_SIZE_OFFSET, data.length);
 
     int maxSize = Math.min(data.length - offset, MAX_BINARY_VALUE_SIZE);
@@ -86,7 +84,7 @@ public class OSBTreeValuePage extends ODurablePage {
     return offset + maxSize;
   }
 
-  public int readBinaryContent(byte[] data, int offset) throws IOException {
+  public int readBinaryContent(byte[] data, int offset) {
     int valueSize = getIntValue(PAGE_VALUE_SIZE_OFFSET);
     byte[] content = getBinaryValue(BINARY_CONTENT_OFFSET, valueSize);
 
@@ -99,7 +97,7 @@ public class OSBTreeValuePage extends ODurablePage {
     return getLongValue(NEXT_VALUE_PAGE_OFFSET);
   }
 
-  public void setNextFreeListPage(long pageIndex) throws IOException {
+  public void setNextFreeListPage(long pageIndex) {
     setLongValue(FREE_LIST_NEXT_PAGE_OFFSET, pageIndex);
   }
 

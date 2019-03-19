@@ -20,20 +20,18 @@
 
 package com.orientechnologies.orient.core.storage.index.hashindex.local;
 
-import java.io.IOException;
-
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
  * @since 4/25/14
  */
-public class ONullBucket<V> extends ODurablePage {
+class ONullBucket<V> extends ODurablePage {
   private final OBinarySerializer<V> valueSerializer;
 
-  public ONullBucket(OCacheEntry cacheEntry, OBinarySerializer<V> valueSerializer, boolean isNew) {
+  public ONullBucket(OCacheEntryImpl cacheEntry, OBinarySerializer<V> valueSerializer, boolean isNew) {
     super(cacheEntry);
     this.valueSerializer = valueSerializer;
 
@@ -41,7 +39,7 @@ public class ONullBucket<V> extends ODurablePage {
       setByteValue(NEXT_FREE_POSITION, (byte) 0);
   }
 
-  public void setValue(V value) throws IOException {
+  public void setValue(V value) {
     setByteValue(NEXT_FREE_POSITION, (byte) 1);
 
     final int valueSize = valueSerializer.getObjectSize(value);

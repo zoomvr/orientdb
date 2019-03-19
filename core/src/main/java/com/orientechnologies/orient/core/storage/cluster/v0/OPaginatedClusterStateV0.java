@@ -21,19 +21,19 @@
 package com.orientechnologies.orient.core.storage.cluster.v0;
 
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
  * @since 20.08.13
  */
-public class OPaginatedClusterStateV0 extends ODurablePage {
+class OPaginatedClusterStateV0 extends ODurablePage {
   private static final int RECORDS_SIZE_OFFSET = NEXT_FREE_POSITION;
   private static final int SIZE_OFFSET         = RECORDS_SIZE_OFFSET + OLongSerializer.LONG_SIZE;
   private static final int FREE_LIST_OFFSET    = SIZE_OFFSET + OLongSerializer.LONG_SIZE;
 
-  public OPaginatedClusterStateV0(OCacheEntry cacheEntry) {
+  public OPaginatedClusterStateV0(OCacheEntryImpl cacheEntry) {
     super(cacheEntry);
   }
 

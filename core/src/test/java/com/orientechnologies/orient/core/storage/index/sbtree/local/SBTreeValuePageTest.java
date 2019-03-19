@@ -2,7 +2,6 @@ package com.orientechnologies.orient.core.storage.index.sbtree.local;
 
 import com.orientechnologies.common.directmemory.OByteBufferPool;
 import com.orientechnologies.common.directmemory.OPointer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
@@ -25,7 +24,7 @@ public class SBTreeValuePageTest {
     OCachePointer cachePointerOne = new OCachePointer(pointerOne, bufferPool, 0, 0);
     cachePointerOne.incrementReferrer();
 
-    OCacheEntry cacheEntryOne = new OCacheEntryImpl(0, 0, cachePointerOne);
+    OCacheEntryImpl cacheEntryOne = new OCacheEntryImpl(0, 0, cachePointerOne);
     cacheEntryOne.acquireExclusiveLock();
     OSBTreeValuePage valuePageOne = new OSBTreeValuePage(cacheEntryOne, true);
 
@@ -40,7 +39,7 @@ public class SBTreeValuePageTest {
     OCachePointer cachePointerTwo = new OCachePointer(pointerTwo, bufferPool, 0, 0);
     cachePointerTwo.incrementReferrer();
 
-    OCacheEntry cacheEntryTwo = new OCacheEntryImpl(0, 0, cachePointerTwo);
+    OCacheEntryImpl cacheEntryTwo = new OCacheEntryImpl(0, 0, cachePointerTwo);
     cacheEntryTwo.acquireExclusiveLock();
 
     OSBTreeValuePage valuePageTwo = new OSBTreeValuePage(cacheEntryTwo, true);
@@ -75,7 +74,7 @@ public class SBTreeValuePageTest {
     OCachePointer cachePointer = new OCachePointer(pointer, bufferPool, 0, 0);
     cachePointer.incrementReferrer();
 
-    OCacheEntry cacheEntry = new OCacheEntryImpl(0, 0, cachePointer);
+    OCacheEntryImpl cacheEntry = new OCacheEntryImpl(0, 0, cachePointer);
     cacheEntry.acquireExclusiveLock();
 
     OSBTreeValuePage valuePage = new OSBTreeValuePage(cacheEntry, true);

@@ -22,9 +22,7 @@ package com.orientechnologies.orient.core.storage.index.hashindex.local;
 
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
-
-import java.io.IOException;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -39,11 +37,11 @@ public class ODirectoryFirstPage extends ODirectoryPage {
   public static final int  NODES_PER_PAGE   = (OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024 - ITEMS_OFFSET)
                                                 / OHashTableDirectory.BINARY_LEVEL_SIZE;
 
-  public ODirectoryFirstPage(OCacheEntry cacheEntry, OCacheEntry entry) {
+  public ODirectoryFirstPage(OCacheEntryImpl cacheEntry, OCacheEntryImpl entry) {
     super(cacheEntry, entry);
   }
 
-  public void setTreeSize(int treeSize) throws IOException {
+  public void setTreeSize(int treeSize) {
     setIntValue(TREE_SIZE_OFFSET, treeSize);
   }
 
@@ -51,7 +49,7 @@ public class ODirectoryFirstPage extends ODirectoryPage {
     return getIntValue(TREE_SIZE_OFFSET);
   }
 
-  public void setTombstone(int tombstone) throws IOException {
+  public void setTombstone(int tombstone) {
     setIntValue(TOMBSTONE_OFFSET, tombstone);
   }
 

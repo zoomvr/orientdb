@@ -20,10 +20,8 @@
 package com.orientechnologies.orient.core.storage.index.sbtree.local;
 
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
-
-import java.io.IOException;
 
 /**
  * 
@@ -41,7 +39,7 @@ import java.io.IOException;
 public class ONullBucket<V> extends ODurablePage {
   private final OBinarySerializer<V> valueSerializer;
 
-  public ONullBucket(OCacheEntry cacheEntry, OBinarySerializer<V> valueSerializer, boolean isNew) {
+  public ONullBucket(OCacheEntryImpl cacheEntry, OBinarySerializer<V> valueSerializer, boolean isNew) {
     super(cacheEntry);
     this.valueSerializer = valueSerializer;
 
@@ -49,7 +47,7 @@ public class ONullBucket<V> extends ODurablePage {
       setByteValue(NEXT_FREE_POSITION, (byte) 0);
   }
 
-  public void setValue(OSBTreeValue<V> value) throws IOException {
+  public void setValue(OSBTreeValue<V> value) {
     setByteValue(NEXT_FREE_POSITION, (byte) 1);
 
     if (value.isLink()) {
@@ -72,9 +70,9 @@ public class ONullBucket<V> extends ODurablePage {
 
     final boolean isLink = getByteValue(NEXT_FREE_POSITION + 1) == 0;
     if (isLink)
-      return new OSBTreeValue<V>(true, getLongValue(NEXT_FREE_POSITION + 2), null);
+      return new OSBTreeValue<>(true, getLongValue(NEXT_FREE_POSITION + 2), null);
 
-    return new OSBTreeValue<V>(false, -1, deserializeFromDirectMemory(valueSerializer, NEXT_FREE_POSITION + 2));
+    return new OSBTreeValue<>(false, -1, deserializeFromDirectMemory(valueSerializer, NEXT_FREE_POSITION + 2));
   }
 
   public void removeValue() {

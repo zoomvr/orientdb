@@ -27,10 +27,9 @@ import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
-import java.io.IOException;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -48,7 +47,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
   private static final int NEXT_REMOVED_BUCKET_OFFSET = HISTORY_OFFSET + OLongSerializer.LONG_SIZE * 64;
   private static final int POSITIONS_ARRAY_OFFSET     = NEXT_REMOVED_BUCKET_OFFSET + OLongSerializer.LONG_SIZE;
 
-  public static final int MAX_BUCKET_SIZE_BYTES = OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024;
+  private static final int MAX_BUCKET_SIZE_BYTES = OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024;
 
   private final OBinarySerializer<K> keySerializer;
   private final OBinarySerializer<V> valueSerializer;
@@ -56,8 +55,8 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
   private final Comparator           keyComparator = ODefaultComparator.INSTANCE;
   private final OEncryption          encryption;
 
-  public OHashIndexBucket(int depth, OCacheEntry cacheEntry, OBinarySerializer<K> keySerializer,
-      OBinarySerializer<V> valueSerializer, OType[] keyTypes, OEncryption encryption) throws IOException {
+  public OHashIndexBucket(int depth, OCacheEntryImpl cacheEntry, OBinarySerializer<K> keySerializer,
+      OBinarySerializer<V> valueSerializer, OType[] keyTypes, OEncryption encryption) {
     super(cacheEntry);
 
     this.keySerializer = keySerializer;
@@ -68,7 +67,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     init(depth);
   }
 
-  public OHashIndexBucket(OCacheEntry cacheEntry, OBinarySerializer<K> keySerializer, OBinarySerializer<V> valueSerializer,
+  public OHashIndexBucket(OCacheEntryImpl cacheEntry, OBinarySerializer<K> keySerializer, OBinarySerializer<V> valueSerializer,
       OType[] keyTypes, OEncryption encryption) {
     super(cacheEntry);
 
@@ -78,7 +77,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     this.encryption = encryption;
   }
 
-  public void init(int depth) throws IOException {
+  public void init(int depth) {
     setByteValue(DEPTH_OFFSET, (byte) depth);
     setIntValue(FREE_POINTER_OFFSET, MAX_BUCKET_SIZE_BYTES);
     setIntValue(SIZE_OFFSET, 0);
@@ -107,6 +106,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
         cmp = 1;
       else {
         final K midVal = getKey(mid);
+        //noinspection unchecked
         cmp = keyComparator.compare(midVal, key);
       }
 
@@ -152,7 +152,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     }
 
     final V value = deserializeFromDirectMemory(valueSerializer, entryPosition);
-    return new Entry<K, V>(key, value, hashCode);
+    return new Entry<>(key, value, hashCode);
   }
 
   /**
@@ -179,7 +179,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     return deserializeFromDirectMemory(valueSerializer, entryPosition);
   }
 
-  public long getHashCode(int index) {
+  private long getHashCode(int index) {
     int entryPosition = getIntValue(POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE);
     return getLongValue(entryPosition);
   }
@@ -225,7 +225,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
         FREE_POINTER_OFFSET));
   }
 
-  public int updateEntry(int index, V value) throws IOException {
+  public int updateEntry(int index, V value) {
     int entryPosition = getIntValue(POSITIONS_ARRAY_OFFSET + index * OIntegerSerializer.INT_SIZE);
     entryPosition += OLongSerializer.LONG_SIZE;
 
@@ -253,7 +253,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     return 1;
   }
 
-  public Entry<K, V> deleteEntry(int index) throws IOException {
+  public Entry<K, V> deleteEntry(int index) {
     final Entry<K, V> removedEntry = getEntry(index);
 
     final int freePointer = getIntValue(FREE_POINTER_OFFSET);
@@ -293,7 +293,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     return removedEntry;
   }
 
-  public boolean addEntry(long hashCode, K key, V value) throws IOException {
+  public boolean addEntry(long hashCode, K key, V value) {
     int entreeSize;
 
     byte[] encryptedKey = null;
@@ -326,8 +326,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     return true;
   }
 
-  private void insertEntry(long hashCode, K key, V value, int insertionPoint, int entreeSize, byte[] encryptedKey)
-      throws IOException {
+  private void insertEntry(long hashCode, K key, V value, int insertionPoint, int entreeSize, byte[] encryptedKey) {
     int freePointer = getIntValue(FREE_POINTER_OFFSET);
     int size = size();
 
@@ -344,7 +343,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     setIntValue(SIZE_OFFSET, size + 1);
   }
 
-  public void appendEntry(long hashCode, K key, V value) throws IOException {
+  public void appendEntry(long hashCode, K key, V value) {
     final int positionsOffset = size() * OIntegerSerializer.INT_SIZE + POSITIONS_ARRAY_OFFSET;
     final int entreeSize;
     byte[] encryptedKey = null;
@@ -371,7 +370,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     setIntValue(SIZE_OFFSET, size() + 1);
   }
 
-  private void serializeEntry(long hashCode, K key, V value, int entryOffset, byte[] encryptedKey) throws IOException {
+  private void serializeEntry(long hashCode, K key, V value, int entryOffset, byte[] encryptedKey) {
     setLongValue(entryOffset, hashCode);
     entryOffset += OLongSerializer.LONG_SIZE;
 
@@ -409,7 +408,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     return getLongValue(NEXT_REMOVED_BUCKET_OFFSET);
   }
 
-  public void setNextRemovedBucketPair(long nextRemovedBucketPair) throws IOException {
+  public void setNextRemovedBucketPair(long nextRemovedBucketPair) {
     setLongValue(NEXT_REMOVED_BUCKET_OFFSET, nextRemovedBucketPair);
   }
 
@@ -417,7 +416,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     return getLongValue(HISTORY_OFFSET + OLongSerializer.LONG_SIZE * level);
   }
 
-  public void setSplitHistory(int level, long position) throws IOException {
+  public void setSplitHistory(int level, long position) {
     setLongValue(HISTORY_OFFSET + OLongSerializer.LONG_SIZE * level, position);
   }
 
@@ -426,7 +425,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     public final V    value;
     public final long hashCode;
 
-    public Entry(K key, V value, long hashCode) {
+    Entry(K key, V value, long hashCode) {
       this.key = key;
       this.value = value;
       this.hashCode = hashCode;

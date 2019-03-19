@@ -5,7 +5,6 @@ import com.orientechnologies.common.directmemory.OPointer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OLinkSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 import org.junit.Assert;
@@ -28,7 +27,7 @@ public class SBTreeNonLeafBucketTest {
     final OPointer pointer = bufferPool.acquireDirect(true);
 
     OCachePointer cachePointer = new OCachePointer(pointer, bufferPool, 0, 0);
-    OCacheEntry cacheEntry = new OCacheEntryImpl(0, 0, cachePointer);
+    OCacheEntryImpl cacheEntry = new OCacheEntryImpl(0, 0, cachePointer);
     cacheEntry.acquireExclusiveLock();
     cachePointer.incrementReferrer();
 
@@ -63,7 +62,7 @@ public class SBTreeNonLeafBucketTest {
     final OPointer pointer = bufferPool.acquireDirect(true);
 
     OCachePointer cachePointer = new OCachePointer(pointer, bufferPool, 0, 0);
-    OCacheEntry cacheEntry = new OCacheEntryImpl(0, 0, cachePointer);
+    OCacheEntryImpl cacheEntry = new OCacheEntryImpl(0, 0, cachePointer);
     cacheEntry.acquireExclusiveLock();
     cachePointer.incrementReferrer();
 
@@ -129,7 +128,7 @@ public class SBTreeNonLeafBucketTest {
     final OPointer pointer = bufferPool.acquireDirect(true);
 
     OCachePointer cachePointer = new OCachePointer(pointer, bufferPool, 0, 0);
-    OCacheEntry cacheEntry = new OCacheEntryImpl(0, 0, cachePointer);
+    OCacheEntryImpl cacheEntry = new OCacheEntryImpl(0, 0, cachePointer);
     cacheEntry.acquireExclusiveLock();
 
     cachePointer.incrementReferrer();

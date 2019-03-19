@@ -22,10 +22,8 @@ package com.orientechnologies.orient.core.storage.index.hashindex.local;
 
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
-
-import java.io.IOException;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -37,14 +35,14 @@ public class ODirectoryPage extends ODurablePage {
   public static final int   NODES_PER_PAGE = (OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024 - ITEMS_OFFSET)
                                                / OHashTableDirectory.BINARY_LEVEL_SIZE;
 
-  private final OCacheEntry entry;
+  private final OCacheEntryImpl entry;
 
-  public ODirectoryPage(OCacheEntry cacheEntry, OCacheEntry entry) {
+  public ODirectoryPage(OCacheEntryImpl cacheEntry, OCacheEntryImpl entry) {
     super(cacheEntry);
     this.entry = entry;
   }
 
-  public OCacheEntry getEntry() {
+  public OCacheEntryImpl getEntry() {
     return entry;
   }
 
@@ -78,7 +76,7 @@ public class ODirectoryPage extends ODurablePage {
     return getByteValue(offset);
   }
 
-  public void setPointer(int localNodeIndex, int index, long pointer) throws IOException {
+  public void setPointer(int localNodeIndex, int index, long pointer) {
     int offset = getItemsOffset() + (localNodeIndex * OHashTableDirectory.BINARY_LEVEL_SIZE + 3 * OByteSerializer.BYTE_SIZE)
         + index * OHashTableDirectory.ITEM_SIZE;
 
@@ -92,7 +90,7 @@ public class ODirectoryPage extends ODurablePage {
     return getLongValue(offset);
   }
 
-  protected int getItemsOffset() {
+  int getItemsOffset() {
     return ITEMS_OFFSET;
   }
 }

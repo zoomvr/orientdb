@@ -5,7 +5,7 @@ import com.orientechnologies.common.directmemory.ODirectMemoryAllocator;
 import com.orientechnologies.common.directmemory.OPointer;
 import com.orientechnologies.common.types.OModifiableBoolean;
 import com.orientechnologies.orient.core.command.OCommandOutputListener;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 import com.orientechnologies.orient.core.storage.cache.OPageDataVerificationError;
 import com.orientechnologies.orient.core.storage.cache.OWriteCache;
@@ -17,8 +17,16 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.nio.file.Path;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AsyncReadCacheTestIT {
@@ -181,7 +189,7 @@ public class AsyncReadCacheTestIT {
         final int fileId = random.nextInt(fileLimit);
         final int pageIndex = random.nextInt(pageLimit);
 
-        final OCacheEntry cacheEntry = readCache.loadForWrite(fileId, pageIndex, true, writeCache, 1, true, null);
+        final OCacheEntryImpl cacheEntry = readCache.loadForWrite(fileId, pageIndex, true, writeCache, 1, true, null);
         readCache.releaseFromWrite(cacheEntry, writeCache);
         pageCounter++;
       }
@@ -216,7 +224,7 @@ public class AsyncReadCacheTestIT {
         final int fileId = random.nextInt(fileLimit);
         final int pageIndex = random.nextInt(pageLimit);
 
-        final OCacheEntry cacheEntry = readCache.loadForRead(fileId, pageIndex, true, writeCache, 1, true);
+        final OCacheEntryImpl cacheEntry = readCache.loadForRead(fileId, pageIndex, true, writeCache, 1, true);
         readCache.releaseFromRead(cacheEntry, writeCache);
         pageCounter++;
       }
@@ -248,7 +256,7 @@ public class AsyncReadCacheTestIT {
       while (pageCounter < pageCount) {
         final int pageIndex = random.nextInt();
         assert pageIndex < pageLimit;
-        final OCacheEntry cacheEntry = readCache.loadForWrite(0, pageIndex, true, writeCache, 1, true, null);
+        final OCacheEntryImpl cacheEntry = readCache.loadForWrite(0, pageIndex, true, writeCache, 1, true, null);
         readCache.releaseFromWrite(cacheEntry, writeCache);
         pageCounter++;
       }
@@ -280,7 +288,7 @@ public class AsyncReadCacheTestIT {
       while (pageCounter < pageCount) {
         final int pageIndex = random.nextInt();
         assert pageIndex < pageLimit;
-        final OCacheEntry cacheEntry = readCache.loadForRead(0, pageIndex, true, writeCache, 1, true);
+        final OCacheEntryImpl cacheEntry = readCache.loadForRead(0, pageIndex, true, writeCache, 1, true);
         readCache.releaseFromRead(cacheEntry, writeCache);
         pageCounter++;
       }

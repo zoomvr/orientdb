@@ -22,9 +22,7 @@ package com.orientechnologies.orient.core.storage.index.sbtreebonsai.local;
 
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
-
-import java.io.IOException;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 
 /**
  * <p>
@@ -41,7 +39,7 @@ import java.io.IOException;
  * 
  * @author Artem Orobets (enisher-at-gmail.com)
  */
-public class OSysBucket extends OBonsaiBucketAbstract {
+class OSysBucket extends OBonsaiBucketAbstract {
   private static final int  SYS_MAGIC_OFFSET        = WAL_POSITION_OFFSET + OLongSerializer.LONG_SIZE;
   private static final int  FREE_SPACE_OFFSET       = SYS_MAGIC_OFFSET + OByteSerializer.BYTE_SIZE;
   private static final int  FREE_LIST_HEAD_OFFSET   = FREE_SPACE_OFFSET + OBonsaiBucketPointer.SIZE;
@@ -52,11 +50,11 @@ public class OSysBucket extends OBonsaiBucketAbstract {
    */
   private static final byte SYS_MAGIC               = (byte) 41;
 
-  public OSysBucket(OCacheEntry cacheEntry) {
+  public OSysBucket(OCacheEntryImpl cacheEntry) {
     super(cacheEntry);
   }
 
-  public void init() throws IOException {
+  public void init() {
     setByteValue(SYS_MAGIC_OFFSET, SYS_MAGIC);
     setBucketPointer(FREE_SPACE_OFFSET, new OBonsaiBucketPointer(0, OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES));
     setBucketPointer(FREE_LIST_HEAD_OFFSET, OBonsaiBucketPointer.NULL);
@@ -71,7 +69,7 @@ public class OSysBucket extends OBonsaiBucketAbstract {
     return getLongValue(FREE_LIST_LENGTH_OFFSET);
   }
 
-  public void setFreeListLength(long length) throws IOException {
+  public void setFreeListLength(long length) {
     setLongValue(FREE_LIST_LENGTH_OFFSET, length);
   }
 
@@ -79,7 +77,7 @@ public class OSysBucket extends OBonsaiBucketAbstract {
     return getBucketPointer(FREE_SPACE_OFFSET);
   }
 
-  public void setFreeSpacePointer(OBonsaiBucketPointer pointer) throws IOException {
+  public void setFreeSpacePointer(OBonsaiBucketPointer pointer) {
     setBucketPointer(FREE_SPACE_OFFSET, pointer);
   }
 
@@ -87,7 +85,7 @@ public class OSysBucket extends OBonsaiBucketAbstract {
     return getBucketPointer(FREE_LIST_HEAD_OFFSET);
   }
 
-  public void setFreeListHead(OBonsaiBucketPointer pointer) throws IOException {
+  public void setFreeListHead(OBonsaiBucketPointer pointer) {
     setBucketPointer(FREE_LIST_HEAD_OFFSET, pointer);
   }
 }

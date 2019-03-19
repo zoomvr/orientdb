@@ -20,19 +20,19 @@
 
 package com.orientechnologies.orient.core.storage.cache.local.twoq;
 
-import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 
 import java.util.Iterator;
 
 /**
  * @author Artem Orobets (enisher-at-gmail.com)
  */
-public interface LRUList extends Iterable<OCacheEntry> {
-  OCacheEntry get(long fileId, long pageIndex);
+public interface LRUList extends Iterable<OCacheEntryImpl> {
+  OCacheEntryImpl get(long fileId, long pageIndex);
 
-  OCacheEntry remove(long fileId, long pageIndex);
+  OCacheEntryImpl remove(long fileId, long pageIndex);
 
-  void putToMRU(OCacheEntry cacheEntry);
+  void putToMRU(OCacheEntryImpl cacheEntry);
 
   void clear();
 
@@ -40,15 +40,15 @@ public interface LRUList extends Iterable<OCacheEntry> {
 
   int size();
 
-  OCacheEntry removeLRU();
+  OCacheEntryImpl removeLRU();
 
-  OCacheEntry getLRU();
+  OCacheEntryImpl getLRU();
 
   @Override
-  Iterator<OCacheEntry> iterator();
+  Iterator<OCacheEntryImpl> iterator();
 
   /**
    * @return Iterator which iterates from head to tail, or in other words from least recently used to most recently used pages.
    */
-  Iterator<OCacheEntry> reverseIterator();
+  Iterator<OCacheEntryImpl> reverseIterator();
 }
