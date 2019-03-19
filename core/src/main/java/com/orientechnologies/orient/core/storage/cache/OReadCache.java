@@ -39,19 +39,19 @@ public interface OReadCache {
 
   long addFile(String fileName, long fileId, OWriteCache writeCache) throws IOException;
 
-  OCacheEntryImpl loadForWrite(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
+  OCacheEntry loadForWrite(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
       boolean verifyChecksums, OLogSequenceNumber startLSN) throws IOException;
 
-  OCacheEntryImpl loadForRead(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
+  OCacheEntry loadForRead(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
       boolean verifyChecksums) throws IOException;
 
-  void releaseFromRead(OCacheEntryImpl cacheEntry, OWriteCache writeCache);
+  void releaseFromRead(OCacheEntry cacheEntry, OWriteCache writeCache);
 
-  void releaseFromWrite(OCacheEntryImpl cacheEntry, OWriteCache writeCache);
+  void releaseFromWrite(OCacheEntry cacheEntry, OWriteCache writeCache);
 
-  void pinPage(OCacheEntryImpl cacheEntry, OWriteCache writeCache);
+  void pinPage(OCacheEntry cacheEntry, OWriteCache writeCache);
 
-  OCacheEntryImpl allocateNewPage(long fileId, OWriteCache writeCache, OLogSequenceNumber startLSN)
+  OCacheEntry allocateNewPage(long fileId, OWriteCache writeCache, OLogSequenceNumber startLSN)
       throws IOException;
 
   long getUsedMemory();

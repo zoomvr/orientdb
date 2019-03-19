@@ -27,7 +27,7 @@ import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 import java.util.Comparator;
@@ -55,7 +55,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
   private final Comparator           keyComparator = ODefaultComparator.INSTANCE;
   private final OEncryption          encryption;
 
-  public OHashIndexBucket(int depth, OCacheEntryImpl cacheEntry, OBinarySerializer<K> keySerializer,
+  public OHashIndexBucket(int depth, OCacheEntry cacheEntry, OBinarySerializer<K> keySerializer,
       OBinarySerializer<V> valueSerializer, OType[] keyTypes, OEncryption encryption) {
     super(cacheEntry);
 
@@ -67,7 +67,7 @@ public class OHashIndexBucket<K, V> extends ODurablePage implements Iterable<OHa
     init(depth);
   }
 
-  public OHashIndexBucket(OCacheEntryImpl cacheEntry, OBinarySerializer<K> keySerializer, OBinarySerializer<V> valueSerializer,
+  public OHashIndexBucket(OCacheEntry cacheEntry, OBinarySerializer<K> keySerializer, OBinarySerializer<V> valueSerializer,
       OType[] keyTypes, OEncryption encryption) {
     super(cacheEntry);
 

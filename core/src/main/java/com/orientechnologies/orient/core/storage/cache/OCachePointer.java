@@ -249,11 +249,7 @@ public final class OCachePointer {
 
     OCachePointer that = (OCachePointer) o;
 
-    if (!pointer.equals(that.pointer)) {
-      return false;
-    }
-
-    return true;
+    return pointer.equals(that.pointer);
   }
 
   @Override
@@ -288,7 +284,4 @@ public final class OCachePointer {
     return endLSN;
   }
 
-  void setEndLSN(OLogSequenceNumber endLSN) {
-    this.endLSN = endLSN;
-  }
 }

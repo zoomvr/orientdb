@@ -21,7 +21,7 @@
 package com.orientechnologies.orient.core.storage.impl.local.paginated.base;
 
 import com.orientechnologies.common.concur.resource.OSharedResourceAdaptive;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.OReadCache;
 import com.orientechnologies.orient.core.storage.cache.OWriteCache;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
@@ -116,34 +116,34 @@ public abstract class ODurableComponent extends OSharedResourceAdaptive {
     return writeCache.getFilledUpTo(fileId);
   }
 
-  protected final OCacheEntryImpl loadPageForWrite(final long fileId, final long pageIndex, final boolean checkPinnedPages,
+  protected final OCacheEntry loadPageForWrite(final long fileId, final long pageIndex, final boolean checkPinnedPages,
       final boolean verifyCheckSum) throws IOException {
     return readCache.loadForWrite(fileId, pageIndex, checkPinnedPages, writeCache, 1, verifyCheckSum, null);
   }
 
-  protected final OCacheEntryImpl loadPageForRead(final long fileId, final long pageIndex, final boolean checkPinnedPages)
+  protected final OCacheEntry loadPageForRead(final long fileId, final long pageIndex, final boolean checkPinnedPages)
       throws IOException {
     return loadPageForRead(fileId, pageIndex, checkPinnedPages, 1);
   }
 
-  protected final OCacheEntryImpl loadPageForRead(final long fileId, final long pageIndex, final boolean checkPinnedPages,
+  protected final OCacheEntry loadPageForRead(final long fileId, final long pageIndex, final boolean checkPinnedPages,
       final int pageCount) throws IOException {
     return readCache.loadForRead(fileId, pageIndex, checkPinnedPages, writeCache, pageCount, true);
   }
 
-  protected final void pinPage(final OCacheEntryImpl cacheEntry) {
+  protected final void pinPage(final OCacheEntry cacheEntry) {
     readCache.pinPage(cacheEntry, writeCache);
   }
 
-  protected final OCacheEntryImpl addPage(final long fileId) throws IOException {
+  protected final OCacheEntry addPage(final long fileId) throws IOException {
     return readCache.allocateNewPage(fileId, writeCache, null);
   }
 
-  protected final void releasePageFromWrite(final OCacheEntryImpl cacheEntry) {
+  protected final void releasePageFromWrite(final OCacheEntry cacheEntry) {
     readCache.releaseFromWrite(cacheEntry, writeCache);
   }
 
-  protected final void releasePageFromRead(final OCacheEntryImpl cacheEntry) {
+  protected final void releasePageFromRead(final OCacheEntry cacheEntry) {
     readCache.releaseFromRead(cacheEntry, writeCache);
   }
 

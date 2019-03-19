@@ -29,7 +29,7 @@ import com.orientechnologies.common.serialization.types.OShortSerializer;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 import java.util.ArrayList;
@@ -65,7 +65,7 @@ final class Bucket<K> extends ODurablePage {
 
   private final OEncryption encryption;
 
-  Bucket(final OCacheEntryImpl cacheEntry, final boolean isLeaf, final OBinarySerializer<K> keySerializer,
+  Bucket(final OCacheEntry cacheEntry, final boolean isLeaf, final OBinarySerializer<K> keySerializer,
       final OEncryption encryption) {
     super(cacheEntry);
 
@@ -81,7 +81,7 @@ final class Bucket<K> extends ODurablePage {
     setLongValue(RIGHT_SIBLING_OFFSET, -1);
   }
 
-  Bucket(final OCacheEntryImpl cacheEntry, final OBinarySerializer<K> keySerializer, final OEncryption encryption) {
+  Bucket(final OCacheEntry cacheEntry, final OBinarySerializer<K> keySerializer, final OEncryption encryption) {
     super(cacheEntry);
     this.encryption = encryption;
 

@@ -1,7 +1,7 @@
 package com.orientechnologies.orient.core.storage.index.sbtree.multivalue.v1;
 
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 final class ONullEntryPoint extends ODurablePage {
@@ -10,7 +10,7 @@ final class ONullEntryPoint extends ODurablePage {
   private static final int FIRST_PAGE_OFFSET       = FREE_LIST_HEADER_OFFSET + OIntegerSerializer.INT_SIZE;
   private static final int LAST_PAGE_OFFSET        = FIRST_PAGE_OFFSET + OIntegerSerializer.INT_SIZE;
 
-  ONullEntryPoint(final OCacheEntryImpl cacheEntry) {
+  ONullEntryPoint(final OCacheEntry cacheEntry) {
     super(cacheEntry);
   }
 

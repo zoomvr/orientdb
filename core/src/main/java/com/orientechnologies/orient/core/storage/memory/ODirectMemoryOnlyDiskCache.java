@@ -27,7 +27,7 @@ import com.orientechnologies.common.util.OCommonConst;
 import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.exception.OStorageException;
 import com.orientechnologies.orient.core.storage.cache.OAbstractWriteCache;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 import com.orientechnologies.orient.core.storage.cache.OPageDataVerificationError;
 import com.orientechnologies.orient.core.storage.cache.OReadCache;
@@ -182,10 +182,10 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
   }
 
   @Override
-  public final OCacheEntryImpl loadForWrite(final long fileId, final long pageIndex, final boolean checkPinnedPages,
+  public final OCacheEntry loadForWrite(final long fileId, final long pageIndex, final boolean checkPinnedPages,
       final OWriteCache writeCache, final int pageCount, final boolean verifyChecksums, final OLogSequenceNumber startLSN) {
 
-    final OCacheEntryImpl cacheEntry = doLoad(fileId, pageIndex);
+    final OCacheEntry cacheEntry = doLoad(fileId, pageIndex);
 
     if (cacheEntry == null) {
       return null;
@@ -197,10 +197,10 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
   }
 
   @Override
-  public final OCacheEntryImpl loadForRead(final long fileId, final long pageIndex, final boolean checkPinnedPages,
+  public final OCacheEntry loadForRead(final long fileId, final long pageIndex, final boolean checkPinnedPages,
       final OWriteCache writeCache, final int pageCount, final boolean verifyChecksums) {
 
-    final OCacheEntryImpl cacheEntry = doLoad(fileId, pageIndex);
+    final OCacheEntry cacheEntry = doLoad(fileId, pageIndex);
 
     if (cacheEntry == null) {
       return null;
@@ -211,7 +211,7 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
     return cacheEntry;
   }
 
-  private OCacheEntryImpl doLoad(final long fileId, final long pageIndex) {
+  private OCacheEntry doLoad(final long fileId, final long pageIndex) {
     final OSessionStoragePerformanceStatistic sessionStoragePerformanceStatistic = performanceStatisticManager
         .getSessionPerformanceStatistic();
 
@@ -223,7 +223,7 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
       final int intId = extractFileId(fileId);
 
       final MemoryFile memoryFile = getFile(intId);
-      final OCacheEntryImpl cacheEntry = memoryFile.loadPage(pageIndex);
+      final OCacheEntry cacheEntry = memoryFile.loadPage(pageIndex);
       if (cacheEntry == null) {
         return null;
       }
@@ -242,11 +242,11 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
   }
 
   @Override
-  public final void pinPage(final OCacheEntryImpl cacheEntry, final OWriteCache writeCache) {
+  public final void pinPage(final OCacheEntry cacheEntry, final OWriteCache writeCache) {
   }
 
   @Override
-  public final OCacheEntryImpl allocateNewPage(final long fileId, final OWriteCache writeCache, final OLogSequenceNumber startLSN) {
+  public final OCacheEntry allocateNewPage(final long fileId, final OWriteCache writeCache, final OLogSequenceNumber startLSN) {
     final OSessionStoragePerformanceStatistic sessionStoragePerformanceStatistic = performanceStatisticManager
         .getSessionPerformanceStatistic();
 
@@ -258,7 +258,7 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
       final int intId = extractFileId(fileId);
 
       final MemoryFile memoryFile = getFile(intId);
-      final OCacheEntryImpl cacheEntry = memoryFile.addNewPage();
+      final OCacheEntry cacheEntry = memoryFile.addNewPage();
 
       //noinspection SynchronizationOnLocalVariableOrMethodParameter
       synchronized (cacheEntry) {
@@ -290,20 +290,20 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
   }
 
   @Override
-  public final void releaseFromWrite(final OCacheEntryImpl cacheEntry, final OWriteCache writeCache) {
+  public final void releaseFromWrite(final OCacheEntry cacheEntry, final OWriteCache writeCache) {
     cacheEntry.releaseExclusiveLock();
 
     doRelease(cacheEntry);
   }
 
   @Override
-  public final void releaseFromRead(final OCacheEntryImpl cacheEntry, final OWriteCache writeCache) {
+  public final void releaseFromRead(final OCacheEntry cacheEntry, final OWriteCache writeCache) {
     cacheEntry.releaseSharedLock();
 
     doRelease(cacheEntry);
   }
 
-  private static void doRelease(final OCacheEntryImpl cacheEntry) {
+  private static void doRelease(final OCacheEntry cacheEntry) {
     //noinspection SynchronizationOnLocalVariableOrMethodParameter
     synchronized (cacheEntry) {
       cacheEntry.decrementUsages();
@@ -502,14 +502,14 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
 
     private final ReadWriteLock clearLock = new ReentrantReadWriteLock();
 
-    private final ConcurrentSkipListMap<Long, OCacheEntryImpl> content = new ConcurrentSkipListMap<>();
+    private final ConcurrentSkipListMap<Long, OCacheEntry> content = new ConcurrentSkipListMap<>();
 
     private MemoryFile(final int storageId, final int id) {
       this.storageId = storageId;
       this.id = id;
     }
 
-    private OCacheEntryImpl loadPage(final long index) {
+    private OCacheEntry loadPage(final long index) {
       clearLock.readLock().lock();
       try {
         return content.get(index);
@@ -518,10 +518,10 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
       }
     }
 
-    private OCacheEntryImpl addNewPage() {
+    private OCacheEntry addNewPage() {
       clearLock.readLock().lock();
       try {
-        OCacheEntryImpl cacheEntry;
+        OCacheEntry cacheEntry;
 
         long index;
         do {
@@ -538,9 +538,9 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
           final OCachePointer cachePointer = new OCachePointer(pointer, bufferPool, id, index);
           cachePointer.incrementReferrer();
 
-          cacheEntry = new OCacheEntryImpl(composeFileId(storageId, id), index, cachePointer);
+          cacheEntry = new OCacheEntry(composeFileId(storageId, id), index, cachePointer);
 
-          final OCacheEntryImpl oldCacheEntry = content.putIfAbsent(index, cacheEntry);
+          final OCacheEntry oldCacheEntry = content.putIfAbsent(index, cacheEntry);
 
           if (oldCacheEntry != null) {
             cachePointer.decrementReferrer();
@@ -581,7 +581,7 @@ public final class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implem
 
       clearLock.writeLock().lock();
       try {
-        for (final OCacheEntryImpl entry : content.values()) {
+        for (final OCacheEntry entry : content.values()) {
           //noinspection SynchronizationOnLocalVariableOrMethodParameter
           synchronized (entry) {
             thereAreNotReleased |= entry.getUsagesCount() > 0;

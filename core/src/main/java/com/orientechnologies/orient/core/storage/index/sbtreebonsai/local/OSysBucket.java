@@ -22,7 +22,7 @@ package com.orientechnologies.orient.core.storage.index.sbtreebonsai.local;
 
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 
 /**
  * <p>
@@ -50,7 +50,7 @@ class OSysBucket extends OBonsaiBucketAbstract {
    */
   private static final byte SYS_MAGIC               = (byte) 41;
 
-  public OSysBucket(OCacheEntryImpl cacheEntry) {
+  public OSysBucket(OCacheEntry cacheEntry) {
     super(cacheEntry);
   }
 

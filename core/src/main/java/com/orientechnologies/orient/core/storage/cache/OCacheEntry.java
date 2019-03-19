@@ -1,14 +1,13 @@
 package com.orientechnologies.orient.core.storage.cache;
 
 import com.orientechnologies.orient.core.storage.cache.chm.LRUList;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by tglman on 23/06/16.
  */
-public final class OCacheEntryImpl {
+public final class OCacheEntry {
   private static final int FROZEN = -1;
   private static final int DEAD   = -2;
 
@@ -19,12 +18,12 @@ public final class OCacheEntryImpl {
   private final AtomicInteger usagesCount = new AtomicInteger();
   private final AtomicInteger state       = new AtomicInteger();
 
-  private OCacheEntryImpl next;
-  private OCacheEntryImpl prev;
+  private OCacheEntry next;
+  private OCacheEntry prev;
 
   private LRUList container;
 
-  public OCacheEntryImpl(final long fileId, final long pageIndex, final OCachePointer dataPointer) {
+  public OCacheEntry(final long fileId, final long pageIndex, final OCachePointer dataPointer) {
     this.fileId = fileId;
     this.pageIndex = pageIndex;
 
@@ -87,14 +86,6 @@ public final class OCacheEntryImpl {
 
   public void decrementUsages() {
     usagesCount.decrementAndGet();
-  }
-
-  public OLogSequenceNumber getEndLSN() {
-    return dataPointer.getEndLSN();
-  }
-
-  public void setEndLSN(final OLogSequenceNumber endLSN) {
-    dataPointer.setEndLSN(endLSN);
   }
 
   public boolean acquireEntry() {
@@ -170,19 +161,19 @@ public final class OCacheEntryImpl {
     return this.state.get() == DEAD;
   }
 
-  public OCacheEntryImpl getNext() {
+  public OCacheEntry getNext() {
     return next;
   }
 
-  public OCacheEntryImpl getPrev() {
+  public OCacheEntry getPrev() {
     return prev;
   }
 
-  public void setPrev(final OCacheEntryImpl prev) {
+  public void setPrev(final OCacheEntry prev) {
     this.prev = prev;
   }
 
-  public void setNext(final OCacheEntryImpl next) {
+  public void setNext(final OCacheEntry next) {
     this.next = next;
   }
 
@@ -201,7 +192,7 @@ public final class OCacheEntryImpl {
     if (o == null || getClass() != o.getClass())
       return false;
 
-    final OCacheEntryImpl that = (OCacheEntryImpl) o;
+    final OCacheEntry that = (OCacheEntry) o;
 
     if (fileId != that.fileId)
       return false;
@@ -217,7 +208,7 @@ public final class OCacheEntryImpl {
 
   @Override
   public String toString() {
-    return "OCacheEntryImpl{" + "dataPointer=" + dataPointer + ", fileId=" + fileId + ", pageIndex=" + pageIndex + ", usagesCount="
+    return "OCacheEntry{" + "dataPointer=" + dataPointer + ", fileId=" + fileId + ", pageIndex=" + pageIndex + ", usagesCount="
         + usagesCount + '}';
   }
 }

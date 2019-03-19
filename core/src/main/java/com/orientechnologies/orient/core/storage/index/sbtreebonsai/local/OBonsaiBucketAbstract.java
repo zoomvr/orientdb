@@ -21,7 +21,7 @@
 package com.orientechnologies.orient.core.storage.index.sbtreebonsai.local;
 
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 /**
@@ -36,7 +36,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODura
  * @author Artem Orobets (enisher-at-gmail.com)
  */
 class OBonsaiBucketAbstract extends ODurablePage {
-  OBonsaiBucketAbstract(OCacheEntryImpl cacheEntry) {
+  OBonsaiBucketAbstract(OCacheEntry cacheEntry) {
     super(cacheEntry);
   }
 

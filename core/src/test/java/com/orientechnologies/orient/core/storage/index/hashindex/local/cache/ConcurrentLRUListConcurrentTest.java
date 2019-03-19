@@ -1,6 +1,6 @@
 package com.orientechnologies.orient.core.storage.index.hashindex.local.cache;
 
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.local.twoq.ConcurrentLRUList;
 import com.orientechnologies.orient.core.storage.cache.local.twoq.LRUList;
 import com.orientechnologies.orient.test.ConcurrentTestHelper;
@@ -72,16 +72,16 @@ public class ConcurrentLRUListConcurrentTest {
   private void assertListConsistency(int expectedSize) {
     Assert.assertEquals(list.size(), expectedSize);
     int count = 0;
-    List<OCacheEntryImpl> items = new ArrayList<OCacheEntryImpl>();
-    for (OCacheEntryImpl entry : list) {
+    List<OCacheEntry> items = new ArrayList<OCacheEntry>();
+    for (OCacheEntry entry : list) {
       items.add(entry);
       count++;
     }
     Assert.assertEquals(count, expectedSize);
 
     Collections.reverse(items);
-    for (OCacheEntryImpl item : items) {
-      OCacheEntryImpl actual = list.removeLRU();
+    for (OCacheEntry item : items) {
+      OCacheEntry actual = list.removeLRU();
       Assert.assertEquals(actual, item);
     }
     Assert.assertNull(list.removeLRU());
@@ -91,16 +91,16 @@ public class ConcurrentLRUListConcurrentTest {
   private void assertListConsistency() {
     int expectedSize = list.size();
     int count = 0;
-    List<OCacheEntryImpl> items = new ArrayList<OCacheEntryImpl>();
-    for (OCacheEntryImpl entry : list) {
+    List<OCacheEntry> items = new ArrayList<OCacheEntry>();
+    for (OCacheEntry entry : list) {
       items.add(entry);
       count++;
     }
     Assert.assertEquals(count, expectedSize);
 
     Collections.reverse(items);
-    for (OCacheEntryImpl item : items) {
-      OCacheEntryImpl actual = list.removeLRU();
+    for (OCacheEntry item : items) {
+      OCacheEntry actual = list.removeLRU();
       Assert.assertEquals(actual, item);
     }
 
@@ -126,7 +126,7 @@ public class ConcurrentLRUListConcurrentTest {
         @Override
         public Integer call() throws Exception {
           for (int i = 0; i < AMOUNT_OF_OPERATIONS; i++) {
-            list.putToMRU(new OCacheEntryImpl(threadNumber, i, null));
+            list.putToMRU(new OCacheEntry(threadNumber, i, null));
           }
           return AMOUNT_OF_OPERATIONS;
         }
@@ -143,7 +143,7 @@ public class ConcurrentLRUListConcurrentTest {
           int actualRemoves = 0;
           consumeCPU(1000);
           for (int i = 0; i < AMOUNT_OF_OPERATIONS; i++) {
-            OCacheEntryImpl e = list.removeLRU();
+            OCacheEntry e = list.removeLRU();
             if (e != null) {
               actualRemoves++;
             }
@@ -165,7 +165,7 @@ public class ConcurrentLRUListConcurrentTest {
         public Integer call() throws Exception {
           Random r = new Random();
           for (int i = 0; i < AMOUNT_OF_OPERATIONS; i++) {
-            list.putToMRU(new OCacheEntryImpl(0, r.nextInt(200), null));
+            list.putToMRU(new OCacheEntry(0, r.nextInt(200), null));
             consumeCPU(r.nextInt(500) + 1000);
           }
           return AMOUNT_OF_OPERATIONS;
@@ -184,7 +184,7 @@ public class ConcurrentLRUListConcurrentTest {
         public Integer call() throws Exception {
           Random r = new Random();
           for (int i = 0; i < AMOUNT_OF_OPERATIONS; i++) {
-            list.putToMRU(new OCacheEntryImpl(0, 0, null));
+            list.putToMRU(new OCacheEntry(0, 0, null));
             consumeCPU(r.nextInt(500) + 1000);
           }
           return AMOUNT_OF_OPERATIONS;
@@ -202,7 +202,7 @@ public class ConcurrentLRUListConcurrentTest {
           Random r = new Random();
           int actualRemoves = 0;
           for (int i = 0; i < AMOUNT_OF_OPERATIONS; i++) {
-            OCacheEntryImpl e = list.remove(0, r.nextInt(100));
+            OCacheEntry e = list.remove(0, r.nextInt(100));
             if (e != null) {
               actualRemoves++;
             }

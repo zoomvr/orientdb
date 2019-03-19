@@ -22,7 +22,7 @@ package com.orientechnologies.orient.core.storage.index.hashindex.local;
 
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -37,7 +37,7 @@ public class ODirectoryFirstPage extends ODirectoryPage {
   public static final int  NODES_PER_PAGE   = (OGlobalConfiguration.DISK_CACHE_PAGE_SIZE.getValueAsInteger() * 1024 - ITEMS_OFFSET)
                                                 / OHashTableDirectory.BINARY_LEVEL_SIZE;
 
-  public ODirectoryFirstPage(OCacheEntryImpl cacheEntry, OCacheEntryImpl entry) {
+  public ODirectoryFirstPage(OCacheEntry cacheEntry, OCacheEntry entry) {
     super(cacheEntry, entry);
   }
 

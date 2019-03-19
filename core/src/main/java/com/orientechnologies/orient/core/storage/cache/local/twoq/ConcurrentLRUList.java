@@ -20,7 +20,7 @@
 
 package com.orientechnologies.orient.core.storage.cache.local.twoq;
 
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -61,7 +61,7 @@ public class ConcurrentLRUList implements LRUList {
   }
 
   @Override
-  public OCacheEntryImpl get(long fileId, long pageIndex) {
+  public OCacheEntry get(long fileId, long pageIndex) {
     final LRUEntry lruEntry = cache.get(new CacheKey(fileId, pageIndex));
 
     purge();
@@ -73,7 +73,7 @@ public class ConcurrentLRUList implements LRUList {
   }
 
   @Override
-  public OCacheEntryImpl remove(long fileId, long pageIndex) {
+  public OCacheEntry remove(long fileId, long pageIndex) {
     CacheKey key = new CacheKey(fileId, pageIndex);
     final LRUEntry valueToRemove = cache.remove(key);
 
@@ -98,7 +98,7 @@ public class ConcurrentLRUList implements LRUList {
   }
 
   @Override
-  public void putToMRU(OCacheEntryImpl cacheEntry) {
+  public void putToMRU(OCacheEntry cacheEntry) {
     final CacheKey key = new CacheKey(cacheEntry.getFileId(), cacheEntry.getPageIndex());
     LRUEntry value = new LRUEntry(key, cacheEntry);
     final LRUEntry existingValue = cache.putIfAbsent(key, value);
@@ -148,7 +148,7 @@ public class ConcurrentLRUList implements LRUList {
   }
 
   @Override
-  public OCacheEntryImpl removeLRU() {
+  public OCacheEntry removeLRU() {
     ListNode current = headReference;
 
     boolean removed = false;
@@ -199,7 +199,7 @@ public class ConcurrentLRUList implements LRUList {
   }
 
   @Override
-  public OCacheEntryImpl getLRU() {
+  public OCacheEntry getLRU() {
     ListNode current = headReference;
 
     LRUEntry currentEntry = null;
@@ -301,12 +301,12 @@ public class ConcurrentLRUList implements LRUList {
     return cache.size();
   }
 
-  private boolean isInUse(OCacheEntryImpl entry) {
+  private boolean isInUse(OCacheEntry entry) {
     return entry != null && entry.getUsagesCount() != 0;
   }
 
   @Override
-  public Iterator<OCacheEntryImpl> iterator() {
+  public Iterator<OCacheEntry> iterator() {
     return new OCacheEntryIterator(tailReference.get());
   }
 
@@ -314,11 +314,11 @@ public class ConcurrentLRUList implements LRUList {
    * {@inheritDoc}
    */
   @Override
-  public Iterator<OCacheEntryImpl> reverseIterator() {
+  public Iterator<OCacheEntry> reverseIterator() {
     return new OReverseCacheEntryIterator(headReference);
   }
 
-  private static class OCacheEntryIterator implements Iterator<OCacheEntryImpl> {
+  private static class OCacheEntryIterator implements Iterator<OCacheEntry> {
 
     private ListNode current;
 
@@ -334,11 +334,11 @@ public class ConcurrentLRUList implements LRUList {
     }
 
     @Override
-    public OCacheEntryImpl next() {
+    public OCacheEntry next() {
       if (!hasNext())
         throw new NoSuchElementException();
 
-      final OCacheEntryImpl entry = current.entry.entry;
+      final OCacheEntry entry = current.entry.entry;
 
       do {
         current = current.previous.get();
@@ -356,7 +356,7 @@ public class ConcurrentLRUList implements LRUList {
   /**
    * Iterates from head to tail of LRU queue.
    */
-  private static class OReverseCacheEntryIterator implements Iterator<OCacheEntryImpl> {
+  private static class OReverseCacheEntryIterator implements Iterator<OCacheEntry> {
     private ListNode current;
 
     OReverseCacheEntryIterator(ListNode start) {
@@ -373,11 +373,11 @@ public class ConcurrentLRUList implements LRUList {
     }
 
     @Override
-    public OCacheEntryImpl next() {
+    public OCacheEntry next() {
       if (!hasNext())
         throw new NoSuchElementException();
 
-      final OCacheEntryImpl entry = current.entry.entry;
+      final OCacheEntry entry = current.entry.entry;
       //because we purge nodes into background and because
       //head node is dummy we skip entries with empty entries
 
@@ -428,12 +428,12 @@ public class ConcurrentLRUList implements LRUList {
   private static class LRUEntry {
     private final    AtomicReference<ListNode> listNode = new AtomicReference<>();
     private final    CacheKey                  key;
-    private volatile OCacheEntryImpl           entry;
+    private volatile OCacheEntry               entry;
 
     private       boolean       removed    = false;
     private final ReadWriteLock removeLock = new ReentrantReadWriteLock();
 
-    private LRUEntry(CacheKey key, OCacheEntryImpl entry) {
+    private LRUEntry(CacheKey key, OCacheEntry entry) {
       this.key = key;
       this.entry = entry;
     }

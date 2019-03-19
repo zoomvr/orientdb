@@ -22,7 +22,7 @@ package com.orientechnologies.orient.core.storage.index.hashindex.local;
 
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
 
@@ -55,7 +55,7 @@ public class OHashTableDirectory extends ODurableComponent {
   }
 
   private void init() throws IOException {
-    OCacheEntryImpl firstEntry = loadPageForWrite(fileId, firstEntryIndex, true, true);
+    OCacheEntry firstEntry = loadPageForWrite(fileId, firstEntryIndex, true, true);
 
     if (firstEntry == null) {
       firstEntry = addPage(fileId);
@@ -80,7 +80,7 @@ public class OHashTableDirectory extends ODurableComponent {
     final int filledUpTo = (int) getFilledUpTo(fileId);
 
     for (int i = 0; i < filledUpTo; i++) {
-      final OCacheEntryImpl entry = loadPageForRead(fileId, i, true);
+      final OCacheEntry entry = loadPageForRead(fileId, i, true);
       assert entry != null;
 
       pinPage(entry);
@@ -105,7 +105,7 @@ public class OHashTableDirectory extends ODurableComponent {
 
   int addNewNode(final byte maxLeftChildDepth, final byte maxRightChildDepth, final byte nodeLocalDepth, final long[] newNode) throws IOException {
     int nodeIndex;
-    final OCacheEntryImpl firstEntry = loadPageForWrite(fileId, firstEntryIndex, true, true);
+    final OCacheEntry firstEntry = loadPageForWrite(fileId, firstEntryIndex, true, true);
     try {
       final ODirectoryFirstPage firstPage = new ODirectoryFirstPage(firstEntry, firstEntry);
 
@@ -138,7 +138,7 @@ public class OHashTableDirectory extends ODurableComponent {
         final int pageIndex = nodeIndex / ODirectoryPage.NODES_PER_PAGE;
         final int localLevel = nodeIndex % ODirectoryPage.NODES_PER_PAGE;
 
-        OCacheEntryImpl cacheEntry = loadPageForWrite(fileId, pageIndex, true, true);
+        OCacheEntry cacheEntry = loadPageForWrite(fileId, pageIndex, true, true);
         while (cacheEntry == null || cacheEntry.getPageIndex() < pageIndex) {
           if (cacheEntry != null) {
             releasePageFromWrite(cacheEntry);
@@ -175,7 +175,7 @@ public class OHashTableDirectory extends ODurableComponent {
   }
 
   void deleteNode(final int nodeIndex) throws IOException {
-    final OCacheEntryImpl firstEntry = loadPageForWrite(fileId, firstEntryIndex, true, true);
+    final OCacheEntry firstEntry = loadPageForWrite(fileId, firstEntryIndex, true, true);
     try {
       final ODirectoryFirstPage firstPage = new ODirectoryFirstPage(firstEntry, firstEntry);
       if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
@@ -185,7 +185,7 @@ public class OHashTableDirectory extends ODurableComponent {
         final int pageIndex = nodeIndex / ODirectoryPage.NODES_PER_PAGE;
         final int localNodeIndex = nodeIndex % ODirectoryPage.NODES_PER_PAGE;
 
-        final OCacheEntryImpl cacheEntry = loadPageForWrite(fileId, pageIndex, true, true);
+        final OCacheEntry cacheEntry = loadPageForWrite(fileId, pageIndex, true, true);
         try {
           final ODirectoryPage page = new ODirectoryPage(cacheEntry, cacheEntry);
 
@@ -318,7 +318,7 @@ public class OHashTableDirectory extends ODurableComponent {
   private ODirectoryPage loadPage(final int nodeIndex, final boolean exclusiveLock)
       throws IOException {
     if (nodeIndex < ODirectoryFirstPage.NODES_PER_PAGE) {
-      final OCacheEntryImpl cacheEntry;
+      final OCacheEntry cacheEntry;
 
       if (exclusiveLock) {
         cacheEntry = loadPageForWrite(fileId, firstEntryIndex, true, true);
@@ -331,7 +331,7 @@ public class OHashTableDirectory extends ODurableComponent {
 
     final int pageIndex = nodeIndex / ODirectoryPage.NODES_PER_PAGE;
 
-    final OCacheEntryImpl cacheEntry;
+    final OCacheEntry cacheEntry;
 
     if (exclusiveLock) {
       cacheEntry = loadPageForWrite(fileId, pageIndex, true, true);
@@ -343,7 +343,7 @@ public class OHashTableDirectory extends ODurableComponent {
   }
 
   private void releasePage(final ODirectoryPage page, final boolean exclusiveLock) {
-    final OCacheEntryImpl cacheEntry = page.getEntry();
+    final OCacheEntry cacheEntry = page.getEntry();
 
     if (exclusiveLock) {
       releasePageFromWrite(cacheEntry);

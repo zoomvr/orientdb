@@ -26,7 +26,7 @@ import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.record.ORecordVersionHelper;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 /**
@@ -60,7 +60,7 @@ public final class OClusterPage extends ODurablePage {
   private static final int ENTRY_KIND_UNKNOWN = 0;
   private static final int ENTRY_KIND_DATA    = +1;
 
-  public OClusterPage(OCacheEntryImpl cacheEntry, boolean newPage) {
+  public OClusterPage(OCacheEntry cacheEntry, boolean newPage) {
     super(cacheEntry);
 
     if (newPage) {

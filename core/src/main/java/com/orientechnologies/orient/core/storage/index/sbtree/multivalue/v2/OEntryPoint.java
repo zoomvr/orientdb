@@ -3,7 +3,7 @@ package com.orientechnologies.orient.core.storage.index.sbtree.multivalue.v2;
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 final class OEntryPoint<K> extends ODurablePage {
@@ -13,7 +13,7 @@ final class OEntryPoint<K> extends ODurablePage {
   private static final int PAGES_SIZE_OFFSET     = TREE_SIZE_OFFSET + OLongSerializer.LONG_SIZE;
   private static final int ENTRY_ID_OFFSET       = PAGES_SIZE_OFFSET + OIntegerSerializer.INT_SIZE;
 
-  OEntryPoint(final OCacheEntryImpl cacheEntry) {
+  OEntryPoint(final OCacheEntry cacheEntry) {
     super(cacheEntry);
   }
 

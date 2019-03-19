@@ -1,6 +1,6 @@
 package com.orientechnologies.orient.core.storage.cache.chm;
 
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 
 import java.util.Iterator;
@@ -14,9 +14,9 @@ final class WTinyLFUPolicy {
   private static final int EDEN_PERCENT         = 20;
   private static final int PROBATIONARY_PERCENT = 20;
 
-  private volatile int                                         maxSize;
-  private final    ConcurrentHashMap<PageKey, OCacheEntryImpl> data;
-  private final    Admittor                                    admittor;
+  private volatile int                                     maxSize;
+  private final    ConcurrentHashMap<PageKey, OCacheEntry> data;
+  private final    Admittor                                admittor;
 
   private final AtomicInteger cacheSize;
 
@@ -28,7 +28,7 @@ final class WTinyLFUPolicy {
   private int maxProtectedSize;
   private int maxSecondLevelSize;
 
-  WTinyLFUPolicy(final ConcurrentHashMap<PageKey, OCacheEntryImpl> data, final Admittor admittor, final AtomicInteger cacheSize) {
+  WTinyLFUPolicy(final ConcurrentHashMap<PageKey, OCacheEntry> data, final Admittor admittor, final AtomicInteger cacheSize) {
     this.data = data;
     this.admittor = admittor;
     this.cacheSize = cacheSize;
@@ -50,7 +50,7 @@ final class WTinyLFUPolicy {
     return maxSize;
   }
 
-  void onAccess(OCacheEntryImpl cacheEntry) {
+  void onAccess(OCacheEntry cacheEntry) {
     admittor.increment(PageKey.hashCode(cacheEntry.getFileId(), (int) cacheEntry.getPageIndex()));
 
     if (!cacheEntry.isDead()) {
@@ -75,7 +75,7 @@ final class WTinyLFUPolicy {
     assert probation.size() + protection.size() <= maxSecondLevelSize;
   }
 
-  void onAdd(final OCacheEntryImpl cacheEntry) {
+  void onAdd(final OCacheEntry cacheEntry) {
     admittor.increment(PageKey.hashCode(cacheEntry.getFileId(), (int) cacheEntry.getPageIndex()));
 
     if (cacheEntry.isAlive()) {
@@ -95,13 +95,13 @@ final class WTinyLFUPolicy {
 
   private void purgeEden() {
     while (eden.size() > maxEdenSize) {
-      final OCacheEntryImpl candidate = eden.poll();
+      final OCacheEntry candidate = eden.poll();
       assert candidate != null;
 
       if (probation.size() + protection.size() < maxSecondLevelSize) {
         probation.moveToTheTail(candidate);
       } else {
-        final OCacheEntryImpl victim = probation.peek();
+        final OCacheEntry victim = probation.peek();
 
         final int candidateKeyHashCode = PageKey.hashCode(candidate.getFileId(), (int) candidate.getPageIndex());
         final int victimKeyHashCode = PageKey.hashCode(victim.getFileId(), (int) victim.getPageIndex());
@@ -151,7 +151,7 @@ final class WTinyLFUPolicy {
     assert protection.size() <= maxProtectedSize;
   }
 
-  void onRemove(final OCacheEntryImpl cacheEntry) {
+  void onRemove(final OCacheEntry cacheEntry) {
     assert cacheEntry.isFrozen();
 
     if (probation.contains(cacheEntry)) {
@@ -175,15 +175,15 @@ final class WTinyLFUPolicy {
     maxSecondLevelSize = maxSize - maxEdenSize;
   }
 
-  Iterator<OCacheEntryImpl> eden() {
+  Iterator<OCacheEntry> eden() {
     return eden.iterator();
   }
 
-  Iterator<OCacheEntryImpl> protection() {
+  Iterator<OCacheEntry> protection() {
     return protection.iterator();
   }
 
-  Iterator<OCacheEntryImpl> probation() {
+  Iterator<OCacheEntry> probation() {
     return probation.iterator();
   }
 
@@ -193,22 +193,22 @@ final class WTinyLFUPolicy {
   }
 
   void assertConsistency() {
-    for (final OCacheEntryImpl cacheEntry : data.values()) {
+    for (final OCacheEntry cacheEntry : data.values()) {
       assert eden.contains(cacheEntry) || protection.contains(cacheEntry) || probation.contains(cacheEntry);
     }
 
     int counter = 0;
-    for (final OCacheEntryImpl cacheEntry : eden) {
+    for (final OCacheEntry cacheEntry : eden) {
       assert data.get(new PageKey(cacheEntry.getFileId(), (int) cacheEntry.getPageIndex())) == cacheEntry;
       counter++;
     }
 
-    for (final OCacheEntryImpl cacheEntry : probation) {
+    for (final OCacheEntry cacheEntry : probation) {
       assert data.get(new PageKey(cacheEntry.getFileId(), (int) cacheEntry.getPageIndex())) == cacheEntry;
       counter++;
     }
 
-    for (final OCacheEntryImpl cacheEntry : protection) {
+    for (final OCacheEntry cacheEntry : protection) {
       assert data.get(new PageKey(cacheEntry.getFileId(), (int) cacheEntry.getPageIndex())) == cacheEntry;
       counter++;
     }

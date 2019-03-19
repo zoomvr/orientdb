@@ -25,7 +25,7 @@ import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.common.serialization.types.OShortSerializer;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OSBTree;
 
@@ -58,7 +58,7 @@ final class ONullBucket extends ODurablePage {
 
   private final OSBTree<OMultiValueEntry, Byte> multiContainer;
 
-  ONullBucket(final OCacheEntryImpl cacheEntry, final OSBTree<OMultiValueEntry, Byte> multiContainer) {
+  ONullBucket(final OCacheEntry cacheEntry, final OSBTree<OMultiValueEntry, Byte> multiContainer) {
     super(cacheEntry);
 
     this.multiContainer = multiContainer;

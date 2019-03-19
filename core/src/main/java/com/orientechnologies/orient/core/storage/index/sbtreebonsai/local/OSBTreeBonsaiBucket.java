@@ -27,7 +27,7 @@ import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.exception.OSBTreeBonsaiLocalException;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -134,7 +134,7 @@ public class OSBTreeBonsaiBucket<K, V> extends OBonsaiBucketAbstract {
     }
   }
 
-  public OSBTreeBonsaiBucket(OCacheEntryImpl cacheEntry, int pageOffset, boolean isLeaf, OBinarySerializer<K> keySerializer,
+  public OSBTreeBonsaiBucket(OCacheEntry cacheEntry, int pageOffset, boolean isLeaf, OBinarySerializer<K> keySerializer,
       OBinarySerializer<V> valueSerializer, OSBTreeBonsaiLocal<K, V> tree) {
     super(cacheEntry);
 
@@ -158,7 +158,7 @@ public class OSBTreeBonsaiBucket<K, V> extends OBonsaiBucketAbstract {
     this.tree = tree;
   }
 
-  public OSBTreeBonsaiBucket(OCacheEntryImpl cacheEntry, int pageOffset, OBinarySerializer<K> keySerializer,
+  public OSBTreeBonsaiBucket(OCacheEntry cacheEntry, int pageOffset, OBinarySerializer<K> keySerializer,
       OBinarySerializer<V> valueSerializer, OSBTreeBonsaiLocal<K, V> tree) {
     super(cacheEntry);
 

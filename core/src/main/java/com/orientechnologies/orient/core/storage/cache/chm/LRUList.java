@@ -1,19 +1,19 @@
 package com.orientechnologies.orient.core.storage.cache.chm;
 
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-public final class LRUList implements Iterable<OCacheEntryImpl> {
+public final class LRUList implements Iterable<OCacheEntry> {
   private int size;
 
-  private OCacheEntryImpl head;
-  private OCacheEntryImpl tail;
+  private OCacheEntry head;
+  private OCacheEntry tail;
 
-  void remove(final OCacheEntryImpl entry) {
-    final OCacheEntryImpl next = entry.getNext();
-    final OCacheEntryImpl prev = entry.getPrev();
+  void remove(final OCacheEntry entry) {
+    final OCacheEntry next = entry.getNext();
+    final OCacheEntry prev = entry.getPrev();
 
     if (!(next != null || prev != null || entry == head)) {
       return;
@@ -47,18 +47,18 @@ public final class LRUList implements Iterable<OCacheEntryImpl> {
     size--;
   }
 
-  boolean contains(final OCacheEntryImpl entry) {
+  boolean contains(final OCacheEntry entry) {
     return entry.getContainer() == this;
   }
 
-  void moveToTheTail(final OCacheEntryImpl entry) {
+  void moveToTheTail(final OCacheEntry entry) {
     if (tail == entry) {
       assert entry.getNext() == null;
       return;
     }
 
-    final OCacheEntryImpl next = entry.getNext();
-    final OCacheEntryImpl prev = entry.getPrev();
+    final OCacheEntry next = entry.getNext();
+    final OCacheEntry prev = entry.getPrev();
 
     final boolean newEntry = entry.getContainer() == null;
     assert entry.getContainer() == null || entry.getContainer() == this;
@@ -102,14 +102,14 @@ public final class LRUList implements Iterable<OCacheEntryImpl> {
     return size;
   }
 
-  OCacheEntryImpl poll() {
+  OCacheEntry poll() {
     if (head == null) {
       return null;
     }
 
-    final OCacheEntryImpl entry = head;
+    final OCacheEntry entry = head;
 
-    final OCacheEntryImpl next = head.getNext();
+    final OCacheEntry next = head.getNext();
     assert next == null || next.getPrev() == head;
 
     head = next;
@@ -132,13 +132,13 @@ public final class LRUList implements Iterable<OCacheEntryImpl> {
     return entry;
   }
 
-  OCacheEntryImpl peek() {
+  OCacheEntry peek() {
     return head;
   }
 
-  public Iterator<OCacheEntryImpl> iterator() {
-    return new Iterator<OCacheEntryImpl>() {
-      private OCacheEntryImpl next = tail;
+  public Iterator<OCacheEntry> iterator() {
+    return new Iterator<OCacheEntry>() {
+      private OCacheEntry next = tail;
 
       @Override
       public boolean hasNext() {
@@ -146,11 +146,11 @@ public final class LRUList implements Iterable<OCacheEntryImpl> {
       }
 
       @Override
-      public OCacheEntryImpl next() {
+      public OCacheEntry next() {
         if (!hasNext()) {
           throw new NoSuchElementException();
         }
-        final OCacheEntryImpl result = next;
+        final OCacheEntry result = next;
         next = next.getPrev();
 
         return result;

@@ -22,7 +22,7 @@ package com.orientechnologies.orient.core.storage.index.hashindex.local;
 
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 /**
@@ -38,7 +38,7 @@ class OHashIndexFileLevelMetadataPage extends ODurablePage {
 
   private final static int ITEM_SIZE                  = OByteSerializer.BYTE_SIZE + 3 * OLongSerializer.LONG_SIZE;
 
-  public OHashIndexFileLevelMetadataPage(OCacheEntryImpl cacheEntry, boolean isNewPage) {
+  public OHashIndexFileLevelMetadataPage(OCacheEntry cacheEntry, boolean isNewPage) {
     super(cacheEntry);
 
     if (isNewPage) {

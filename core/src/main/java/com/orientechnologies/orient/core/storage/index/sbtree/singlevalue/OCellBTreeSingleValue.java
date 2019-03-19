@@ -38,7 +38,7 @@ import com.orientechnologies.orient.core.index.engine.OBaseIndexEngine;
 import com.orientechnologies.orient.core.iterator.OEmptyIterator;
 import com.orientechnologies.orient.core.iterator.OEmptyMapEntryIterator;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
@@ -128,7 +128,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
         fileId = addFile(getFullName());
         nullBucketFileId = addFile(getName() + nullFileExtension);
 
-        final OCacheEntryImpl entryPointCacheEntry = addPage(fileId);
+        final OCacheEntry entryPointCacheEntry = addPage(fileId);
         try {
           final OEntryPoint<K> entryPoint = new OEntryPoint<>(entryPointCacheEntry);
           entryPoint.init();
@@ -136,7 +136,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           releasePageFromWrite(entryPointCacheEntry);
         }
 
-        final OCacheEntryImpl rootCacheEntry = addPage(fileId);
+        final OCacheEntry rootCacheEntry = addPage(fileId);
         try {
           @SuppressWarnings("unused")
           final OSBTreeBucketSingleValue<K> rootBucket = new OSBTreeBucketSingleValue<>(rootCacheEntry, true, keySerializer,
@@ -145,7 +145,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           releasePageFromWrite(rootCacheEntry);
         }
 
-        final OCacheEntryImpl nullCacheEntry = addPage(nullBucketFileId);
+        final OCacheEntry nullCacheEntry = addPage(nullBucketFileId);
         try {
           @SuppressWarnings("unused")
           final ONullBucket nullBucket = new ONullBucket(nullCacheEntry, true);
@@ -179,7 +179,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           }
 
           final long pageIndex = bucketSearchResult.pageIndex;
-          final OCacheEntryImpl keyBucketCacheEntry = loadPageForRead(fileId, pageIndex, false);
+          final OCacheEntry keyBucketCacheEntry = loadPageForRead(fileId, pageIndex, false);
           try {
             final OSBTreeBucketSingleValue<K> keyBucket = new OSBTreeBucketSingleValue<>(keyBucketCacheEntry, keySerializer,
                 keyTypes, encryption);
@@ -188,7 +188,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
             releasePageFromRead(keyBucketCacheEntry);
           }
         } else {
-          final OCacheEntryImpl nullBucketCacheEntry = loadPageForRead(nullBucketFileId, 0, false);
+          final OCacheEntry nullBucketCacheEntry = loadPageForRead(nullBucketFileId, 0, false);
           try {
             final ONullBucket nullBucket = new ONullBucket(nullBucketCacheEntry, false);
             return nullBucket.getValue();
@@ -235,7 +235,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
 
           UpdateBucketSearchResult bucketSearchResult = findBucketForUpdate(key);
 
-          OCacheEntryImpl keyBucketCacheEntry = loadPageForWrite(fileId, bucketSearchResult.getLastPathItem(), false, true);
+          OCacheEntry keyBucketCacheEntry = loadPageForWrite(fileId, bucketSearchResult.getLastPathItem(), false, true);
           OSBTreeBucketSingleValue<K> keyBucket = new OSBTreeBucketSingleValue<>(keyBucketCacheEntry, keySerializer, keyTypes,
               encryption);
 
@@ -329,7 +329,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           }
 
         } else {
-          final OCacheEntryImpl cacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
+          final OCacheEntry cacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
 
           int sizeDiff = 0;
 
@@ -385,7 +385,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
     try {
       acquireExclusiveLock();
       try {
-        final OCacheEntryImpl nullCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
+        final OCacheEntry nullCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
         try {
           final ONullBucket nullBucket = new ONullBucket(nullCacheEntry, false);
           nullBucket.removeValue();
@@ -393,7 +393,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           releasePageFromWrite(nullCacheEntry);
         }
 
-        final OCacheEntryImpl entryPointCacheEntry = loadPageForWrite(fileId, ENTRY_POINT_INDEX, false, true);
+        final OCacheEntry entryPointCacheEntry = loadPageForWrite(fileId, ENTRY_POINT_INDEX, false, true);
         try {
           final OEntryPoint<K> entryPoint = new OEntryPoint<>(entryPointCacheEntry);
           entryPoint.init();
@@ -401,7 +401,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           releasePageFromWrite(entryPointCacheEntry);
         }
 
-        final OCacheEntryImpl cacheEntry = loadPageForWrite(fileId, ROOT_INDEX, false, true);
+        final OCacheEntry cacheEntry = loadPageForWrite(fileId, ROOT_INDEX, false, true);
         try {
           @SuppressWarnings("unused")
           final OSBTreeBucketSingleValue<K> rootBucket = new OSBTreeBucketSingleValue<>(cacheEntry, true, keySerializer, keyTypes,
@@ -488,7 +488,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
     try {
       acquireSharedLock();
       try {
-        final OCacheEntryImpl entryPointCacheEntry = loadPageForRead(fileId, ENTRY_POINT_INDEX, false);
+        final OCacheEntry entryPointCacheEntry = loadPageForRead(fileId, ENTRY_POINT_INDEX, false);
         try {
           final OEntryPoint<K> entryPoint = new OEntryPoint<>(entryPointCacheEntry);
           return entryPoint.getTreeSize();
@@ -544,7 +544,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
 
   private ORID removeNullBucket() throws IOException {
     ORID removedValue;
-    final OCacheEntryImpl nullCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
+    final OCacheEntry nullCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
     try {
       final ONullBucket nullBucket = new ONullBucket(nullCacheEntry, false);
       removedValue = nullBucket.getValue();
@@ -565,7 +565,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
 
   private ORID removeKey(final BucketSearchResult bucketSearchResult) throws IOException {
     final ORID removedValue;
-    final OCacheEntryImpl keyBucketCacheEntry = loadPageForWrite(fileId, bucketSearchResult.pageIndex, false, true);
+    final OCacheEntry keyBucketCacheEntry = loadPageForWrite(fileId, bucketSearchResult.pageIndex, false, true);
     try {
       final OSBTreeBucketSingleValue<K> keyBucket = new OSBTreeBucketSingleValue<>(keyBucketCacheEntry, keySerializer, keyTypes,
           encryption);
@@ -625,7 +625,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           return null;
         }
 
-        final OCacheEntryImpl cacheEntry = loadPageForRead(fileId, searchResult.pageIndex, false);
+        final OCacheEntry cacheEntry = loadPageForRead(fileId, searchResult.pageIndex, false);
         try {
           final OSBTreeBucketSingleValue<K> bucket = new OSBTreeBucketSingleValue<>(cacheEntry, keySerializer, keyTypes,
               encryption);
@@ -655,7 +655,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           return null;
         }
 
-        final OCacheEntryImpl cacheEntry = loadPageForRead(fileId, searchResult.pageIndex, false);
+        final OCacheEntry cacheEntry = loadPageForRead(fileId, searchResult.pageIndex, false);
         try {
           final OSBTreeBucketSingleValue<K> bucket = new OSBTreeBucketSingleValue<>(cacheEntry, keySerializer, keyTypes,
               encryption);
@@ -725,7 +725,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
   }
 
   private void updateSize(final long diffSize) throws IOException {
-    final OCacheEntryImpl entryPointCacheEntry = loadPageForWrite(fileId, ENTRY_POINT_INDEX, false, true);
+    final OCacheEntry entryPointCacheEntry = loadPageForWrite(fileId, ENTRY_POINT_INDEX, false, true);
     try {
       final OEntryPoint<K> entryPoint = new OEntryPoint<>(entryPointCacheEntry);
       entryPoint.setTreeSize(entryPoint.getTreeSize() + diffSize);
@@ -822,7 +822,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
 
     long bucketIndex = ROOT_INDEX;
 
-    OCacheEntryImpl cacheEntry = loadPageForRead(fileId, bucketIndex, false);
+    OCacheEntry cacheEntry = loadPageForRead(fileId, bucketIndex, false);
     int itemIndex = 0;
     try {
       OSBTreeBucketSingleValue<K> bucket = new OSBTreeBucketSingleValue<>(cacheEntry, keySerializer, keyTypes, encryption);
@@ -880,7 +880,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
 
     long bucketIndex = ROOT_INDEX;
 
-    OCacheEntryImpl cacheEntry = loadPageForRead(fileId, bucketIndex, false);
+    OCacheEntry cacheEntry = loadPageForRead(fileId, bucketIndex, false);
 
     OSBTreeBucketSingleValue<K> bucket = new OSBTreeBucketSingleValue<>(cacheEntry, keySerializer, keyTypes, encryption);
 
@@ -1007,7 +1007,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
     return keyFrom;
   }
 
-  private UpdateBucketSearchResult splitBucket(final OSBTreeBucketSingleValue<K> bucketToSplit, final OCacheEntryImpl entryToSplit,
+  private UpdateBucketSearchResult splitBucket(final OSBTreeBucketSingleValue<K> bucketToSplit, final OCacheEntry entryToSplit,
       final List<Long> path, final List<Integer> itemPointers, final int keyIndex, final OAtomicOperation atomicOperation)
       throws IOException {
     final boolean splitLeaf = bucketToSplit.isLeaf();
@@ -1035,8 +1035,8 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
       final long pageIndex, final OSBTreeBucketSingleValue<K> bucketToSplit, final boolean splitLeaf, final int indexToSplit,
       final K separationKey, final List<byte[]> rightEntries, final OAtomicOperation atomicOperation) throws IOException {
 
-    final OCacheEntryImpl rightBucketEntry;
-    final OCacheEntryImpl entryPointCacheEntry = loadPageForWrite(fileId, ENTRY_POINT_INDEX, false, true);
+    final OCacheEntry rightBucketEntry;
+    final OCacheEntry entryPointCacheEntry = loadPageForWrite(fileId, ENTRY_POINT_INDEX, false, true);
     try {
       final OEntryPoint<K> entryPoint = new OEntryPoint<>(entryPointCacheEntry);
       final int pageSize = entryPoint.getPagesSize();
@@ -1070,7 +1070,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
         bucketToSplit.setRightSibling(rightBucketEntry.getPageIndex());
 
         if (rightSiblingPageIndex >= 0) {
-          final OCacheEntryImpl rightSiblingBucketEntry = loadPageForWrite(fileId, rightSiblingPageIndex, false, true);
+          final OCacheEntry rightSiblingBucketEntry = loadPageForWrite(fileId, rightSiblingPageIndex, false, true);
           final OSBTreeBucketSingleValue<K> rightSiblingBucket = new OSBTreeBucketSingleValue<>(rightSiblingBucketEntry,
               keySerializer, keyTypes, encryption);
           try {
@@ -1082,7 +1082,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
       }
 
       long parentIndex = path.get(path.size() - 2);
-      OCacheEntryImpl parentCacheEntry = loadPageForWrite(fileId, parentIndex, false, true);
+      OCacheEntry parentCacheEntry = loadPageForWrite(fileId, parentIndex, false, true);
       try {
         OSBTreeBucketSingleValue<K> parentBucket = new OSBTreeBucketSingleValue<>(parentCacheEntry, keySerializer, keyTypes,
             encryption);
@@ -1137,7 +1137,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
     return new UpdateBucketSearchResult(resultItemPointers, resultPath, keyIndex - indexToSplit - 1);
   }
 
-  private UpdateBucketSearchResult splitRootBucket(final int keyIndex, final OCacheEntryImpl bucketEntry,
+  private UpdateBucketSearchResult splitRootBucket(final int keyIndex, final OCacheEntry bucketEntry,
       OSBTreeBucketSingleValue<K> bucketToSplit, final boolean splitLeaf, final int indexToSplit, final K separationKey,
       final List<byte[]> rightEntries) throws IOException {
     final List<byte[]> leftEntries = new ArrayList<>(indexToSplit);
@@ -1146,10 +1146,10 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
       leftEntries.add(bucketToSplit.getRawEntry(i));
     }
 
-    final OCacheEntryImpl leftBucketEntry;
-    final OCacheEntryImpl rightBucketEntry;
+    final OCacheEntry leftBucketEntry;
+    final OCacheEntry rightBucketEntry;
 
-    final OCacheEntryImpl entryPointCacheEntry = loadPageForWrite(fileId, ENTRY_POINT_INDEX, false, true);
+    final OCacheEntry entryPointCacheEntry = loadPageForWrite(fileId, ENTRY_POINT_INDEX, false, true);
     try {
       final OEntryPoint<K> entryPoint = new OEntryPoint<>(entryPointCacheEntry);
       int pageSize = entryPoint.getPagesSize();
@@ -1246,7 +1246,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
             this);
       }
 
-      final OCacheEntryImpl bucketEntry = loadPageForRead(fileId, pageIndex, false);
+      final OCacheEntry bucketEntry = loadPageForRead(fileId, pageIndex, false);
       try {
         final OSBTreeBucketSingleValue<K> keyBucket = new OSBTreeBucketSingleValue<>(bucketEntry, keySerializer, keyTypes,
             encryption);
@@ -1286,7 +1286,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
       }
 
       path.add(pageIndex);
-      final OCacheEntryImpl bucketEntry = loadPageForRead(fileId, pageIndex, false);
+      final OCacheEntry bucketEntry = loadPageForRead(fileId, pageIndex, false);
       try {
         final OSBTreeBucketSingleValue<K> keyBucket = new OSBTreeBucketSingleValue<>(bucketEntry, keySerializer, keyTypes,
             encryption);
@@ -1471,7 +1471,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
               break;
             }
 
-            final OCacheEntryImpl entryPointCacheEntry = loadPageForRead(fileId, ENTRY_POINT_INDEX, false);
+            final OCacheEntry entryPointCacheEntry = loadPageForRead(fileId, ENTRY_POINT_INDEX, false);
             try {
               final OEntryPoint<K> entryPoint = new OEntryPoint<>(entryPointCacheEntry);
               if (pageIndex >= entryPoint.getPagesSize() + 1) {
@@ -1482,7 +1482,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
               releasePageFromRead(entryPointCacheEntry);
             }
 
-            final OCacheEntryImpl cacheEntry = loadPageForRead(fileId, pageIndex, false);
+            final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false);
             try {
               final OSBTreeBucketSingleValue<K> bucket = new OSBTreeBucketSingleValue<>(cacheEntry, keySerializer, keyTypes,
                   encryption);
@@ -1602,7 +1602,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
               break;
             }
 
-            final OCacheEntryImpl cacheEntry = loadPageForRead(fileId, pageIndex, false);
+            final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false);
             try {
               final OSBTreeBucketSingleValue<K> bucket = new OSBTreeBucketSingleValue<>(cacheEntry, keySerializer, keyTypes,
                   encryption);
@@ -1736,7 +1736,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
               break;
             }
 
-            final OCacheEntryImpl cacheEntry = loadPageForRead(fileId, pageIndex, false);
+            final OCacheEntry cacheEntry = loadPageForRead(fileId, pageIndex, false);
             try {
               final OSBTreeBucketSingleValue<K> bucket = new OSBTreeBucketSingleValue<>(cacheEntry, keySerializer, keyTypes,
                   encryption);

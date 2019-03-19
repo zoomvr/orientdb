@@ -20,7 +20,7 @@
 package com.orientechnologies.orient.core.storage.index.sbtree.local;
 
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
-import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 
 /**
@@ -39,7 +39,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODura
 public class ONullBucket<V> extends ODurablePage {
   private final OBinarySerializer<V> valueSerializer;
 
-  public ONullBucket(OCacheEntryImpl cacheEntry, OBinarySerializer<V> valueSerializer, boolean isNew) {
+  public ONullBucket(OCacheEntry cacheEntry, OBinarySerializer<V> valueSerializer, boolean isNew) {
     super(cacheEntry);
     this.valueSerializer = valueSerializer;
 
