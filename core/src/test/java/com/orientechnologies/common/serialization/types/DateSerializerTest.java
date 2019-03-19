@@ -16,14 +16,14 @@
 
 package com.orientechnologies.common.serialization.types;
 
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Calendar;
 import java.util.Date;
-
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChangesTree;
-import org.junit.Assert;import org.junit.Before; import org.junit.Test;
 /**
  * @author Ilya Bershadskiy (ibersh20-at-gmail.com)
  * @since 20.01.12
@@ -39,10 +39,12 @@ public class DateSerializerTest {
     dateSerializer = new ODateSerializer();
   }
 
+  @Test
   public void testFieldSize() {
     Assert.assertEquals(dateSerializer.getObjectSize(OBJECT), FIELD_SIZE);
   }
 
+  @Test
   public void testSerialize() {
     dateSerializer.serialize(OBJECT, stream, 0);
     Calendar calendar = Calendar.getInstance();
@@ -54,6 +56,7 @@ public class DateSerializerTest {
     Assert.assertEquals(dateSerializer.deserialize(stream, 0), calendar.getTime());
   }
 
+  @Test
   public void testSerializeNative() {
     dateSerializer.serializeNativeObject(OBJECT, stream, 0);
     Calendar calendar = Calendar.getInstance();
@@ -65,6 +68,7 @@ public class DateSerializerTest {
     Assert.assertEquals(dateSerializer.deserializeNativeObject(stream, 0), calendar.getTime());
   }
 
+  @Test
   public void testNativeDirectMemoryCompatibility() {
     dateSerializer.serializeNativeObject(OBJECT, stream, 0);
     Calendar calendar = Calendar.getInstance();
@@ -82,6 +86,7 @@ public class DateSerializerTest {
     Assert.assertEquals(dateSerializer.deserializeFromByteBufferObject(buffer), calendar.getTime());
   }
 
+  @Test
   public void testSerializeInByteBuffer() {
     final int serializationOffset = 5;
 
@@ -107,25 +112,5 @@ public class DateSerializerTest {
     Assert.assertEquals(dateSerializer.deserializeFromByteBufferObject(buffer), calendar.getTime());
 
     Assert.assertEquals(buffer.position() - serializationOffset, binarySize);
-  }
-
-  public void testSerializeWALChanges() {
-    final int serializationOffset = 5;
-    final ByteBuffer buffer = ByteBuffer.allocateDirect(FIELD_SIZE + serializationOffset).order(ByteOrder.nativeOrder());
-    final byte[] data = new byte[FIELD_SIZE];
-    dateSerializer.serializeNativeObject(OBJECT, data, 0);
-    final OWALChanges walChanges = new OWALChangesTree();
-    walChanges.setBinaryValue(buffer, data, serializationOffset);
-
-    Calendar calendar = Calendar.getInstance();
-    calendar.setTime(OBJECT);
-    calendar.set(Calendar.HOUR_OF_DAY, 0);
-    calendar.set(Calendar.MINUTE, 0);
-    calendar.set(Calendar.SECOND, 0);
-    calendar.set(Calendar.MILLISECOND, 0);
-
-    Assert.assertEquals(dateSerializer.getObjectSizeInByteBuffer(buffer, walChanges, serializationOffset), FIELD_SIZE);
-    Assert
-        .assertEquals(dateSerializer.deserializeFromByteBufferObject(buffer, walChanges, serializationOffset), calendar.getTime());
   }
 }

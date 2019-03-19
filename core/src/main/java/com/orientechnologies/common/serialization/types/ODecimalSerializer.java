@@ -20,8 +20,6 @@
 
 package com.orientechnologies.common.serialization.types;
 
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -131,25 +129,4 @@ public class ODecimalSerializer implements OBinarySerializer<BigDecimal> {
     return OIntegerSerializer.INT_SIZE + OBinaryTypeSerializer.INSTANCE.getObjectSizeInByteBuffer(buffer);
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public BigDecimal deserializeFromByteBufferObject(ByteBuffer buffer, OWALChanges walChanges, int offset) {
-    final int scale = walChanges.getIntValue(buffer, offset);
-    offset += OIntegerSerializer.INT_SIZE;
-
-    final byte[] unscaledValue = OBinaryTypeSerializer.INSTANCE.deserializeFromByteBufferObject(buffer, walChanges, offset);
-
-    return new BigDecimal(new BigInteger(unscaledValue), scale);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public int getObjectSizeInByteBuffer(ByteBuffer buffer, OWALChanges walChanges, int offset) {
-    return OIntegerSerializer.INT_SIZE + OBinaryTypeSerializer.INSTANCE
-        .getObjectSizeInByteBuffer(buffer, walChanges, offset + OIntegerSerializer.INT_SIZE);
-  }
 }

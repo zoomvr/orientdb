@@ -22,7 +22,6 @@ package com.orientechnologies.orient.core.storage.cache;
 
 import com.orientechnologies.orient.core.storage.cache.chm.LRUList;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -59,8 +58,6 @@ public interface OCacheEntry {
   boolean isLockAcquiredByCurrentThread();
 
   void decrementUsages();
-
-  OWALChanges getChanges();
 
   OLogSequenceNumber getEndLSN();
 

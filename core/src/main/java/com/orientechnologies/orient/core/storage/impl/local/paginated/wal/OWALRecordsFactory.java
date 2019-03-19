@@ -46,7 +46,6 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_END_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_START_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.NON_TX_OPERATION_PERFORMED_WAL_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.UPDATE_PAGE_RECORD;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -117,9 +116,6 @@ public final class OWALRecordsFactory {
 
     final OWriteableWALRecord walRecord;
     switch (content[0]) {
-    case UPDATE_PAGE_RECORD:
-      walRecord = new OUpdatePageRecord();
-      break;
     case FUZZY_CHECKPOINT_START_RECORD:
       walRecord = new OFuzzyCheckpointStartRecord();
       break;

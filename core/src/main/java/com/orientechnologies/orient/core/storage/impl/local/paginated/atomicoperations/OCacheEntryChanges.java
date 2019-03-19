@@ -4,16 +4,13 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 import com.orientechnologies.orient.core.storage.cache.chm.LRUList;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALPageChangesPortion;
 
 /**
  * Created by tglman on 23/06/16.
  */
 public class OCacheEntryChanges implements OCacheEntry {
 
-  OCacheEntry delegate;
-  final OWALChanges changes = new OWALPageChangesPortion();
+  private OCacheEntry delegate;
 
   boolean isNew;
   boolean pinPage;
@@ -94,11 +91,6 @@ public class OCacheEntryChanges implements OCacheEntry {
   @Override
   public void decrementUsages() {
     delegate.decrementUsages();
-  }
-
-  @Override
-  public OWALChanges getChanges() {
-    return changes;
   }
 
   public void setDelegate(final OCacheEntry delegate) {

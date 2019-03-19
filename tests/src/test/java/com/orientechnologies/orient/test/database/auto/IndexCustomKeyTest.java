@@ -23,7 +23,6 @@ import com.orientechnologies.orient.core.index.ORuntimeKeyIndexDefinition;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.serialization.OSerializableStream;
 import com.orientechnologies.orient.core.serialization.serializer.binary.OBinarySerializerFactory;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
 import com.orientechnologies.orient.core.tx.OTransaction;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -167,15 +166,6 @@ public class IndexCustomKeyTest extends DocumentDBBaseTest {
       return LENGTH;
     }
 
-    @Override
-    public ComparableBinary deserializeFromByteBufferObject(ByteBuffer buffer, OWALChanges walChanges, int offset) {
-      return new ComparableBinary(walChanges.getBinaryValue(buffer, offset, LENGTH));
-    }
-
-    @Override
-    public int getObjectSizeInByteBuffer(ByteBuffer buffer, OWALChanges walChanges, int offset) {
-      return LENGTH;
-    }
   }
 
   protected OIndex<?> getIndex() {

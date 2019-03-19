@@ -3,7 +3,6 @@ package com.orientechnologies.orient.core.storage.index.sbtree.multivalue.v2;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.common.serialization.types.OShortSerializer;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
 
 import java.nio.ByteBuffer;
 
@@ -119,23 +118,4 @@ public class MultiValueEntrySerializer implements OBinarySerializer<OMultiValueE
     return 2 * OLongSerializer.LONG_SIZE + OShortSerializer.SHORT_SIZE;
   }
 
-  @Override
-  public OMultiValueEntry deserializeFromByteBufferObject(final ByteBuffer buffer, final OWALChanges walChanges, final int offset) {
-    int position = offset;
-
-    final long id = walChanges.getLongValue(buffer, position);
-    position += OLongSerializer.LONG_SIZE;
-
-    final int clusterId = walChanges.getShortValue(buffer, position);
-    position += OShortSerializer.SHORT_SIZE;
-
-    final long clusterPosition = walChanges.getLongValue(buffer, position);
-
-    return new OMultiValueEntry(id, clusterId, clusterPosition);
-  }
-
-  @Override
-  public int getObjectSizeInByteBuffer(final ByteBuffer buffer, final OWALChanges walChanges, final int offset) {
-    return 2 * OLongSerializer.LONG_SIZE + OShortSerializer.SHORT_SIZE;
-  }
 }

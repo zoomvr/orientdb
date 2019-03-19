@@ -22,7 +22,6 @@ package com.orientechnologies.common.serialization.types;
 
 import com.orientechnologies.common.serialization.OBinaryConverter;
 import com.orientechnologies.common.serialization.OBinaryConverterFactory;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -130,19 +129,4 @@ public class OShortSerializer implements OBinarySerializer<Short> {
     return SHORT_SIZE;
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public Short deserializeFromByteBufferObject(ByteBuffer buffer, OWALChanges walChanges, int offset) {
-    return walChanges.getShortValue(buffer, offset);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public int getObjectSizeInByteBuffer(ByteBuffer buffer, OWALChanges walChanges, int offset) {
-    return SHORT_SIZE;
-  }
 }

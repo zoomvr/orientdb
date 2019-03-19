@@ -23,8 +23,6 @@ package com.orientechnologies.common.serialization.types;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
-
 /**
  * @author Artem Orobets (enisher-at-gmail.com)
  */
@@ -122,21 +120,4 @@ public class OUUIDSerializer implements OBinarySerializer<UUID> {
     return UUID_SIZE;
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public UUID deserializeFromByteBufferObject(ByteBuffer buffer, OWALChanges walChanges, int offset) {
-    final long mostSignificantBits = walChanges.getLongValue(buffer, offset);
-    final long leastSignificantBits = walChanges.getLongValue(buffer, offset + OLongSerializer.LONG_SIZE);
-    return new UUID(mostSignificantBits, leastSignificantBits);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public int getObjectSizeInByteBuffer(ByteBuffer buffer, OWALChanges walChanges, int offset) {
-    return UUID_SIZE;
-  }
 }
