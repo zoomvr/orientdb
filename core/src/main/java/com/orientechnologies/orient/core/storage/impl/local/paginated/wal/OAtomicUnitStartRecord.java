@@ -20,60 +20,18 @@
 
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal;
 
-import com.orientechnologies.common.serialization.types.OByteSerializer;
-
 import java.nio.ByteBuffer;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
  * @since 24.05.13
  */
-public class OAtomicUnitStartRecord extends OOperationUnitRecord {
-  private boolean isRollbackSupported;
-
-  public OAtomicUnitStartRecord() {
+public final class OAtomicUnitStartRecord extends OOperationUnitRecord {
+  OAtomicUnitStartRecord() {
   }
 
-  public OAtomicUnitStartRecord(final boolean isRollbackSupported, final OOperationUnitId unitId) {
+  public OAtomicUnitStartRecord(final OOperationUnitId unitId) {
     super(unitId);
-    this.isRollbackSupported = isRollbackSupported;
-  }
-
-  public boolean isRollbackSupported() {
-    return isRollbackSupported;
-  }
-
-  @Override
-  public int toStream(final byte[] content, int offset) {
-    offset = super.toStream(content, offset);
-
-    content[offset] = isRollbackSupported ? (byte) 1 : 0;
-    offset++;
-
-    return offset;
-
-  }
-
-  @Override
-  public void toStream(final ByteBuffer buffer) {
-    super.toStream(buffer);
-
-    buffer.put(isRollbackSupported ? (byte) 1 : 0);
-  }
-
-  @Override
-  public int fromStream(final byte[] content, int offset) {
-    offset = super.fromStream(content, offset);
-
-    isRollbackSupported = content[offset] > 0;
-    offset++;
-
-    return offset;
-  }
-
-  @Override
-  public int serializedSize() {
-    return super.serializedSize() + OByteSerializer.BYTE_SIZE;
   }
 
   @Override
@@ -87,7 +45,10 @@ public class OAtomicUnitStartRecord extends OOperationUnitRecord {
   }
 
   @Override
-  public String toString() {
-    return toString("isRollbackSupported=" + isRollbackSupported);
+  protected void serializeToByteBuffer(final ByteBuffer buffer) {
+  }
+
+  @Override
+  protected void deserializeFromByteBuffer(final ByteBuffer buffer) {
   }
 }

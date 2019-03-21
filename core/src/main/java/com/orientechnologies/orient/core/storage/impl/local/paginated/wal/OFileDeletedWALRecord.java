@@ -4,7 +4,7 @@ import com.orientechnologies.common.serialization.types.OLongSerializer;
 
 import java.nio.ByteBuffer;
 
-public class OFileDeletedWALRecord extends OOperationUnitBodyRecord {
+public final class OFileDeletedWALRecord extends OOperationUnitBodyRecord {
   private long fileId;
 
   public OFileDeletedWALRecord() {
@@ -20,30 +20,13 @@ public class OFileDeletedWALRecord extends OOperationUnitBodyRecord {
   }
 
   @Override
-  public int toStream(byte[] content, int offset) {
-    offset = super.toStream(content, offset);
-
-    OLongSerializer.INSTANCE.serializeNative(fileId, content, offset);
-    offset += OLongSerializer.LONG_SIZE;
-
-    return offset;
-  }
-
-  @Override
-  public void toStream(final ByteBuffer buffer) {
-    super.toStream(buffer);
+  protected void serializeToByteBuffer(final ByteBuffer buffer) {
     buffer.putLong(fileId);
   }
 
-
   @Override
-  public int fromStream(byte[] content, int offset) {
-    offset = super.fromStream(content, offset);
-
-    fileId = OLongSerializer.INSTANCE.deserializeNative(content, offset);
-    offset += OLongSerializer.LONG_SIZE;
-
-    return offset;
+  protected void deserializeFromByteBuffer(final ByteBuffer buffer) {
+    fileId = buffer.getLong();
   }
 
   @Override

@@ -1015,7 +1015,7 @@ public final class OCASDiskWriteAheadLog implements OWriteAheadLog {
   }
 
   public OLogSequenceNumber logAtomicOperationStartRecord(final boolean isRollbackSupported, final OOperationUnitId unitId) {
-    final OAtomicUnitStartRecord record = new OAtomicUnitStartRecord(isRollbackSupported, unitId);
+    final OAtomicUnitStartRecord record = new OAtomicUnitStartRecord(unitId);
     return log(record);
   }
 

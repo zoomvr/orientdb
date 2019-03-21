@@ -16,6 +16,7 @@
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -36,25 +37,44 @@ public abstract class OOperationUnitRecord extends OAbstractWALRecord {
   }
 
   @Override
-  public int toStream(final byte[] content, final int offset) {
-    return operationUnitId.toStream(content, offset);
-  }
+  public final int toStream(final byte[] content, final int offset) {
+    final ByteBuffer buffer = ByteBuffer.wrap(content).order(ByteOrder.nativeOrder());
+    buffer.position(offset);
 
-  @Override
-  public void toStream(ByteBuffer buffer) {
     operationUnitId.toStream(buffer);
+
+    serializeToByteBuffer(buffer);
+
+    return buffer.position();
   }
 
   @Override
-  public int fromStream(final byte[] content, final int offset) {
+  public final void toStream(ByteBuffer buffer) {
+    operationUnitId.toStream(buffer);
+    serializeToByteBuffer(buffer);
+  }
+
+  @Override
+  public final int fromStream(final byte[] content, final int offset) {
+    final ByteBuffer buffer = ByteBuffer.wrap(content).order(ByteOrder.nativeOrder());
+    buffer.position(offset);
+
     operationUnitId = new OOperationUnitId();
-    return operationUnitId.fromStream(content, offset);
+    operationUnitId.fromStream(buffer);
+
+    deserializeFromByteBuffer(buffer);
+
+    return buffer.position();
   }
 
   @Override
   public int serializedSize() {
     return OOperationUnitId.SERIALIZED_SIZE;
   }
+
+  protected abstract void serializeToByteBuffer(final ByteBuffer buffer);
+
+  protected abstract void deserializeFromByteBuffer(final ByteBuffer buffer);
 
   @Override
   public boolean equals(final Object o) {
