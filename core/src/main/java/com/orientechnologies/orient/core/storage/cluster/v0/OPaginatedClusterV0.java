@@ -1218,25 +1218,8 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
   }
 
   @Override
-  public void truncate() throws IOException {
-    boolean rollback = false;
-    startAtomicOperation(true);
-    try {
-      acquireExclusiveLock();
-      try {
-        truncateFile(fileId);
-        clusterPositionMap.truncate();
-
-        initCusterState();
-      } finally {
-        releaseExclusiveLock();
-      }
-    } catch (final Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
-    }
+  public void truncate() {
+    throw new UnsupportedOperationException("Cluster truncation is not supported because it is not durable");
   }
 
   @Override
