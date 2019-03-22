@@ -25,6 +25,7 @@ public class OPaginatedClusterCreateCOSerializationTest {
     pos = restoredClusterCreateCO.fromStream(stream, 1);
 
     Assert.assertEquals(size + 1, pos);
+    Assert.assertEquals(operationUnitId, restoredClusterCreateCO.getOperationUnitId());
     Assert.assertEquals(clusterName, restoredClusterCreateCO.getClusterName());
     Assert.assertEquals(clusterId, restoredClusterCreateCO.getClusterId());
   }

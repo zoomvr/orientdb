@@ -32,6 +32,7 @@ import com.orientechnologies.orient.core.conflict.ORecordConflictStrategy;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.encryption.OEncryptionFactory;
+import com.orientechnologies.orient.core.exception.ONotEmptyClusterCanNotBeDeletedException;
 import com.orientechnologies.orient.core.exception.OPaginatedClusterException;
 import com.orientechnologies.orient.core.exception.ORecordNotFoundException;
 import com.orientechnologies.orient.core.id.ORID;
@@ -54,6 +55,7 @@ import com.orientechnologies.orient.core.storage.impl.local.OClusterBrowsePage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.ORecordOperationMetadata;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteCO;
 
 import java.io.File;
 import java.io.IOException;
@@ -290,12 +292,21 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
   @Override
   public void delete() throws IOException {
     boolean rollback = false;
+    final OAtomicOperation atomicOperation = startAtomicOperation(false);
     try {
       acquireExclusiveLock();
       try {
+        final long entries = getEntries();
+        if (entries > 0) {
+          throw new ONotEmptyClusterCanNotBeDeletedException(
+              "Not empty cluster can not be deleted. Cluster has " + entries + " records", this);
+        }
+
         deleteFile(fileId);
 
         clusterPositionMap.delete();
+
+        atomicOperation.addComponentOperation(new OPaginatedClusterDeleteCO(getName(), id));
       } finally {
         releaseExclusiveLock();
       }
