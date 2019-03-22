@@ -22,11 +22,14 @@ package com.orientechnologies.orient.core.storage.impl.local.paginated.atomicope
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.OComponentOperationRecord;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,7 +40,6 @@ import java.util.Set;
  * @since 12/3/13
  */
 public final class OAtomicOperation {
-
   private final OLogSequenceNumber startLSN;
   private final OOperationUnitId   operationUnitId;
 
@@ -46,14 +48,19 @@ public final class OAtomicOperation {
 
   private final Set<String> lockedObjects = new HashSet<>();
 
-
   private final Map<String, OAtomicOperationMetadata<?>> metadata = new LinkedHashMap<>();
+
+  private final List<OComponentOperationRecord> pendingComponentOperations = new ArrayList<>();
 
   public OAtomicOperation(final OLogSequenceNumber startLSN, final OOperationUnitId operationUnitId) {
     this.startLSN = startLSN;
     this.operationUnitId = operationUnitId;
 
     startCounter = 1;
+  }
+
+  public void addComponentOperation(final OComponentOperationRecord componentOperation) {
+    pendingComponentOperations.add(componentOperation);
   }
 
   public OOperationUnitId getOperationUnitId() {

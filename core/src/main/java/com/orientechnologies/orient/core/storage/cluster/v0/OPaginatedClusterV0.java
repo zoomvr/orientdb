@@ -53,6 +53,7 @@ import com.orientechnologies.orient.core.storage.impl.local.OClusterBrowseEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OClusterBrowsePage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.ORecordOperationMetadata;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
 
 import java.io.File;
 import java.io.IOException;
@@ -174,7 +175,7 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
   @Override
   public void create(final int startSize) throws IOException {
     boolean rollback = false;
-    startAtomicOperation(false);
+    final OAtomicOperation atomicOperation = startAtomicOperation(false);
     try {
       acquireExclusiveLock();
       try {
@@ -183,6 +184,8 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
         initCusterState();
 
         clusterPositionMap.create();
+
+        atomicOperation.addComponentOperation(new OPaginatedClusterCreateCO(getName(), id));
       } finally {
         releaseExclusiveLock();
       }
@@ -1182,7 +1185,8 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
 
           updateClusterState(1, recordsSizeDiff);
 
-          clusterPositionMap.update(clusterPosition, new OClusterPositionMapBucket.PositionEntry(firstPageIndex, firstPagePosition));
+          clusterPositionMap
+              .update(clusterPosition, new OClusterPositionMapBucket.PositionEntry(firstPageIndex, firstPagePosition));
 
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
         }
@@ -1519,8 +1523,7 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
     ((OClusterBasedStorageConfiguration) storageLocal.getConfiguration()).updateCluster(config);
   }
 
-  private void updateClusterState(final long sizeDiff, final long recordsSizeDiff)
-      throws IOException {
+  private void updateClusterState(final long sizeDiff, final long recordsSizeDiff) throws IOException {
     final OCacheEntry pinnedStateEntry = loadPageForWrite(fileId, pinnedStateEntryIndex, true, true);
     try {
       final OPaginatedClusterStateV0 paginatedClusterState = new OPaginatedClusterStateV0(pinnedStateEntry);
@@ -1685,8 +1688,7 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
     return nextPagePointer >>> PAGE_INDEX_OFFSET;
   }
 
-  private AddEntryResult addEntry(final int recordVersion, final byte[] entryContent)
-      throws IOException {
+  private AddEntryResult addEntry(final int recordVersion, final byte[] entryContent) throws IOException {
     final FindFreePageResult findFreePageResult = findFreePage(entryContent.length);
 
     final int freePageIndex = findFreePageResult.freePageIndex;
@@ -1794,8 +1796,7 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
     }
   }
 
-  private void updateFreePagesIndex(final int prevFreePageIndex, final long pageIndex)
-      throws IOException {
+  private void updateFreePagesIndex(final int prevFreePageIndex, final long pageIndex) throws IOException {
     final OCacheEntry cacheEntry = loadPageForWrite(fileId, pageIndex, false, true);
 
     try {
@@ -1881,8 +1882,7 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
     }
   }
 
-  private void updateFreePagesList(final int freeListIndex, final long pageIndex)
-      throws IOException {
+  private void updateFreePagesList(final int freeListIndex, final long pageIndex) throws IOException {
     final OCacheEntry pinnedStateEntry = loadPageForWrite(fileId, pinnedStateEntryIndex, true, true);
     try {
       final OPaginatedClusterStateV0 paginatedClusterState = new OPaginatedClusterStateV0(pinnedStateEntry);

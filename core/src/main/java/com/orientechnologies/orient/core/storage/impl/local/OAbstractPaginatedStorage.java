@@ -835,21 +835,10 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
                   + ") in database '" + name + "'");
         }
 
-        final OCluster cluster = clusters.get(clusterId);
-        if (cluster == null) {
+        if (dropClusterInternal(clusterId)) {
           return false;
         }
 
-        if (iTruncate) {
-          cluster.truncate();
-        }
-        cluster.delete();
-
-        makeStorageDirty();
-        clusterMap.remove(cluster.getName().toLowerCase(configuration.getLocaleInstance()));
-        clusters.set(clusterId, null);
-
-        // UPDATE CONFIGURATION
         ((OClusterBasedStorageConfiguration) configuration).dropCluster(clusterId);
 
         return true;
@@ -866,6 +855,24 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     } catch (final Throwable t) {
       throw logAndPrepareForRethrow(t);
     }
+  }
+
+  public boolean dropClusterInternal(final int clusterId) throws IOException {
+    final OCluster cluster = clusters.get(clusterId);
+
+    if (cluster == null) {
+      return true;
+    }
+
+    cluster.delete();
+
+    makeStorageDirty();
+
+    clusterMap.remove(cluster.getName().toLowerCase(configuration.getLocaleInstance()));
+    clusters.set(clusterId, null);
+
+    // UPDATE CONFIGURATION
+    return false;
   }
 
   @Override
@@ -1064,7 +1071,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
    * not deleted - length of content is provided in above entity</li> </ol>
    *
    * @param lsn LSN from which we should find changed records
-   *
    *
    * @see OGlobalConfiguration#STORAGE_TRACK_CHANGED_RECORDS_IN_WAL
    */
@@ -4932,7 +4938,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     return addClusterInternal(clusterName, clusterPos, parameters);
   }
 
-  private int addClusterInternal(String clusterName, final int clusterPos, final Object... parameters) throws IOException {
+  public int addClusterInternal(String clusterName, final int clusterPos, final Object... parameters) throws IOException {
     final OPaginatedCluster cluster;
     if (clusterName != null) {
       clusterName = clusterName.toLowerCase(configuration.getLocaleInstance());

@@ -1,14 +1,13 @@
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal;
 
-import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import org.junit.Assert; import org.junit.Test;
-
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.ORecordOperationMetadata;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperationMetadata;
+import org.junit.Assert;
+
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class OAtomicUnitEndRecordTest {
   public void recordMetadataSerializationTest() throws IOException {
@@ -19,7 +18,7 @@ public class OAtomicUnitEndRecordTest {
     Map<String, OAtomicOperationMetadata<?>> metadata = new LinkedHashMap<String, OAtomicOperationMetadata<?>>();
     metadata.put(recordOperationMetadata.getKey(), recordOperationMetadata);
 
-    OAtomicUnitEndRecord atomicUnitEndRecord = new OAtomicUnitEndRecord(OOperationUnitId.generateId(), false, metadata);
+    OAtomicUnitEndRecord atomicUnitEndRecord = new OAtomicUnitEndRecord(OOperationUnitId.generateId(), metadata);
     int arraySize = atomicUnitEndRecord.serializedSize() + 1;
     byte[] content = new byte[arraySize];
 
@@ -38,7 +37,7 @@ public class OAtomicUnitEndRecordTest {
   }
 
   public void recordNoMetadataSerializationTest() throws IOException {
-    OAtomicUnitEndRecord atomicUnitEndRecord = new OAtomicUnitEndRecord(OOperationUnitId.generateId(), false, null);
+    OAtomicUnitEndRecord atomicUnitEndRecord = new OAtomicUnitEndRecord(OOperationUnitId.generateId(), null);
     int arraySize = atomicUnitEndRecord.serializedSize() + 1;
     byte[] content = new byte[arraySize];
 

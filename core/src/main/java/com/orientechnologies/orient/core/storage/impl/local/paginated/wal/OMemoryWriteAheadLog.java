@@ -57,7 +57,7 @@ public class OMemoryWriteAheadLog extends OAbstractWriteAheadLog {
   @Override
   public OLogSequenceNumber logAtomicOperationEndRecord(OOperationUnitId operationUnitId, boolean rollback,
       OLogSequenceNumber startLsn, Map<String, OAtomicOperationMetadata<?>> atomicOperationMetadata) throws IOException {
-    return log(new OAtomicUnitEndRecord(operationUnitId, rollback, atomicOperationMetadata));
+    return log(new OAtomicUnitEndRecord(operationUnitId, atomicOperationMetadata));
   }
 
   @Override

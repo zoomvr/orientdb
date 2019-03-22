@@ -39,19 +39,14 @@ import java.util.Set;
  * @since 24.05.13
  */
 public class OAtomicUnitEndRecord extends OOperationUnitBodyRecord {
-  private boolean rollback;
-
   private Map<String, OAtomicOperationMetadata<?>> atomicOperationMetadataMap = new LinkedHashMap<>();
 
   public OAtomicUnitEndRecord() {
   }
 
-  public OAtomicUnitEndRecord(final OOperationUnitId operationUnitId, final boolean rollback,
+  public OAtomicUnitEndRecord(final OOperationUnitId operationUnitId,
       final Map<String, OAtomicOperationMetadata<?>> atomicOperationMetadataMap) {
     super(operationUnitId);
-
-    this.rollback = rollback;
-
     assert operationUnitId != null;
 
     if (atomicOperationMetadataMap != null && atomicOperationMetadataMap.size() > 0) {
@@ -59,14 +54,8 @@ public class OAtomicUnitEndRecord extends OOperationUnitBodyRecord {
     }
   }
 
-  public boolean isRollback() {
-    return rollback;
-  }
-
   @Override
   protected void serializeToByteBuffer(final ByteBuffer buffer) {
-    buffer.put(rollback ? (byte) 1 : 0);
-
     if (atomicOperationMetadataMap.size() > 0) {
       for (final Map.Entry<String, OAtomicOperationMetadata<?>> entry : atomicOperationMetadataMap.entrySet()) {
         if (entry.getKey().equals(ORecordOperationMetadata.RID_METADATA_KEY)) {
@@ -91,8 +80,6 @@ public class OAtomicUnitEndRecord extends OOperationUnitBodyRecord {
 
   @Override
   protected void deserializeFromByteBuffer(final ByteBuffer buffer) {
-    rollback = buffer.get() > 0;
-
     atomicOperationMetadataMap = new LinkedHashMap<>();
     final int metadataId = buffer.get();
 
@@ -143,11 +130,6 @@ public class OAtomicUnitEndRecord extends OOperationUnitBodyRecord {
   @Override
   public boolean isUpdateMasterRecord() {
     return false;
-  }
-
-  @Override
-  public String toString() {
-    return toString("rollback=" + rollback);
   }
 
   @Override

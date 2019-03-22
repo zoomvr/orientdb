@@ -36,6 +36,10 @@ public abstract class OOperationUnitRecord extends OAbstractWALRecord {
     return operationUnitId;
   }
 
+  public void setOperationUnitId(final OOperationUnitId operationUnitId) {
+    this.operationUnitId = operationUnitId;
+  }
+
   @Override
   public final int toStream(final byte[] content, final int offset) {
     final ByteBuffer buffer = ByteBuffer.wrap(content).order(ByteOrder.nativeOrder());
@@ -75,29 +79,4 @@ public abstract class OOperationUnitRecord extends OAbstractWALRecord {
   protected abstract void serializeToByteBuffer(final ByteBuffer buffer);
 
   protected abstract void deserializeFromByteBuffer(final ByteBuffer buffer);
-
-  @Override
-  public boolean equals(final Object o) {
-    if (this == o)
-      return true;
-    if (o == null || getClass() != o.getClass())
-      return false;
-
-    final OOperationUnitRecord that = (OOperationUnitRecord) o;
-
-    if (!operationUnitId.equals(that.operationUnitId))
-      return false;
-
-    return true;
-  }
-
-  @Override
-  public int hashCode() {
-    return operationUnitId.hashCode();
-  }
-
-  @Override
-  public String toString() {
-    return toString("operationUnitId=" + operationUnitId);
-  }
 }
