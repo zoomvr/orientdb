@@ -60,7 +60,10 @@ public final class OAtomicOperation {
   }
 
   public void addComponentOperation(final OComponentOperationRecord componentOperation) {
-    pendingComponentOperations.add(componentOperation);
+    if (!rollback) {
+      componentOperation.setOperationUnitId(operationUnitId);
+      pendingComponentOperations.add(componentOperation);
+    }
   }
 
   public OOperationUnitId getOperationUnitId() {
