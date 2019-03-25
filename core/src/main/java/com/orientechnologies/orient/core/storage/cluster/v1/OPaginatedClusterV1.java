@@ -56,6 +56,7 @@ import com.orientechnologies.orient.core.storage.impl.local.OClusterBrowsePage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.ORecordOperationMetadata;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateRecordCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteCO;
 
 import java.io.File;
@@ -485,6 +486,8 @@ public final class OPaginatedClusterV1 extends OPaginatedCluster {
 
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
 
+          atomicOperation.addComponentOperation(new OPaginatedClusterCreateRecordCO(id, content, recordVersion, recordType,
+              allocatedPosition != null ? allocatedPosition.clusterPosition : -1));
           return createPhysicalPosition(recordType, clusterPosition, addEntryResult.recordVersion);
         } else {
           final int entrySize = content.length + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
@@ -566,6 +569,9 @@ public final class OPaginatedClusterV1 extends OPaginatedCluster {
           }
 
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
+          atomicOperation.addComponentOperation(new OPaginatedClusterCreateRecordCO(id, content, recordVersion, recordType,
+              allocatedPosition != null ? allocatedPosition.clusterPosition : -1));
+
           return createPhysicalPosition(recordType, clusterPosition, version);
 
         }

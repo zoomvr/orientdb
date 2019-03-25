@@ -875,6 +875,26 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     return false;
   }
 
+  public void createRecordInternal(final int clusterId, final byte[] content, final int recordVersion, final byte recordType,
+      final long recordPosition) throws IOException {
+    final OCluster cluster = clusters.get(clusterId);
+    final OPhysicalPosition physicalPosition;
+
+    if (recordPosition >= 0) {
+      physicalPosition = new OPhysicalPosition(recordPosition);
+    } else {
+      physicalPosition = null;
+    }
+
+    cluster.createRecord(content, recordVersion, recordType, physicalPosition);
+  }
+
+  public void deleteRecordInternal(final int clusterId, final long recordPosition) throws IOException {
+    final OCluster cluster = clusters.get(clusterId);
+
+    cluster.deleteRecord(recordPosition);
+  }
+
   @Override
   public final int getId() {
     return id;

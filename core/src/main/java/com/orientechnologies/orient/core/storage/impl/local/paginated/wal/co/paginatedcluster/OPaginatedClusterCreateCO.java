@@ -3,7 +3,6 @@ package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.pa
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OStringSerializer;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.OComponentOperationRecord;
 
@@ -31,12 +30,12 @@ public class OPaginatedClusterCreateCO extends OComponentOperationRecord {
   }
 
   @Override
-  public void undo(final OAbstractPaginatedStorage storage, final OAtomicOperation atomicOperation) throws IOException {
+  public void undo(final OAbstractPaginatedStorage storage) throws IOException {
     storage.dropClusterInternal(clusterId);
   }
 
   @Override
-  public void redo(final OAbstractPaginatedStorage storage, final OAtomicOperation atomicOperation) throws IOException {
+  public void redo(final OAbstractPaginatedStorage storage) throws IOException {
     storage.addClusterInternal(clusterName, clusterId);
   }
 
