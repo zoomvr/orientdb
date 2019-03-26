@@ -14,7 +14,7 @@ public abstract class OComponentOperationRecord extends OOperationUnitBodyRecord
     return false;
   }
 
-  public abstract void undo(OAbstractPaginatedStorage storage) throws IOException;
-
   public abstract void redo(OAbstractPaginatedStorage storage) throws IOException;
+
+  public abstract void undo(OAbstractPaginatedStorage storage) throws IOException;
 }

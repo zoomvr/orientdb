@@ -245,7 +245,7 @@ public class ClusterPageTest {
 
     int position = localPage.appendRecord(recordVersion, new byte[] { 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1 });
 
-    Assert.assertTrue(localPage.deleteRecord(position));
+    Assert.assertNotNull(localPage.deleteRecord(position));
 
     int newRecordVersion = 0;
 
@@ -297,7 +297,7 @@ public class ClusterPageTest {
 
     int position = localPage.appendRecord(recordVersion, new byte[] { 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1 });
 
-    Assert.assertTrue(localPage.deleteRecord(position));
+    Assert.assertNotNull(localPage.deleteRecord(position));
 
     int newRecordVersion = 0;
     newRecordVersion++;
@@ -354,7 +354,7 @@ public class ClusterPageTest {
 
     int position = localPage.appendRecord(recordVersion, new byte[] { 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1 });
 
-    Assert.assertTrue(localPage.deleteRecord(position));
+    Assert.assertNotNull(localPage.deleteRecord(position));
 
     Assert.assertEquals(localPage.appendRecord(recordVersion, new byte[] { 2, 2, 2, 4, 5, 6, 5, 4, 2, 2, 2 }), position);
 
@@ -403,7 +403,7 @@ public class ClusterPageTest {
 
     int position = localPage.appendRecord(recordVersion, new byte[] { 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1 });
 
-    Assert.assertTrue(localPage.deleteRecord(position));
+    Assert.assertNotNull(localPage.deleteRecord(position));
 
     Assert.assertEquals(localPage.appendRecord(recordVersion, new byte[] { 2, 2, 2, 4, 5, 6, 5, 4, 2, 2, 2 }), position);
 
@@ -466,11 +466,11 @@ public class ClusterPageTest {
 
     int freeSpace = localPage.getFreeSpace();
 
-    Assert.assertTrue(localPage.deleteRecord(0));
-    Assert.assertTrue(localPage.deleteRecord(2));
+    Assert.assertNotNull(localPage.deleteRecord(0));
+    Assert.assertNotNull(localPage.deleteRecord(2));
 
-    Assert.assertFalse(localPage.deleteRecord(0));
-    Assert.assertFalse(localPage.deleteRecord(7));
+    Assert.assertNull(localPage.deleteRecord(0));
+    Assert.assertNull(localPage.deleteRecord(7));
 
     Assert.assertEquals(localPage.findFirstDeletedRecord(0), 0);
     Assert.assertEquals(localPage.findFirstDeletedRecord(1), 2);
@@ -638,7 +638,7 @@ public class ClusterPageTest {
     Assert.assertEquals(position, 0);
     Assert.assertEquals(localPage.getRecordVersion(0), recordVersion);
 
-    Assert.assertTrue(localPage.deleteRecord(0));
+    Assert.assertNotNull(localPage.deleteRecord(0));
 
     recordVersion++;
     int freeSpace = localPage.getFreeSpace();

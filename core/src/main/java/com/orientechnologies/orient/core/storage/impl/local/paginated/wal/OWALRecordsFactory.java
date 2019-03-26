@@ -42,6 +42,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.ATOMIC_UNIT_START_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CHECKPOINT_END_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_CREATE_RECORD_CO;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_DELETE_RECORD_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CREATE_CLUSTER_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.DELETE_CLUSTER_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.EMPTY_WAL_RECORD;
@@ -158,6 +159,9 @@ public final class OWALRecordsFactory {
       walRecord = new OPaginatedClusterDeleteCO();
       break;
     case CLUSTER_CREATE_RECORD_CO:
+      walRecord = new OPaginatedClusterCreateRecordCO();
+      break;
+    case CLUSTER_DELETE_RECORD_CO:
       walRecord = new OPaginatedClusterCreateRecordCO();
       break;
     default:
