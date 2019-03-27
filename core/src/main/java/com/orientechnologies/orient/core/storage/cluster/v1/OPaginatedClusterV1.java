@@ -340,12 +340,6 @@ public final class OPaginatedClusterV1 extends OPaginatedCluster {
       case NAME:
         setNameInternal(stringValue);
         break;
-      case RECORD_GROW_FACTOR:
-        setRecordGrowFactorInternal(stringValue);
-        break;
-      case RECORD_OVERFLOW_GROW_FACTOR:
-        setRecordOverflowGrowFactorInternal(stringValue);
-        break;
       case CONFLICTSTRATEGY:
         setRecordConflictStrategy(stringValue);
         break;
