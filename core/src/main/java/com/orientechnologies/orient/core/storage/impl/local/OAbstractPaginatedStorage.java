@@ -901,6 +901,13 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     cluster.allocatePosition(recordType);
   }
 
+  public void updateRecordInternal(final int clusterId, final long clusterPosition, final byte[] recordContent,
+      final int recordVersion, final byte recordType) throws IOException {
+    final OCluster cluster = clusters.get(clusterId);
+
+    cluster.updateRecord(clusterPosition, recordContent, recordVersion, recordType);
+  }
+
   @Override
   public final int getId() {
     return id;

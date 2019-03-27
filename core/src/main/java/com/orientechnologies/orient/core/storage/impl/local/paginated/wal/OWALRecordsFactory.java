@@ -27,6 +27,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OW
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateRecordCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterUpdateRecordCO;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import net.jpountz.lz4.LZ4Compressor;
@@ -43,6 +44,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CHECKPOINT_END_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_CREATE_RECORD_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_DELETE_RECORD_CO;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_UPDATE_RECORD_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CREATE_CLUSTER_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.DELETE_CLUSTER_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.EMPTY_WAL_RECORD;
@@ -163,6 +165,9 @@ public final class OWALRecordsFactory {
       break;
     case CLUSTER_DELETE_RECORD_CO:
       walRecord = new OPaginatedClusterCreateRecordCO();
+      break;
+    case CLUSTER_UPDATE_RECORD_CO:
+      walRecord = new OPaginatedClusterUpdateRecordCO();
       break;
     default:
       if (idToTypeMap.containsKey(content[0]))
