@@ -19,6 +19,7 @@
  */
 package com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations;
 
+import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
@@ -40,8 +41,9 @@ import java.util.Set;
  * @since 12/3/13
  */
 public final class OAtomicOperation {
-  private final OLogSequenceNumber startLSN;
-  private final OOperationUnitId   operationUnitId;
+  private final OLogSequenceNumber        startLSN;
+  private final OOperationUnitId          operationUnitId;
+  private final OAbstractPaginatedStorage storage;
 
   private int     startCounter;
   private boolean rollback;
@@ -52,9 +54,11 @@ public final class OAtomicOperation {
 
   private final List<OComponentOperationRecord> pendingComponentOperations = new ArrayList<>();
 
-  public OAtomicOperation(final OLogSequenceNumber startLSN, final OOperationUnitId operationUnitId) {
+  public OAtomicOperation(final OLogSequenceNumber startLSN, final OOperationUnitId operationUnitId,
+      final OAbstractPaginatedStorage storage) {
     this.startLSN = startLSN;
     this.operationUnitId = operationUnitId;
+    this.storage = storage;
 
     startCounter = 1;
   }
@@ -98,8 +102,41 @@ public final class OAtomicOperation {
     return Collections.unmodifiableMap(metadata);
   }
 
-  OLogSequenceNumber finalizeTx(final OWriteAheadLog writeAheadLog) throws IOException {
-    return writeAheadLog.logAtomicOperationEndRecord(getOperationUnitId(), rollback, this.startLSN, getMetadata());
+  OLogSequenceNumber commitTx(final OWriteAheadLog writeAheadLog, final boolean useWAL) throws IOException {
+    assert !rollback;
+
+    final OLogSequenceNumber lsn;
+    if (useWAL && writeAheadLog != null) {
+      lsn = writeAheadLog.logAtomicOperationEndRecord(getOperationUnitId(), false, this.startLSN, getMetadata());
+    } else {
+      lsn = null;
+    }
+
+    pendingComponentOperations.clear();
+
+    return lsn;
+  }
+
+  OLogSequenceNumber rollbackTx(final OWriteAheadLog writeAheadLog, final boolean useWAL) throws IOException {
+    assert rollback;
+
+    final List<OComponentOperationRecord> operationsSnapshot = new ArrayList<>(pendingComponentOperations);
+    Collections.reverse(operationsSnapshot);
+
+    for (final OComponentOperationRecord operation : operationsSnapshot) {
+      operation.undo(storage);
+    }
+
+    pendingComponentOperations.clear();
+
+    final OLogSequenceNumber lsn;
+    if (useWAL && writeAheadLog != null) {
+      lsn = writeAheadLog.logAtomicOperationEndRecord(getOperationUnitId(), true, this.startLSN, getMetadata());
+    } else {
+      lsn = null;
+    }
+
+    return lsn;
   }
 
   void incrementCounter() {
