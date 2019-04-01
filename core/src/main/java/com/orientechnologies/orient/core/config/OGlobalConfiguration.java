@@ -31,6 +31,7 @@ import com.orientechnologies.orient.core.index.OIndexDefinition;
 import com.orientechnologies.orient.core.metadata.OMetadataDefault;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.ORecordSerializerBinary;
 import com.orientechnologies.orient.core.storage.OChecksumMode;
+import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
 
 import java.io.PrintStream;
 import java.util.Locale;
@@ -222,6 +223,9 @@ public enum OGlobalConfiguration {// ENVIRONMENT
 
   STORAGE_CALL_FSYNC("storage.callFsync", "Call fsync during fuzzy checkpoints or WAL writes, true by default", Boolean.class,
       true),
+
+  STORAGE_CLUSTER_VERSION("storage.cluster.version", "Binary version of cluster which will be used inside of storage",
+      Integer.class, OPaginatedCluster.getLatestBinaryVersion()),
 
   STORAGE_PRINT_WAL_PERFORMANCE_STATISTICS("storage.printWALPerformanceStatistics",
       "Periodically prints statistics about WAL performance", Boolean.class, false),

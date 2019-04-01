@@ -104,6 +104,7 @@ public final class OClusterPositionMapBucket extends ODurablePage {
     }
 
     final int position = entryPosition(index);
+    setByteValue(position, FILLED);
     updateEntry(position, entry);
   }
 

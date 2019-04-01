@@ -15,17 +15,19 @@ public class OPaginatedClusterCreateRecordCO extends OComponentOperationRecord {
   private byte[] recordContent;
   private int    recordVersion;
   private byte   recordType;
+  private long   allocatedPosition;
   private long   recordPosition;
 
   public OPaginatedClusterCreateRecordCO() {
   }
 
   public OPaginatedClusterCreateRecordCO(final int clusterId, final byte[] recordContent, final int recordVersion,
-      final byte recordType, final long recordPosition) {
+      final byte recordType, final long allocatedPosition, final long recordPosition) {
     this.clusterId = clusterId;
     this.recordContent = recordContent;
     this.recordVersion = recordVersion;
     this.recordType = recordType;
+    this.allocatedPosition = allocatedPosition;
     this.recordPosition = recordPosition;
   }
 
@@ -45,8 +47,8 @@ public class OPaginatedClusterCreateRecordCO extends OComponentOperationRecord {
     return recordType;
   }
 
-  public long getRecordPosition() {
-    return recordPosition;
+  long getAllocatedPosition() {
+    return allocatedPosition;
   }
 
   @Override
@@ -56,7 +58,7 @@ public class OPaginatedClusterCreateRecordCO extends OComponentOperationRecord {
 
   @Override
   public void redo(final OAbstractPaginatedStorage storage) throws IOException {
-    storage.createRecordInternal(clusterId, recordContent, recordVersion, recordType, recordPosition);
+    storage.createRecordInternal(clusterId, recordContent, recordVersion, recordType, allocatedPosition);
   }
 
   @Override
@@ -66,7 +68,7 @@ public class OPaginatedClusterCreateRecordCO extends OComponentOperationRecord {
     buffer.put(recordContent);
     buffer.put(recordType);
     buffer.putInt(recordVersion);
-    buffer.putLong(recordPosition);
+    buffer.putLong(allocatedPosition);
   }
 
   @Override
@@ -79,7 +81,7 @@ public class OPaginatedClusterCreateRecordCO extends OComponentOperationRecord {
     buffer.get(recordContent);
     recordType = buffer.get();
     recordVersion = buffer.getInt();
-    recordPosition = buffer.getLong();
+    allocatedPosition = buffer.getLong();
   }
 
   @Override

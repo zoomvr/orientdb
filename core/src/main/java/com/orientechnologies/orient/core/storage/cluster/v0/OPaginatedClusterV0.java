@@ -483,7 +483,7 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
 
           atomicOperation.addComponentOperation(new OPaginatedClusterCreateRecordCO(id, content, recordVersion, recordType,
-              allocatedPosition != null ? allocatedPosition.clusterPosition : -1));
+              allocatedPosition != null ? allocatedPosition.clusterPosition : -1, clusterPosition));
 
           return createPhysicalPosition(recordType, clusterPosition, addEntryResult.recordVersion);
         } else {
@@ -567,7 +567,7 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
 
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
           atomicOperation.addComponentOperation(new OPaginatedClusterCreateRecordCO(id, content, recordVersion, recordType,
-              allocatedPosition != null ? allocatedPosition.clusterPosition : -1));
+              allocatedPosition != null ? allocatedPosition.clusterPosition : -1, clusterPosition));
 
           return createPhysicalPosition(recordType, clusterPosition, version);
 

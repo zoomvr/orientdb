@@ -4976,8 +4976,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     if (clusterName != null) {
       clusterName = clusterName.toLowerCase(configuration.getLocaleInstance());
 
-      cluster = OPaginatedClusterFactory
-          .createCluster(clusterName, configuration.getVersion(), OPaginatedCluster.getLatestBinaryVersion(), this);
+      cluster = OPaginatedClusterFactory.createCluster(clusterName, configuration.getVersion(),
+          configuration.getContextConfiguration().getValueAsInteger(OGlobalConfiguration.STORAGE_CLUSTER_VERSION), this);
       cluster.configure(this, clusterPos, clusterName, parameters);
     } else {
       cluster = null;

@@ -18,10 +18,11 @@ public class OPaginatedClusterCreateRecordCOSerializationTest {
 
     final int recordVersion = 56;
     final byte recordType = 12;
-    final long recordPosition = 456;
+    final long allocatedPosition = 456;
+    final long recordPosition = 234;
 
     OPaginatedClusterCreateRecordCO createRecordCO = new OPaginatedClusterCreateRecordCO(clusterId, recordContent, recordVersion,
-        recordType, recordPosition);
+        recordType, allocatedPosition, recordPosition);
     createRecordCO.setOperationUnitId(operationUnitId);
 
     final int size = createRecordCO.serializedSize();
@@ -37,6 +38,6 @@ public class OPaginatedClusterCreateRecordCOSerializationTest {
     Assert.assertEquals(operationUnitId, restoredCreateRecordCO.getOperationUnitId());
     Assert.assertEquals(recordVersion, restoredCreateRecordCO.getRecordVersion());
     Assert.assertEquals(recordType, restoredCreateRecordCO.getRecordType());
-    Assert.assertEquals(recordPosition, restoredCreateRecordCO.getRecordPosition());
+    Assert.assertEquals(allocatedPosition, restoredCreateRecordCO.getAllocatedPosition());
   }
 }

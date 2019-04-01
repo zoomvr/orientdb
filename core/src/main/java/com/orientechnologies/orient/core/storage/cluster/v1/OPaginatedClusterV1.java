@@ -486,7 +486,7 @@ public final class OPaginatedClusterV1 extends OPaginatedCluster {
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
 
           atomicOperation.addComponentOperation(new OPaginatedClusterCreateRecordCO(id, content, recordVersion, recordType,
-              allocatedPosition != null ? allocatedPosition.clusterPosition : -1));
+              allocatedPosition != null ? allocatedPosition.clusterPosition : -1, clusterPosition));
           return createPhysicalPosition(recordType, clusterPosition, addEntryResult.recordVersion);
         } else {
           final int entrySize = content.length + OIntegerSerializer.INT_SIZE + OByteSerializer.BYTE_SIZE;
@@ -569,7 +569,7 @@ public final class OPaginatedClusterV1 extends OPaginatedCluster {
 
           addAtomicOperationMetadata(new ORecordId(id, clusterPosition), atomicOperation);
           atomicOperation.addComponentOperation(new OPaginatedClusterCreateRecordCO(id, content, recordVersion, recordType,
-              allocatedPosition != null ? allocatedPosition.clusterPosition : -1));
+              allocatedPosition != null ? allocatedPosition.clusterPosition : -1, clusterPosition));
 
           return createPhysicalPosition(recordType, clusterPosition, version);
 

@@ -47,6 +47,7 @@ public final class OAtomicOperation {
 
   private int     startCounter;
   private boolean rollback;
+  private boolean rollbackInProgress;
 
   private final Set<String> lockedObjects = new HashSet<>();
 
@@ -123,9 +124,11 @@ public final class OAtomicOperation {
     final List<OComponentOperationRecord> operationsSnapshot = new ArrayList<>(pendingComponentOperations);
     Collections.reverse(operationsSnapshot);
 
+    rollbackInProgress = true;
     for (final OComponentOperationRecord operation : operationsSnapshot) {
       operation.undo(storage);
     }
+    rollbackInProgress = false;
 
     pendingComponentOperations.clear();
 
@@ -157,6 +160,10 @@ public final class OAtomicOperation {
 
   boolean isRollback() {
     return rollback;
+  }
+
+  boolean isRollbackInProgress() {
+    return rollbackInProgress;
   }
 
   void addLockedObject(final String lockedObject) {

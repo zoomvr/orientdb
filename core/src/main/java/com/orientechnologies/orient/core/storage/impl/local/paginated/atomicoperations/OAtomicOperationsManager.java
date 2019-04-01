@@ -138,6 +138,11 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
   public OAtomicOperation startAtomicOperation(String lockName, boolean trackNonTxOperations) throws IOException {
     OAtomicOperation operation = currentOperation.get();
     if (operation != null) {
+
+      if (operation.isRollbackInProgress()) {
+        return operation;
+      }
+
       operation.incrementCounter();
 
       if (lockName != null) {
@@ -361,6 +366,10 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
     if (operation == null) {
       OLogManager.instance().error(this, "There is no atomic operation active", null);
       throw new ODatabaseException("There is no atomic operation active");
+    }
+
+    if (operation.isRollbackInProgress()) {
+      return null;
     }
 
     int counter = operation.getCounter();
