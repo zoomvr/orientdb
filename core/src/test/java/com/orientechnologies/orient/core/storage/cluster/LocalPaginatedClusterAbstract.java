@@ -1056,26 +1056,55 @@ public abstract class LocalPaginatedClusterAbstract {
 
   @Test
   public void testUpdateOneSmallRecord() throws IOException {
-    byte[] smallRecord = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 };
-    int recordVersion = 0;
-    recordVersion++;
-    recordVersion++;
+    {
+      byte[] smallRecord = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 };
 
-    OPhysicalPosition physicalPosition = paginatedCluster.createRecord(smallRecord, recordVersion, (byte) 1, null);
-    Assert.assertEquals(physicalPosition.clusterPosition, 0);
+      int recordVersion = 0;
+      recordVersion++;
+      recordVersion++;
 
-    recordVersion++;
-    smallRecord = new byte[] { 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3 };
-    paginatedCluster.updateRecord(physicalPosition.clusterPosition, smallRecord, recordVersion, (byte) 2);
+      OPhysicalPosition physicalPosition = paginatedCluster.createRecord(smallRecord, recordVersion, (byte) 1, null);
+      Assert.assertEquals(physicalPosition.clusterPosition, 0);
 
-    ORawBuffer rawBuffer = paginatedCluster.readRecord(physicalPosition.clusterPosition, false);
-    Assert.assertNotNull(rawBuffer);
+      recordVersion++;
+      smallRecord = new byte[] { 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3 };
+      paginatedCluster.updateRecord(physicalPosition.clusterPosition, smallRecord, recordVersion, (byte) 2);
 
-    Assert.assertEquals(rawBuffer.version, recordVersion);
-    //    Assert.assertEquals(rawBuffer.buffer, smallRecord);
+      ORawBuffer rawBuffer = paginatedCluster.readRecord(physicalPosition.clusterPosition, false);
+      Assert.assertNotNull(rawBuffer);
 
-    Assertions.assertThat(rawBuffer.buffer).isEqualTo(smallRecord);
-    Assert.assertEquals(rawBuffer.recordType, 2);
+      Assert.assertEquals(rawBuffer.version, recordVersion);
+
+      Assertions.assertThat(rawBuffer.buffer).isEqualTo(smallRecord);
+      Assert.assertEquals(rawBuffer.recordType, 2);
+    }
+    {
+      OAtomicOperationsManager atomicOperationsManager = storage.getAtomicOperationsManager();
+
+      final byte[] initialSmallRecord = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 };
+
+      int recordVersion = 0;
+      recordVersion++;
+      recordVersion++;
+
+      OPhysicalPosition physicalPosition = paginatedCluster.createRecord(initialSmallRecord, recordVersion, (byte) 1, null);
+      Assert.assertEquals(physicalPosition.clusterPosition, 1);
+
+      recordVersion++;
+      final byte[] updatedSmallRecord = new byte[] { 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3 };
+
+      atomicOperationsManager.startAtomicOperation((String) null, true);
+      paginatedCluster.updateRecord(physicalPosition.clusterPosition, updatedSmallRecord, recordVersion, (byte) 2);
+      atomicOperationsManager.endAtomicOperation(true);
+
+      ORawBuffer rawBuffer = paginatedCluster.readRecord(physicalPosition.clusterPosition, false);
+      Assert.assertNotNull(rawBuffer);
+
+      Assert.assertEquals(rawBuffer.version, recordVersion - 1);
+
+      Assertions.assertThat(rawBuffer.buffer).isEqualTo(initialSmallRecord);
+      Assert.assertEquals(rawBuffer.recordType, 1);
+    }
   }
 
   @Test
