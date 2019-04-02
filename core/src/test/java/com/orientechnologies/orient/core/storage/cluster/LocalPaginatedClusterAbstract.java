@@ -1241,10 +1241,37 @@ public abstract class LocalPaginatedClusterAbstract {
     Assert.assertNotNull(rawBuffer);
 
     Assert.assertEquals(rawBuffer.version, recordVersion);
-    //    Assert.assertEquals(rawBuffer.buffer, bigRecord);
 
     Assertions.assertThat(rawBuffer.buffer).isEqualTo(bigRecord);
     Assert.assertEquals(rawBuffer.recordType, 2);
+
+    final byte[] nextBigRecord = new byte[2 * 65536 + 20];
+    mersenneTwisterFast.nextBytes(nextBigRecord);
+
+    final OAtomicOperationsManager atomicOperationsManager = storage.getAtomicOperationsManager();
+    atomicOperationsManager.startAtomicOperation((String) null, true);
+    paginatedCluster.updateRecord(physicalPosition.clusterPosition, nextBigRecord, recordVersion + 1, (byte) 1);
+    atomicOperationsManager.endAtomicOperation(true);
+
+    assert OAtomicOperationsManager.getCurrentOperation() == null;
+
+    rawBuffer = paginatedCluster.readRecord(physicalPosition.clusterPosition, false);
+    Assert.assertNotNull(rawBuffer);
+
+    Assertions.assertThat(rawBuffer.buffer).isEqualTo(bigRecord);
+    Assert.assertEquals(rawBuffer.recordType, 2);
+    Assert.assertEquals(recordVersion, rawBuffer.version);
+
+
+    paginatedCluster.updateRecord(physicalPosition.clusterPosition, nextBigRecord, recordVersion + 1, (byte) 1);
+
+    rawBuffer = paginatedCluster.readRecord(physicalPosition.clusterPosition, false);
+    Assert.assertNotNull(rawBuffer);
+
+    Assert.assertEquals(rawBuffer.version, recordVersion + 1);
+
+    Assertions.assertThat(rawBuffer.buffer).isEqualTo(nextBigRecord);
+    Assert.assertEquals(rawBuffer.recordType, 1);
   }
 
   @Test

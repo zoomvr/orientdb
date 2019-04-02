@@ -977,7 +977,7 @@ public final class OPaginatedClusterV1 extends OPaginatedCluster {
               }
 
               if (from == 0) {
-                oldRecordVersion = localPage.getRecordVersion(newRecordPosition);
+                oldRecordVersion = localPage.getRecordVersion(nextRecordPosition);
               }
 
               final int currentEntrySize = localPage.getRecordSize(nextRecordPosition);
