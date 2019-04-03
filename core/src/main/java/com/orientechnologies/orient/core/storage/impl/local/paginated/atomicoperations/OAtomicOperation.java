@@ -107,7 +107,12 @@ public final class OAtomicOperation {
     assert !rollback;
 
     final OLogSequenceNumber lsn;
+
     if (useWAL && writeAheadLog != null) {
+      for (OComponentOperationRecord operationRecord : pendingComponentOperations) {
+        writeAheadLog.log(operationRecord);
+      }
+
       lsn = writeAheadLog.logAtomicOperationEndRecord(getOperationUnitId(), false, this.startLSN, getMetadata());
     } else {
       lsn = null;
