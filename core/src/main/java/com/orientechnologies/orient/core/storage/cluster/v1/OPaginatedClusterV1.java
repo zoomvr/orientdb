@@ -157,8 +157,10 @@ public final class OPaginatedClusterV1 extends OPaginatedCluster {
     try {
       return new OStoragePaginatedClusterConfiguration(id, getName(), null, true,
           OStoragePaginatedClusterConfiguration.DEFAULT_GROW_FACTOR, OStoragePaginatedClusterConfiguration.DEFAULT_GROW_FACTOR,
-          compression.name(), encryption.name(), null, recordConflictStrategy.getName(), OStorageClusterConfiguration.STATUS.ONLINE,
-          BINARY_VERSION);
+          compression != null ? compression.name() : ONothingCompression.NAME,
+          encryption != null ? encryption.name() : ONothingEncryption.NAME, null,
+          recordConflictStrategy != null ? recordConflictStrategy.getName() : null,
+          OStorageClusterConfiguration.STATUS.ONLINE, BINARY_VERSION);
 
     } finally {
       releaseSharedLock();

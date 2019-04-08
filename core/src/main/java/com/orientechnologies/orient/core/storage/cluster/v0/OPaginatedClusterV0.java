@@ -24,6 +24,7 @@ import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.compression.OCompression;
 import com.orientechnologies.orient.core.compression.OCompressionFactory;
+import com.orientechnologies.orient.core.compression.impl.ONothingCompression;
 import com.orientechnologies.orient.core.config.OContextConfiguration;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.config.OStorageClusterConfiguration;
@@ -31,6 +32,7 @@ import com.orientechnologies.orient.core.config.OStoragePaginatedClusterConfigur
 import com.orientechnologies.orient.core.conflict.ORecordConflictStrategy;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.encryption.OEncryptionFactory;
+import com.orientechnologies.orient.core.encryption.impl.ONothingEncryption;
 import com.orientechnologies.orient.core.exception.ONotEmptyClusterCanNotBeDeletedException;
 import com.orientechnologies.orient.core.exception.OPaginatedClusterException;
 import com.orientechnologies.orient.core.exception.ORecordNotFoundException;
@@ -149,9 +151,10 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
     try {
       return new OStoragePaginatedClusterConfiguration(id, getName(), null, true,
           OStoragePaginatedClusterConfiguration.DEFAULT_GROW_FACTOR, OStoragePaginatedClusterConfiguration.DEFAULT_GROW_FACTOR,
-          compression.name(), encryption.name(), null, recordConflictStrategy.getName(), OStorageClusterConfiguration.STATUS.ONLINE,
+          compression != null ? compression.name() : ONothingCompression.NAME,
+          encryption != null ? encryption.name() : ONothingEncryption.NAME, null,
+          recordConflictStrategy != null ? recordConflictStrategy.getName() : null, OStorageClusterConfiguration.STATUS.ONLINE,
           BINARY_VERSION);
-
     } finally {
       releaseSharedLock();
     }
