@@ -484,7 +484,7 @@ public class OStorageConfigurationImpl implements OSerializableStream, OStorageC
             clusterBinaryVersion = 0;
           }
 
-          currentCluster = new OStoragePaginatedClusterConfiguration(this, clusterId, clusterName, null, cc, bb, aa,
+          currentCluster = new OStoragePaginatedClusterConfiguration(clusterId, clusterName, null, cc, bb, aa,
               clusterCompression, clusterEncryption, configuration.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY),
               clusterConflictStrategy, status, clusterBinaryVersion);
 

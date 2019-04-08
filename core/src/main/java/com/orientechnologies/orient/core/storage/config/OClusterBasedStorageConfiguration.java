@@ -126,7 +126,7 @@ public final class OClusterBasedStorageConfiguration implements OStorageConfigur
   public void create(final OContextConfiguration contextConfiguration) throws IOException {
     lock.acquireWriteLock();
     try {
-      cluster.create(-1);
+      cluster.create();
       btree.create(OStringSerializer.INSTANCE, null, 1, null);
 
       this.configuration = contextConfiguration;
@@ -1529,7 +1529,7 @@ public final class OClusterBasedStorageConfiguration implements OStorageConfigur
 
     final String compression = deserializeStringValue(property, pos);
 
-    return new OStoragePaginatedClusterConfiguration(this, id, name, null, useWal, 0, 0, compression, encryption,
+    return new OStoragePaginatedClusterConfiguration(id, name, null, useWal, 0, 0, compression, encryption,
         configuration.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY), conflictStrategy,
         OStorageClusterConfiguration.STATUS.valueOf(status), binaryVersion);
   }

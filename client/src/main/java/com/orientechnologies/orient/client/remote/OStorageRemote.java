@@ -1233,6 +1233,21 @@ public class OStorageRemote extends OStorageAbstract implements OStorageProxy, O
     return response.getResult();
   }
 
+  @Override
+  public String getClusterName(final int clusterId) {
+    final OCluster cluster = getClusterById(clusterId);
+    if (cluster != null) {
+      return cluster.getName();
+    }
+
+    throw new OStorageException("Cluster " + clusterId + " is absent in storage.");
+  }
+
+  @Override
+  public boolean setClusterAttribute(final int id, final OCluster.ATTRIBUTES attribute, final Object value) {
+    return false;
+  }
+
   public void removeClusterFromConfiguration(int iClusterId) {
     stateLock.acquireWriteLock();
     try {
@@ -2019,7 +2034,7 @@ public class OStorageRemote extends OStorageAbstract implements OStorageProxy, O
           final int clusterId = clusterConfig.getId();
           if (clusterName != null) {
             clusterName = clusterName.toLowerCase(Locale.ENGLISH);
-            cluster.configure(null, clusterId, clusterName);
+            cluster.configure(clusterId, clusterName);
             if (clusterId >= clusters.length)
               clusters = Arrays.copyOf(clusters, clusterId + 1);
             clusters[clusterId] = cluster;
@@ -2113,7 +2128,7 @@ public class OStorageRemote extends OStorageAbstract implements OStorageProxy, O
       if (clusters.length <= clusterId || clusters[clusterId] == null) {
         //Adding the cluster waiting for the push
         final OClusterRemote cluster = new OClusterRemote();
-        cluster.configure(this, clusterId, iClusterName.toLowerCase(Locale.ENGLISH));
+        cluster.configure(clusterId, iClusterName.toLowerCase(Locale.ENGLISH));
 
         if (clusters.length <= clusterId)
           clusters = Arrays.copyOf(clusters, clusterId + 1);

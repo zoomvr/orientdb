@@ -25,9 +25,9 @@ package com.orientechnologies.orient.core.config;
  * @since 09.07.13
  */
 public class OStoragePaginatedClusterConfiguration implements OStorageClusterConfiguration {
-  public static final float                 DEFAULT_GROW_FACTOR      = (float) 1.2;
-  public              float                 recordOverflowGrowFactor = DEFAULT_GROW_FACTOR;
-  public              float                 recordGrowFactor         = DEFAULT_GROW_FACTOR;
+  public static final float                 DEFAULT_GROW_FACTOR = (float) 1.2;
+  public              float                 recordOverflowGrowFactor;
+  public              float                 recordGrowFactor;
   public              String                compression;
   public              String                encryption;
   public              String                encryptionKey;
@@ -35,16 +35,14 @@ public class OStoragePaginatedClusterConfiguration implements OStorageClusterCon
   public              int                   id;
   public              String                name;
   public              String                location;
-  public              boolean               useWal                   = true;
+  public              boolean               useWal;
   public              String                conflictStrategy;
-  private             STATUS                status                   = STATUS.ONLINE;
+  private             STATUS                status;
   private final       int                   binaryVersion;
 
-  public OStoragePaginatedClusterConfiguration(final OStorageConfiguration root, final int id, final String name,
-      final String location, final boolean useWal, final float recordOverflowGrowFactor, final float recordGrowFactor,
-      final String compression, final String iEncryption, final String iEncryptionKey, final String conflictStrategy,
-      final STATUS iStatus, int binaryVersion) {
-    this.root = root;
+  public OStoragePaginatedClusterConfiguration(final int id, final String name, final String location, final boolean useWal,
+      final float recordOverflowGrowFactor, final float recordGrowFactor, final String compression, final String iEncryption,
+      final String iEncryptionKey, final String conflictStrategy, final STATUS iStatus, int binaryVersion) {
     this.id = id;
     this.name = name;
     this.location = location;

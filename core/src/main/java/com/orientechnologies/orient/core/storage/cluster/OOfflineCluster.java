@@ -26,7 +26,6 @@ import com.orientechnologies.orient.core.storage.OCluster;
 import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.ORawBuffer;
 import com.orientechnologies.orient.core.storage.OStorage;
-import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OClusterBrowsePage;
 
 import java.io.IOException;
@@ -42,17 +41,15 @@ public class OOfflineCluster implements OCluster {
 
   private final    String                    name;
   private final    int                       id;
-  private final    OAbstractPaginatedStorage storageLocal;
   private volatile int                       binaryVersion;
 
-  public OOfflineCluster(final OAbstractPaginatedStorage iStorage, final int iId, final String iName) {
-    storageLocal = iStorage;
+  public OOfflineCluster(final int iId, final String iName) {
     id = iId;
     name = iName;
   }
 
   @Override
-  public void configure(OStorage iStorage, int iId, String iClusterName, Object... iParameters) throws IOException {
+  public void configure(int id, String clusterName) throws IOException {
   }
 
   @Override
@@ -61,7 +58,7 @@ public class OOfflineCluster implements OCluster {
   }
 
   @Override
-  public void create(int iStartSize) throws IOException {
+  public void create() throws IOException {
   }
 
   @Override
@@ -79,27 +76,6 @@ public class OOfflineCluster implements OCluster {
 
   @Override
   public void delete() throws IOException {
-  }
-
-  @Override
-  public Object set(ATTRIBUTES attribute, Object value) throws IOException {
-    if (attribute == null)
-      throw new IllegalArgumentException("attribute is null");
-
-    final String stringValue = value != null ? value.toString() : null;
-
-    switch (attribute) {
-    case STATUS: {
-      if (stringValue == null)
-        throw new IllegalStateException("Value of attribute is null.");
-
-      return storageLocal.setClusterStatus(id, OStorageClusterConfiguration.STATUS
-          .valueOf(stringValue.toUpperCase(storageLocal.getConfiguration().getLocaleInstance())));
-    }
-    default:
-      throw new IllegalArgumentException(
-          "Runtime change of attribute '" + attribute + " is not supported on Offline cluster " + getName());
-    }
   }
 
   @Override
@@ -166,6 +142,21 @@ public class OOfflineCluster implements OCluster {
   @Override
   public OPhysicalPosition getPhysicalPosition(OPhysicalPosition iPPosition) throws IOException {
     throw new OOfflineClusterException("Cannot read a record on offline cluster '" + name + "'");
+  }
+
+  @Override
+  public void setClusterName(final String name) {
+    throw new OOfflineClusterException("Cannot set cluster name on offline cluster '" + name + "'");
+  }
+
+  @Override
+  public void setRecordConflictStrategy(final String conflictStrategy) {
+    throw new OOfflineClusterException("Cannot set record conflict strategy on offline cluster '" + name + "'");
+  }
+
+  @Override
+  public void setEncryption(final String encryptionName, final String encryptionKey) {
+    throw new OOfflineClusterException("Cannot set encryption on offline cluster '" + name + "'");
   }
 
   @Override

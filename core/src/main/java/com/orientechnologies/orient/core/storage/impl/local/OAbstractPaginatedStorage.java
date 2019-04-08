@@ -803,7 +803,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         }
 
         makeStorageDirty();
-        return addClusterInternal(clusterName, requestedId, parameters);
+        return doAddCluster(clusterName, requestedId);
 
       } catch (final IOException e) {
         throw OException.wrapException(new OStorageException("Error in creation of new cluster '" + clusterName + "'"), e);
@@ -857,6 +857,68 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
+  @Override
+  public boolean setClusterAttribute(final int id, final OCluster.ATTRIBUTES attribute, final Object value) {
+    stateLock.acquireWriteLock();
+    try {
+      checkOpenness();
+
+      if (id >= clusters.size()) {
+        return false;
+      }
+
+      final OCluster cluster = clusters.get(id);
+
+      if (cluster == null) {
+        return false;
+      }
+
+      doSetClusterAttributed(attribute, value, cluster);
+
+      return true;
+    } catch (final RuntimeException ee) {
+      throw logAndPrepareForRethrow(ee);
+    } catch (final Error ee) {
+      throw logAndPrepareForRethrow(ee);
+    } catch (final Throwable t) {
+      throw logAndPrepareForRethrow(t);
+    } finally {
+      stateLock.releaseWriteLock();
+    }
+  }
+
+  private void doSetClusterAttributed(final OCluster.ATTRIBUTES attribute, final Object value, final OCluster cluster) {
+    final String stringValue = value != null ? value.toString() : null;
+    switch (attribute) {
+    case NAME:
+      cluster.setClusterName(stringValue);
+      break;
+    case CONFLICTSTRATEGY:
+      cluster.setRecordConflictStrategy(stringValue);
+      break;
+    case STATUS: {
+      if (stringValue == null) {
+        throw new IllegalStateException("Value of attribute is null");
+      }
+
+      setClusterStatus(id,
+          OStorageClusterConfiguration.STATUS.valueOf(stringValue.toUpperCase(getConfiguration().getLocaleInstance())));
+    }
+    case ENCRYPTION:
+      if (cluster.getEntries() > 0) {
+        throw new IllegalArgumentException(
+            "Cannot change encryption setting on cluster '" + getName() + "' because it is not empty");
+      }
+      cluster.setEncryption(stringValue,
+          configuration.getContextConfiguration().getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY));
+      break;
+    default:
+      throw new IllegalArgumentException("Runtime change of attribute '" + attribute + " is not supported");
+    }
+
+    ((OClusterBasedStorageConfiguration) configuration).updateCluster(((OPaginatedCluster) cluster).generateClusterConfig());
+  }
+
   public boolean dropClusterInternal(final int clusterId) throws IOException {
     final OCluster cluster = clusters.get(clusterId);
 
@@ -864,9 +926,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       return true;
     }
 
-    cluster.delete();
-
     makeStorageDirty();
+
+    cluster.delete();
 
     clusterMap.remove(cluster.getName().toLowerCase(configuration.getLocaleInstance()));
     clusters.set(clusterId, null);
@@ -938,7 +1000,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         final OCluster newCluster;
         if (iStatus == OStorageClusterConfiguration.STATUS.OFFLINE) {
           cluster.close(true);
-          newCluster = new OOfflineCluster(this, clusterId, cluster.getName());
+          newCluster = new OOfflineCluster(clusterId, cluster.getName());
 
           boolean configured = false;
           for (final OStorageClusterConfiguration clusterConfiguration : configuration.getClusters()) {
@@ -956,7 +1018,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
           newCluster = OPaginatedClusterFactory
               .createCluster(cluster.getName(), configuration.getVersion(), cluster.getBinaryVersion(), this);
-          newCluster.configure(this, clusterId, cluster.getName());
+          newCluster.configure(clusterId, cluster.getName());
           newCluster.open();
         }
 
@@ -3665,6 +3727,29 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   }
 
   @Override
+  public String getClusterName(int clusterId) {
+    stateLock.acquireReadLock();
+    try {
+      checkOpenness();
+
+      if (clusterId == ORID.CLUSTER_ID_INVALID) {
+        clusterId = defaultClusterId;
+      }
+
+      return doGetAndCheckCluster(clusterId).getName();
+
+    } catch (final RuntimeException ee) {
+      throw logAndPrepareForRethrow(ee);
+    } catch (final Error ee) {
+      throw logAndPrepareForRethrow(ee);
+    } catch (final Throwable t) {
+      throw logAndPrepareForRethrow(t);
+    } finally {
+      stateLock.releaseReadLock();
+    }
+  }
+
+  @Override
   public final OCluster getClusterByName(final String clusterName) {
     try {
       checkOpenness();
@@ -3672,12 +3757,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       stateLock.acquireReadLock();
       try {
         checkOpenness();
-        final OCluster cluster = clusterMap.get(clusterName.toLowerCase(configuration.getLocaleInstance()));
-
-        if (cluster == null) {
-          throw new OStorageException("Cluster " + clusterName + " does not exist in database '" + name + "'");
-        }
-        return cluster;
+        return doGetClusterByName(clusterName);
       } finally {
         stateLock.releaseReadLock();
       }
@@ -3688,6 +3768,16 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     } catch (final Throwable t) {
       throw logAndPrepareForRethrow(t);
     }
+  }
+
+  private OCluster doGetClusterByName(final String clusterName) {
+    final OCluster cluster = clusterMap.get(clusterName.toLowerCase(configuration.getLocaleInstance()));
+
+    if (cluster == null) {
+      throw new OStorageException("Cluster " + clusterName + " does not exist in database '" + name + "'");
+    }
+
+    return cluster;
   }
 
   @Override
@@ -4910,7 +5000,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       cluster = OPaginatedClusterFactory
           .createCluster(config.getName(), configuration.getVersion(), config.getBinaryVersion(), this);
     } else {
-      cluster = new OOfflineCluster(this, config.getId(), config.getName());
+      cluster = new OOfflineCluster(config.getId(), config.getName());
     }
 
     cluster.configure(this, config);
@@ -4968,17 +5058,17 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       }
     }
 
-    return addClusterInternal(clusterName, clusterPos, parameters);
+    return doAddCluster(clusterName, clusterPos);
   }
 
-  public int addClusterInternal(String clusterName, final int clusterPos, final Object... parameters) throws IOException {
+  private int doAddCluster(String clusterName, final int clusterPos) throws IOException {
     final OPaginatedCluster cluster;
     if (clusterName != null) {
       clusterName = clusterName.toLowerCase(configuration.getLocaleInstance());
 
       cluster = OPaginatedClusterFactory.createCluster(clusterName, configuration.getVersion(),
           configuration.getContextConfiguration().getValueAsInteger(OGlobalConfiguration.STORAGE_CLUSTER_VERSION), this);
-      cluster.configure(this, clusterPos, clusterName, parameters);
+      cluster.configure(clusterPos, clusterName);
     } else {
       cluster = null;
     }
@@ -4986,13 +5076,25 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     int createdClusterId = -1;
 
     if (cluster != null) {
-      cluster.create(-1);
+      cluster.create();
       createdClusterId = registerCluster(cluster);
 
-      cluster.registerInStorageConfig((OClusterBasedStorageConfiguration) configuration);
+      ((OClusterBasedStorageConfiguration) configuration).updateCluster(cluster.generateClusterConfig());
     }
 
     return createdClusterId;
+  }
+
+  public void addClusterInternal(final String clusterName, final int clusterPos) throws IOException {
+    makeStorageDirty();
+
+    final OPaginatedCluster cluster = OPaginatedClusterFactory.createCluster(clusterName, configuration.getVersion(),
+        configuration.getContextConfiguration().getValueAsInteger(OGlobalConfiguration.STORAGE_CLUSTER_VERSION), this);
+
+    cluster.configure(clusterPos, clusterName);
+    cluster.create();
+
+    registerCluster(cluster);
   }
 
   private void doClose(final boolean force, final boolean onDelete) {

@@ -211,6 +211,15 @@ public class PostponedEngineStartTest {
     @Override
     public OStorage createStorage(String iURL, Map<String, String> parameters, long maxWalSegSize) {
       return new OStorage() {
+        @Override
+        public String getClusterName(final int clusterId) {
+          return null;
+        }
+
+        @Override
+        public boolean setClusterAttribute(final int id, final OCluster.ATTRIBUTES attribute, final Object value) {
+          return false;
+        }
 
         @Override
         public List<String> backup(OutputStream out, Map<String, Object> options, Callable<Object> callable,

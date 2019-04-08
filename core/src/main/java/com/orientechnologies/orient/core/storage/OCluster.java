@@ -32,11 +32,11 @@ public interface OCluster {
     NAME, RECORD_GROW_FACTOR, RECORD_OVERFLOW_GROW_FACTOR, CONFLICTSTRATEGY, STATUS, ENCRYPTION
   }
 
-  void configure(OStorage iStorage, int iId, String iClusterName, Object... iParameters) throws IOException;
+  void configure(int id, String clusterName) throws IOException;
 
   void configure(OStorage iStorage, OStorageClusterConfiguration iConfig) throws IOException;
 
-  void create(int iStartSize) throws IOException;
+  void create() throws IOException;
 
   void open() throws IOException;
 
@@ -46,7 +46,11 @@ public interface OCluster {
 
   void delete() throws IOException;
 
-  Object set(ATTRIBUTES iAttribute, Object iValue) throws IOException;
+  void setClusterName(String name);
+
+  void setRecordConflictStrategy(String conflictStrategy);
+
+  void setEncryption(String encryptionName, String encryptionKey);
 
   String encryption();
 

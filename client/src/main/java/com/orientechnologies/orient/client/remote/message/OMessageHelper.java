@@ -35,8 +35,16 @@ import com.orientechnologies.orient.enterprise.channel.binary.OChannelDataOutput
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+import java.util.UUID;
 
 public class OMessageHelper {
 
@@ -154,7 +162,7 @@ public class OMessageHelper {
       final int clusterId = network.readShort();
       if (clusterName != null) {
         clusterName = clusterName.toLowerCase(Locale.ENGLISH);
-        cluster.configure(null, clusterId, clusterName);
+        cluster.configure(clusterId, clusterName);
         if (clusterId >= clusters.length)
           clusters = Arrays.copyOf(clusters, clusterId + 1);
         clusters[clusterId] = cluster;

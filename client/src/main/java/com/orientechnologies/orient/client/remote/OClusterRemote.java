@@ -45,9 +45,9 @@ public class OClusterRemote implements OCluster {
    * @see com.orientechnologies.orient.core.storage.OCluster#configure(com.orientechnologies.orient.core.storage.OStorage, int,
    * java.lang.String, java.lang.String, int, java.lang.Object[])
    */
-  public void configure(OStorage iStorage, int iId, String iClusterName, Object... iParameters) {
-    id = iId;
-    name = iClusterName;
+  public void configure(int id, String clusterName) {
+    this.id = id;
+    name = clusterName;
   }
 
   /*
@@ -66,7 +66,7 @@ public class OClusterRemote implements OCluster {
    *
    * @see com.orientechnologies.orient.core.storage.OCluster#create(int)
    */
-  public void create(int iStartSize) throws IOException {
+  public void create() throws IOException {
 
   }
 
@@ -123,15 +123,26 @@ public class OClusterRemote implements OCluster {
   }
 
   @Override
+  public void setClusterName(final String name) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void setRecordConflictStrategy(final String conflictStrategy) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void setEncryption(final String encryptionName, final String encryptionKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public boolean exists() {
     throw new UnsupportedOperationException("exists");
   }
 
   public void delete() throws IOException {
-  }
-
-  public Object set(ATTRIBUTES iAttribute, Object iValue) throws IOException {
-    return null;
   }
 
   @Override

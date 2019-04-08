@@ -142,6 +142,10 @@ public interface OStorage extends OBackupable, OSharedContainer {
    */
   boolean dropCluster(int iId, final boolean iTruncate);
 
+  String getClusterName(final int clusterId);
+
+  boolean setClusterAttribute(final int id, OCluster.ATTRIBUTES attribute, Object value);
+
   long count(int iClusterId);
 
   long count(int iClusterId, boolean countTombstones);

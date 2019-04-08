@@ -1096,15 +1096,10 @@ public abstract class OClassImpl implements OClass {
 
   public abstract OClassImpl setEncryption(final String iValue);
 
-  protected void setEncryptionInternal(ODatabaseDocumentInternal database, final String iValue) {
+  protected void setEncryptionInternal(ODatabaseDocumentInternal database, final String value) {
     for (int cl : getClusterIds()) {
-      final OCluster c = database.getStorage().getClusterById(cl);
-      if (c != null)
-        try {
-          c.set(OCluster.ATTRIBUTES.ENCRYPTION, iValue);
-        } catch (IOException e) {
-          OLogManager.instance().error(this, "Can not set value of encryption parameter to '%s'", e, iValue);
-        }
+      final OStorage storage = database.getStorage();
+      storage.setClusterAttribute(cl, OCluster.ATTRIBUTES.ENCRYPTION, value);
     }
   }
 
