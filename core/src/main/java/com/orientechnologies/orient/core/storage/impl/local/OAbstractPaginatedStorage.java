@@ -153,6 +153,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALRe
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OCASDiskWriteAheadLog;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OWriteableWALRecord;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.statistic.OPerformanceStatisticManager;
 import com.orientechnologies.orient.core.storage.impl.local.statistic.OSessionStoragePerformanceStatistic;
 import com.orientechnologies.orient.core.storage.index.engine.OHashTableIndexEngine;
@@ -2462,61 +2463,61 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         checkLowDiskSpaceRequestsAndReadOnlyConditions();
 
-        if (indexEngineNameMap.containsKey(engineName)) {
-          // OLD INDEX FILE ARE PRESENT: THIS IS THE CASE OF PARTIAL/BROKEN INDEX
-          OLogManager.instance().warn(this, "Index with name '%s' already exists, removing it and re-create the index", engineName);
-          final OBaseIndexEngine engine = indexEngineNameMap.remove(engineName);
-          if (engine != null) {
-            indexEngines.remove(engine);
-            ((OClusterBasedStorageConfiguration) configuration).deleteIndexEngine(engineName);
-            engine.delete();
-          }
-        }
-
         makeStorageDirty();
 
-        final OBinarySerializer keySerializer = determineKeySerializer(indexDefinition);
-        final int keySize = determineKeySize(indexDefinition);
-        final OType[] keyTypes = indexDefinition != null ? indexDefinition.getTypes() : null;
-        final boolean nullValuesSupport = indexDefinition != null && !indexDefinition.isNullValuesIgnored();
-        final byte serializerId;
+        boolean rollback = false;
+        final OAtomicOperation atomicOperation = atomicOperationsManager.startAtomicOperation((String) null, true);
+        try {
+          if (indexEngineNameMap.containsKey(engineName)) {
+            // OLD INDEX FILE ARE PRESENT: THIS IS THE CASE OF PARTIAL/BROKEN INDEX
+            OLogManager.instance()
+                .warn(this, "Index with name '%s' already exists, removing it and re-create the index", engineName);
+            final OBaseIndexEngine engine = indexEngineNameMap.remove(engineName);
+            if (engine != null) {
+              indexEngines.remove(engine);
+              ((OClusterBasedStorageConfiguration) configuration).deleteIndexEngine(engineName);
+              engine.delete();
+            }
+          }
 
-        if (valueSerializer != null) {
-          serializerId = valueSerializer.getId();
-        } else {
-          serializerId = -1;
+          final OBinarySerializer keySerializer = determineKeySerializer(indexDefinition);
+          final int keySize = determineKeySize(indexDefinition);
+          final OType[] keyTypes = indexDefinition != null ? indexDefinition.getTypes() : null;
+          final boolean nullValuesSupport = indexDefinition != null && !indexDefinition.isNullValuesIgnored();
+          final byte serializerId;
+
+          if (valueSerializer != null) {
+            serializerId = valueSerializer.getId();
+          } else {
+            serializerId = -1;
+          }
+
+          final OBaseIndexEngine engine = addIndexEngineInternal(engineName, algorithm, indexType, valueSerializer, isAutomatic,
+              durableInNonTxMode, version, apiVersion, multivalue, engineProperties, clustersToIndex, metadata, keySerializer,
+              keySize, keyTypes, nullValuesSupport);
+
+          final OContextConfiguration ctxCfg = configuration.getContextConfiguration();
+          final String cfgEncryption = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD);
+          final String cfgEncryptionKey = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY);
+
+          final OStorageConfiguration.IndexEngineData engineData = new OStorageConfigurationImpl.IndexEngineData(engineName,
+              algorithm, indexType, durableInNonTxMode, version, engine.getEngineAPIVersion(), multivalue, serializerId,
+              keySerializer.getId(), isAutomatic, keyTypes, nullValuesSupport, keySize, cfgEncryption, cfgEncryptionKey,
+              engineProperties);
+
+          ((OClusterBasedStorageConfiguration) configuration).addIndexEngine(engineName, engineData);
+
+          atomicOperation.addComponentOperation(
+              new OIndexEngineCreateCO(engineName, algorithm, indexType, keySerializer.getId(), serializerId, isAutomatic, version,
+                  apiVersion, multivalue, engineProperties, clustersToIndex, metadata, keySize, keyTypes, nullValuesSupport));
+
+          return generateIndexId(indexEngines.size() - 1, engine);
+        } catch (Exception e) {
+          rollback = true;
+          throw e;
+        } finally {
+          atomicOperationsManager.endAtomicOperation(rollback);
         }
-
-        final OBaseIndexEngine engine = OIndexes
-            .createIndexEngine(engineName, algorithm, indexType, durableInNonTxMode, this, version, apiVersion, multivalue,
-                engineProperties, metadata);
-
-        final OContextConfiguration ctxCfg = configuration.getContextConfiguration();
-        final String cfgEncryption = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD);
-        final String cfgEncryptionKey = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY);
-
-        final OEncryption encryption;
-        if (cfgEncryption == null || cfgEncryption.equals(ONothingEncryption.NAME)) {
-          encryption = null;
-        } else {
-          encryption = OEncryptionFactory.INSTANCE.getEncryption(cfgEncryption, cfgEncryptionKey);
-        }
-
-        engine.create(valueSerializer, isAutomatic, keyTypes, nullValuesSupport, keySerializer, keySize, clustersToIndex,
-            engineProperties, metadata, encryption);
-
-        indexEngineNameMap.put(engineName, engine);
-
-        indexEngines.add(engine);
-
-        final OStorageConfiguration.IndexEngineData engineData = new OStorageConfigurationImpl.IndexEngineData(engineName,
-            algorithm, indexType, durableInNonTxMode, version, engine.getEngineAPIVersion(), multivalue, serializerId,
-            keySerializer.getId(), isAutomatic, keyTypes, nullValuesSupport, keySize, cfgEncryption, cfgEncryptionKey,
-            engineProperties);
-
-        ((OClusterBasedStorageConfiguration) configuration).addIndexEngine(engineName, engineData);
-
-        return generateIndexId(indexEngines.size() - 1, engine);
       } catch (final IOException e) {
         throw OException.wrapException(new OStorageException("Cannot add index engine " + engineName + " in storage."), e);
       } finally {
@@ -2529,6 +2530,35 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     } catch (final Throwable t) {
       throw logAndPrepareForRethrow(t);
     }
+  }
+
+  public OBaseIndexEngine addIndexEngineInternal(final String engineName, final String algorithm, final String indexType,
+      final OBinarySerializer valueSerializer, final boolean isAutomatic, final Boolean durableInNonTxMode, final int version,
+      final int apiVersion, final boolean multivalue, final Map<String, String> engineProperties, final Set<String> clustersToIndex,
+      final ODocument metadata, final OBinarySerializer keySerializer, final int keySize, final OType[] keyTypes,
+      final boolean nullValuesSupport) throws IOException {
+    final OBaseIndexEngine engine;
+    engine = OIndexes.createIndexEngine(engineName, algorithm, indexType, durableInNonTxMode, this, version, apiVersion, multivalue,
+        engineProperties, metadata);
+
+    final OContextConfiguration ctxCfg = configuration.getContextConfiguration();
+    final String cfgEncryption = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD);
+    final String cfgEncryptionKey = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY);
+
+    final OEncryption encryption;
+    if (cfgEncryption == null || cfgEncryption.equals(ONothingEncryption.NAME)) {
+      encryption = null;
+    } else {
+      encryption = OEncryptionFactory.INSTANCE.getEncryption(cfgEncryption, cfgEncryptionKey);
+    }
+
+    engine.create(valueSerializer, isAutomatic, keyTypes, nullValuesSupport, keySerializer, keySize, clustersToIndex,
+        engineProperties, metadata, encryption);
+
+    indexEngineNameMap.put(engineName, engine);
+    indexEngines.add(engine);
+
+    return engine;
   }
 
   private static int generateIndexId(final int internalId, final OBaseIndexEngine indexEngine) {
@@ -2599,14 +2629,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         checkIndexId(indexId);
 
         makeStorageDirty();
-        final OBaseIndexEngine engine = indexEngines.get(indexId);
 
-        indexEngines.set(indexId, null);
-
-        engine.delete();
-
-        final String engineName = engine.getName();
-        indexEngineNameMap.remove(engineName);
+        final String engineName = deleteIndexEngineInternal(indexId);
         ((OClusterBasedStorageConfiguration) configuration).deleteIndexEngine(engineName);
       } catch (final IOException e) {
         throw OException.wrapException(new OStorageException("Error on index deletion"), e);
@@ -2622,6 +2646,19 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     } catch (final Throwable t) {
       throw logAndPrepareForRethrow(t);
     }
+  }
+
+  public String deleteIndexEngineInternal(final int indexId) throws IOException {
+    final OBaseIndexEngine engine = indexEngines.get(indexId);
+
+    indexEngines.set(indexId, null);
+
+    engine.delete();
+
+    final String engineName = engine.getName();
+    indexEngineNameMap.remove(engineName);
+
+    return engineName;
   }
 
   private void checkIndexId(final int indexId) throws OInvalidIndexEngineIdException {

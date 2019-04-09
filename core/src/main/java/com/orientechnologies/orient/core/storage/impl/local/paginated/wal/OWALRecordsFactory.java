@@ -24,6 +24,7 @@ import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OEmptyWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OWriteableWALRecord;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateRecordCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteCO;
@@ -53,6 +54,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FULL_CHECKPOINT_START_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_END_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_START_RECORD;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_CREATE_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.NON_TX_OPERATION_PERFORMED_WAL_RECORD;
 
 /**
@@ -168,6 +170,9 @@ public final class OWALRecordsFactory {
       break;
     case CLUSTER_UPDATE_RECORD_CO:
       walRecord = new OPaginatedClusterUpdateRecordCO();
+      break;
+    case INDEX_ENGINE_CREATE_CO:
+      walRecord = new OIndexEngineCreateCO();
       break;
     default:
       if (idToTypeMap.containsKey(content[0]))

@@ -24,7 +24,12 @@ import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.io.OIOException;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.util.OCallable;
-import com.orientechnologies.orient.core.command.*;
+import com.orientechnologies.orient.core.command.OCommandDistributedReplicateRequest;
+import com.orientechnologies.orient.core.command.OCommandExecutor;
+import com.orientechnologies.orient.core.command.OCommandManager;
+import com.orientechnologies.orient.core.command.OCommandOutputListener;
+import com.orientechnologies.orient.core.command.OCommandRequestText;
+import com.orientechnologies.orient.core.command.ODistributedCommand;
 import com.orientechnologies.orient.core.command.script.OCommandScript;
 import com.orientechnologies.orient.core.config.OContextConfiguration;
 import com.orientechnologies.orient.core.config.OStorageConfiguration;
@@ -43,22 +48,53 @@ import com.orientechnologies.orient.core.sql.OCommandExecutorSQLDelegate;
 import com.orientechnologies.orient.core.sql.OCommandExecutorSQLSelect;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.sql.functions.OSQLFunctionRuntime;
-import com.orientechnologies.orient.core.storage.*;
+import com.orientechnologies.orient.core.storage.OAutoshardedStorage;
+import com.orientechnologies.orient.core.storage.OCluster;
+import com.orientechnologies.orient.core.storage.OPhysicalPosition;
+import com.orientechnologies.orient.core.storage.ORawBuffer;
+import com.orientechnologies.orient.core.storage.ORecordCallback;
+import com.orientechnologies.orient.core.storage.ORecordMetadata;
+import com.orientechnologies.orient.core.storage.OStorage;
+import com.orientechnologies.orient.core.storage.OStorageOperationResult;
 import com.orientechnologies.orient.core.storage.disk.OLocalPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OFreezableStorageComponent;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManager;
 import com.orientechnologies.orient.core.tx.OTransactionInternal;
-import com.orientechnologies.orient.distributed.impl.task.*;
+import com.orientechnologies.orient.distributed.impl.task.OBackgroundBackup;
+import com.orientechnologies.orient.distributed.impl.task.OReadRecordIfNotLatestTask;
+import com.orientechnologies.orient.distributed.impl.task.OReadRecordTask;
+import com.orientechnologies.orient.distributed.impl.task.OSQLCommandTask;
+import com.orientechnologies.orient.distributed.impl.task.OScriptTask;
 import com.orientechnologies.orient.server.OServer;
-import com.orientechnologies.orient.server.distributed.*;
+import com.orientechnologies.orient.server.distributed.ODistributedConfiguration;
+import com.orientechnologies.orient.server.distributed.ODistributedDatabase;
+import com.orientechnologies.orient.server.distributed.ODistributedException;
 import com.orientechnologies.orient.server.distributed.ODistributedRequest.EXECUTION_MODE;
+import com.orientechnologies.orient.server.distributed.ODistributedResponse;
+import com.orientechnologies.orient.server.distributed.ODistributedServerLog;
+import com.orientechnologies.orient.server.distributed.ODistributedServerManager;
+import com.orientechnologies.orient.server.distributed.OModifiableDistributedConfiguration;
+import com.orientechnologies.orient.server.distributed.OWriteOperationNotPermittedException;
 import com.orientechnologies.orient.server.distributed.task.OAbstractCommandTask;
 import com.orientechnologies.orient.server.distributed.task.OAbstractRemoteTask;
 import com.orientechnologies.orient.server.distributed.task.ODistributedOperationException;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -265,7 +301,7 @@ public class ODistributedStorage implements OStorage, OFreezableStorageComponent
     } catch (ONeedRetryException e) {
       // PASS THROUGH
       throw e;
-    }catch (Exception e) {
+    } catch (Exception e) {
       handleDistributedException("Cannot route COMMAND operation to the distributed node", e);
       // UNREACHABLE
       return null;
@@ -784,6 +820,16 @@ public class ODistributedStorage implements OStorage, OFreezableStorageComponent
   @Override
   public OCluster getClusterById(int iId) {
     return wrapped.getClusterById(iId);
+  }
+
+  @Override
+  public String getClusterName(final int clusterId) {
+    return wrapped.getClusterName(clusterId);
+  }
+
+  @Override
+  public boolean setClusterAttribute(final int id, final OCluster.ATTRIBUTES attribute, final Object value) {
+    return wrapped.setClusterAttribute(id, attribute, value);
   }
 
   @Override
