@@ -4,7 +4,6 @@ import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OStringSerializer;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.serialization.serializer.binary.OBinarySerializerFactory;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes;
@@ -13,9 +12,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.OCo
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 public class OIndexEngineCreateCO extends OComponentOperationRecord {
   private String engineName;
@@ -30,8 +27,6 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
   private int                 apiVersion;
   private boolean             multiValue;
   private Map<String, String> engineProperties;
-  private Set<String>         clustersToIndex;
-  private ODocument           metadata;
 
   private int     keySize;
   private OType[] keyTypes;
@@ -45,8 +40,8 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
 
   public OIndexEngineCreateCO(final String engineName, final String algorithm, final String indexType, final byte keySerializerId,
       final byte valueSerializerId, final boolean isAutomatic, final int version, final int apiVersion, final boolean multiValue,
-      final Map<String, String> engineProperties, final Set<String> clustersToIndex, final ODocument metadata, final int keySize,
-      final OType[] keyTypes, final boolean nullValuesSupport) {
+      final Map<String, String> engineProperties, final int keySize, final OType[] keyTypes, final boolean nullValuesSupport,
+      final int indexId) {
     this.engineName = engineName;
     this.algorithm = algorithm;
     this.indexType = indexType;
@@ -57,14 +52,13 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     this.apiVersion = apiVersion;
     this.multiValue = multiValue;
     this.engineProperties = engineProperties;
-    this.clustersToIndex = clustersToIndex;
-    this.metadata = metadata;
     this.keySize = keySize;
     this.keyTypes = keyTypes;
     this.nullValuesSupport = nullValuesSupport;
+    this.indexId = indexId;
   }
 
-  public String getEngineName() {
+  String getEngineName() {
     return engineName;
   }
 
@@ -76,11 +70,11 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     return indexType;
   }
 
-  public byte getKeySerializerId() {
+  byte getKeySerializerId() {
     return keySerializerId;
   }
 
-  public byte getValueSerializerId() {
+  byte getValueSerializerId() {
     return valueSerializerId;
   }
 
@@ -104,14 +98,6 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     return engineProperties;
   }
 
-  public Set<String> getClustersToIndex() {
-    return clustersToIndex;
-  }
-
-  public ODocument getMetadata() {
-    return metadata;
-  }
-
   public int getKeySize() {
     return keySize;
   }
@@ -120,7 +106,7 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     return keyTypes;
   }
 
-  public boolean isNullValuesSupport() {
+  boolean isNullValuesSupport() {
     return nullValuesSupport;
   }
 
@@ -129,7 +115,7 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     final OBinarySerializerFactory binarySerializerFactory = OBinarySerializerFactory.getInstance();
 
     storage.addIndexEngineInternal(engineName, algorithm, indexType, binarySerializerFactory.getObjectSerializer(valueSerializerId),
-        isAutomatic, true, version, apiVersion, multiValue, engineProperties, clustersToIndex, metadata,
+        isAutomatic, true, version, apiVersion, multiValue, engineProperties,
         binarySerializerFactory.getObjectSerializer(keySerializerId), keySize, keyTypes, nullValuesSupport);
   }
 
@@ -163,25 +149,6 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
         OStringSerializer.INSTANCE.serializeInByteBufferObject(entry.getKey(), buffer);
         OStringSerializer.INSTANCE.serializeInByteBufferObject(entry.getValue(), buffer);
       }
-    }
-
-    if (clustersToIndex == null || clustersToIndex.isEmpty()) {
-      buffer.putInt(0);
-    } else {
-      buffer.putInt(clustersToIndex.size());
-
-      for (final String clusterToIndex : clustersToIndex) {
-        OStringSerializer.INSTANCE.serializeInByteBufferObject(clusterToIndex, buffer);
-      }
-    }
-
-
-
-    if (metadata == null) {
-      buffer.put((byte) 0);
-    } else {
-      buffer.put((byte) 1);
-      OStringSerializer.INSTANCE.serializeInByteBufferObject(metadata.toJSON(), buffer);
     }
 
     buffer.putInt(keySize);
@@ -224,21 +191,6 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
       engineProperties.put(key, value);
     }
 
-    final int clustersToIndexSize = buffer.getInt();
-    clustersToIndex = new HashSet<>();
-
-    for (int i = 0; i < clustersToIndexSize; i++) {
-      clustersToIndex.add(OStringSerializer.INSTANCE.deserializeFromByteBufferObject(buffer));
-    }
-
-    if (buffer.get() == 0) {
-      metadata = null;
-    } else {
-      final String metadataJSON = OStringSerializer.INSTANCE.deserializeFromByteBufferObject(buffer);
-      metadata = new ODocument();
-      metadata.fromJSON(metadataJSON);
-    }
-
     keySize = buffer.getInt();
 
     final int keyTypesSize = buffer.getInt();
@@ -263,19 +215,6 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
         size += OStringSerializer.INSTANCE.getObjectSize(property.getKey());
         size += OStringSerializer.INSTANCE.getObjectSize(property.getValue());
       }
-    }
-
-    size += OIntegerSerializer.INT_SIZE;
-
-    if (clustersToIndex != null) {
-      for (final String clusterToIndex : clustersToIndex) {
-        size += OStringSerializer.INSTANCE.getObjectSize(clusterToIndex);
-      }
-    }
-
-    size += OByteSerializer.BYTE_SIZE;
-    if (metadata != null) {
-      size += OStringSerializer.INSTANCE.getObjectSize(metadata.toJSON());
     }
 
     size += OIntegerSerializer.INT_SIZE;

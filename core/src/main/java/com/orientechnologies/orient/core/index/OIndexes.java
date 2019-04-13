@@ -176,7 +176,7 @@ public final class OIndexes {
 
   public static OBaseIndexEngine createIndexEngine(final String name, final String algorithm, final String type,
       final Boolean durableInNonTxMode, final OStorage storage, final int version, int apiVersion, boolean multivalue,
-      final Map<String, String> indexProperties, ODocument metadata) {
+      final Map<String, String> indexProperties) {
 
     final OIndexFactory factory = findFactoryByAlgorithmAndType(algorithm, type);
 

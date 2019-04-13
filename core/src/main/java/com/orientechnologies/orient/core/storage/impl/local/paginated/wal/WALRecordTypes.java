@@ -23,4 +23,5 @@ public final class WALRecordTypes {
   public static final byte CLUSTER_UPDATE_RECORD_CO            = 20;
 
   public static final byte INDEX_ENGINE_CREATE_CO = 21;
+  public static final byte INDEX_ENGINE_DELETE_CO = 22;
 }
