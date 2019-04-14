@@ -115,10 +115,10 @@ public class OLuceneSpatialIndexFactory implements OIndexFactory, ODatabaseLifec
   }
 
   @Override
-  public OBaseIndexEngine createIndexEngine(String algorithm, String name, Boolean durableInNonTxMode, OStorage storage,
+  public OBaseIndexEngine createIndexEngine(final int indexId, String algorithm, String name, Boolean durableInNonTxMode, OStorage storage,
       int version, int apiVersion, boolean multiValue, Map<String, String> engineProperties) {
 
-    return new OLuceneSpatialIndexEngineDelegator(name, durableInNonTxMode, storage, version);
+    return new OLuceneSpatialIndexEngineDelegator(indexId, name, durableInNonTxMode, storage, version);
 
   }
 

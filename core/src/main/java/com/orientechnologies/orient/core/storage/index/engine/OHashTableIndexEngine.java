@@ -66,8 +66,10 @@ public final class OHashTableIndexEngine implements OIndexEngine {
   private final int version;
 
   private final String name;
+  private final int id;
 
-  public OHashTableIndexEngine(String name, OAbstractPaginatedStorage storage, int version) {
+  public OHashTableIndexEngine(final int id, String name, OAbstractPaginatedStorage storage, int version) {
+    this.id = id;
     this.version = version;
     if (version < 2) {
       throw new IllegalStateException("Unsupported version of hash index");
@@ -86,6 +88,11 @@ public final class OHashTableIndexEngine implements OIndexEngine {
   @Override
   public String getName() {
     return name;
+  }
+
+  @Override
+  public int getId() {
+    return id;
   }
 
   @Override

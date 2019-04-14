@@ -55,8 +55,10 @@ public class OSBTreeIndexEngine implements OIndexEngine {
   private final OSBTree<Object, Object> sbTree;
   private final int                     version;
   private final String                  name;
+  private final int                     id;
 
-  public OSBTreeIndexEngine(String name, OAbstractPaginatedStorage storage, int version) {
+  public OSBTreeIndexEngine(final int id, String name, OAbstractPaginatedStorage storage, int version) {
+    this.id = id;
     this.name = name;
     this.version = version;
 
@@ -70,6 +72,11 @@ public class OSBTreeIndexEngine implements OIndexEngine {
   @Override
   public String getName() {
     return name;
+  }
+
+  @Override
+  public int getId() {
+    return id;
   }
 
   @Override

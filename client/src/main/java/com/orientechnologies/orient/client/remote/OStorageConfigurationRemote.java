@@ -168,7 +168,7 @@ public class OStorageConfigurationRemote implements OStorageConfiguration {
   }
 
   @Override
-  public OStorageConfiguration.IndexEngineData getIndexEngine(String name) {
+  public OStorageConfiguration.IndexEngineData getIndexEngine(String name, final int defaultIndexId) {
     throw new UnsupportedOperationException();
   }
 

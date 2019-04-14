@@ -27,10 +27,12 @@ public final class OCellBTreeSingleValueIndexEngine implements OSingleValueIndex
 
   private final OCellBTreeSingleValue<Object> sbTree;
   private final String                        name;
+  private final int id;
 
-  public OCellBTreeSingleValueIndexEngine(String name, OAbstractPaginatedStorage storage) {
+  public OCellBTreeSingleValueIndexEngine(final int id, String name, OAbstractPaginatedStorage storage, final int indexId) {
+    this.id = id;
     this.name = name;
-    this.sbTree = new OCellBTreeSingleValue<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, storage);
+    this.sbTree = new OCellBTreeSingleValue<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, storage, indexId);
   }
 
   @Override
@@ -44,6 +46,11 @@ public final class OCellBTreeSingleValueIndexEngine implements OSingleValueIndex
   @Override
   public String getName() {
     return name;
+  }
+
+  @Override
+  public int getId() {
+    return id;
   }
 
   @Override

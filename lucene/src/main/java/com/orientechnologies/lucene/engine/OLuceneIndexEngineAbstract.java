@@ -108,8 +108,11 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
 
   private Lock openCloseLock;
 
-  public OLuceneIndexEngineAbstract(OStorage storage, String name) {
+  private final int id;
+
+  public OLuceneIndexEngineAbstract(final int id, OStorage storage, String name) {
     super(true, 0, true);
+    this.id = id;
 
     this.storage = storage;
     this.name = name;
@@ -119,6 +122,11 @@ public abstract class OLuceneIndexEngineAbstract extends OSharedResourceAdaptive
     closed = new AtomicBoolean(true);
 
     openCloseLock = new ReentrantLock();
+  }
+
+  @Override
+  public int getId() {
+    return id;
   }
 
   protected void updateLastAccess() {

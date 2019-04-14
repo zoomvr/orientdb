@@ -220,6 +220,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     OFreezableStorageComponent, OPageIsBrokenListener {
   private static final int WAL_RESTORE_REPORT_INTERVAL = 30 * 1000; // milliseconds
 
+  public static final int STORAGE_CONFIGURATION_INDEX_ID = -1;
+
   private static final Comparator<ORecordOperation> COMMIT_RECORD_OPERATION_COMPARATOR = Comparator
       .comparing(o -> o.getRecord().getIdentity());
 
@@ -484,11 +486,12 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       throw new OStorageException("Storage '" + name + "' is not properly initialized");
     }
 
+    int counter = 0;
     final Set<String> indexNames = configuration.indexEngines();
     for (final String indexName : indexNames) {
-      final OStorageConfiguration.IndexEngineData engineData = configuration.getIndexEngine(indexName);
+      final OStorageConfiguration.IndexEngineData engineData = configuration.getIndexEngine(indexName, counter);
       final OBaseIndexEngine engine = OIndexes
-          .createIndexEngine(engineData.getName(), engineData.getAlgorithm(), engineData.getIndexType(),
+          .createIndexEngine(engineData.getIndexId(), engineData.getName(), engineData.getAlgorithm(), engineData.getIndexType(),
               engineData.getDurableInNonTxMode(), this, engineData.getVersion(), engineData.getApiVersion(),
               engineData.isMultivalue(), engineData.getEngineProperties());
 
@@ -513,7 +516,13 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       }
 
       indexEngineNameMap.put(engineData.getName(), engine);
-      indexEngines.add(engine);
+      while (engineData.getIndexId() <= indexEngines.size()) {
+        indexEngines.add(null);
+      }
+
+      indexEngines.set(engineData.getIndexId(), engine);
+
+      counter++;
     }
   }
 
@@ -2371,10 +2380,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           return -1;
         }
 
-        final int indexId = indexEngines.indexOf(engine);
-        assert indexId >= 0;
-
-        return generateIndexId(indexId, engine);
+        return generateIndexId(engine);
       } finally {
         stateLock.releaseReadLock();
       }
@@ -2417,12 +2423,13 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         final boolean nullValuesSupport = indexDefinition != null && !indexDefinition.isNullValuesIgnored();
 
         final OBaseIndexEngine engine = OIndexes
-            .createIndexEngine(engineName, algorithm, indexType, durableInNonTxMode, this, version, apiVersion, multivalue,
-                engineProperties);
+            .createIndexEngine(indexEngines.size(), engineName, algorithm, indexType, durableInNonTxMode, this, version, apiVersion,
+                multivalue, engineProperties);
 
-        final OStorageConfiguration.IndexEngineData engineData = new OStorageConfigurationImpl.IndexEngineData(engineName,
-            algorithm, indexType, durableInNonTxMode, version, engine.getEngineAPIVersion(), multivalue, valueSerializer.getId(),
-            keySerializer.getId(), isAutomatic, keyTypes, nullValuesSupport, keySize, null, null, engineProperties);
+        final OStorageConfiguration.IndexEngineData engineData = new OStorageConfigurationImpl.IndexEngineData(indexEngines.size(),
+            engineName, algorithm, indexType, durableInNonTxMode, version, engine.getEngineAPIVersion(), multivalue,
+            valueSerializer.getId(), keySerializer.getId(), isAutomatic, keyTypes, nullValuesSupport, keySize, null, null,
+            engineProperties);
 
         if (engineData.getApiVersion() < 1) {
           ((OIndexEngine) engine)
@@ -2436,7 +2443,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         indexEngines.add(engine);
         ((OClusterBasedStorageConfiguration) configuration).addIndexEngine(engineName, engineData);
 
-        return generateIndexId(indexEngines.size() - 1, engine);
+        assert indexEngines.size() - 1 == engine.getId();
+
+        return generateIndexId(engine);
       } catch (final IOException e) {
         throw OException.wrapException(new OStorageException("Cannot add index engine " + engineName + " in storage."), e);
       } finally {
@@ -2475,16 +2484,15 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
                 .warn(this, "Index with name '%s' already exists, removing it and re-create the index", engineName);
             final OBaseIndexEngine engine = indexEngineNameMap.remove(engineName);
             if (engine != null) {
-              final int engineId = indexEngines.indexOf(engine);
-              indexEngines.remove(engineId);
+              indexEngines.set(engine.getId(), null);
 
               engine.delete();
 
-              final OStorageConfiguration.IndexEngineData engineData = configuration.getIndexEngine(engineName);
+              final OStorageConfiguration.IndexEngineData engineData = configuration.getIndexEngine(engineName, engine.getId());
               atomicOperation.addComponentOperation(
-                  new OIndexEngineDeleteCO(engineId, engineName, engineData.getAlgorithm(), engineData.getIndexType(),
-                      engineData.getKeySerializedId(), engineData.getValueSerializerId(), engineData.isAutomatic(),
-                      engineData.getVersion(), engineData.getApiVersion(), engineData.isMultivalue(),
+                  new OIndexEngineDeleteCO(engineData.getIndexId(), engineName, engineData.getAlgorithm(),
+                      engineData.getIndexType(), engineData.getKeySerializedId(), engineData.getValueSerializerId(),
+                      engineData.isAutomatic(), engineData.getVersion(), engineData.getApiVersion(), engineData.isMultivalue(),
                       engineData.getEngineProperties(), engineData.getKeySize(), engineData.getKeyTypes(),
                       engineData.isNullValuesSupport()));
 
@@ -2519,10 +2527,10 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           final String cfgEncryption = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD);
           final String cfgEncryptionKey = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY);
 
-          final OStorageConfiguration.IndexEngineData engineData = new OStorageConfigurationImpl.IndexEngineData(engineName,
-              algorithm, indexType, durableInNonTxMode, version, engine.getEngineAPIVersion(), multivalue, serializerId,
-              keySerializer.getId(), isAutomatic, keyTypes, nullValuesSupport, keySize, cfgEncryption, cfgEncryptionKey,
-              engineProperties);
+          final OStorageConfiguration.IndexEngineData engineData = new OStorageConfigurationImpl.IndexEngineData(
+              indexEngines.size() - 1, engineName, algorithm, indexType, durableInNonTxMode, version, engine.getEngineAPIVersion(),
+              multivalue, serializerId, keySerializer.getId(), isAutomatic, keyTypes, nullValuesSupport, keySize, cfgEncryption,
+              cfgEncryptionKey, engineProperties);
 
           ((OClusterBasedStorageConfiguration) configuration).addIndexEngine(engineName, engineData);
 
@@ -2530,7 +2538,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
               new OIndexEngineCreateCO(engineName, algorithm, indexType, keySerializer.getId(), serializerId, isAutomatic, version,
                   apiVersion, multivalue, engineProperties, keySize, keyTypes, nullValuesSupport, indexEngines.size() - 1));
 
-          return generateIndexId(indexEngines.size() - 1, engine);
+          return generateIndexId(engine);
         } catch (Exception e) {
           rollback = true;
           throw e;
@@ -2557,8 +2565,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       final OBinarySerializer keySerializer, final int keySize, final OType[] keyTypes, final boolean nullValuesSupport)
       throws IOException {
     final OBaseIndexEngine engine;
-    engine = OIndexes.createIndexEngine(engineName, algorithm, indexType, durableInNonTxMode, this, version, apiVersion, multivalue,
-        engineProperties);
+    engine = OIndexes
+        .createIndexEngine(indexEngines.size(), engineName, algorithm, indexType, durableInNonTxMode, this, version, apiVersion,
+            multivalue, engineProperties);
 
     final OContextConfiguration ctxCfg = configuration.getContextConfiguration();
     final String cfgEncryption = ctxCfg.getValueAsString(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD);
@@ -2579,8 +2588,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     return engine;
   }
 
-  private static int generateIndexId(final int internalId, final OBaseIndexEngine indexEngine) {
-    return indexEngine.getEngineAPIVersion() << (OIntegerSerializer.INT_SIZE * 8 - 5) | internalId;
+  private static int generateIndexId(final OBaseIndexEngine indexEngine) {
+    return indexEngine.getEngineAPIVersion() << (OIntegerSerializer.INT_SIZE * 8 - 5) | indexEngine.getId();
   }
 
   private static int extractInternalId(final int externalId) {
@@ -2652,7 +2661,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         final OAtomicOperation atomicOperation = atomicOperationsManager.startAtomicOperation((String) null, true);
         try {
           final String engineName = deleteIndexEngineInternal(indexId);
-          final OStorageConfiguration.IndexEngineData engineData = configuration.getIndexEngine(engineName);
+          final OStorageConfiguration.IndexEngineData engineData = configuration.getIndexEngine(engineName, indexId);
           atomicOperation.addComponentOperation(
               new OIndexEngineDeleteCO(indexId, engineName, engineData.getAlgorithm(), engineData.getIndexType(),
                   engineData.getKeySerializedId(), engineData.getValueSerializerId(), engineData.isAutomatic(),
@@ -2744,7 +2753,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
     try {
       if (transaction.get() != null) {
-        return doRemoveKeyFromIndex(indexId, key);
+        return removeKeyFromIndexInternal(indexId, key);
       }
 
       checkOpenness();
@@ -2755,7 +2764,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         checkLowDiskSpaceRequestsAndReadOnlyConditions();
 
-        return doRemoveKeyFromIndex(indexId, key);
+        return removeKeyFromIndexInternal(indexId, key);
       } finally {
         stateLock.releaseReadLock();
       }
@@ -2770,7 +2779,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  private boolean doRemoveKeyFromIndex(final int indexId, final Object key) throws OInvalidIndexEngineIdException {
+  public boolean removeKeyFromIndexInternal(final int indexId, final Object key) throws OInvalidIndexEngineIdException {
     try {
       checkIndexId(indexId);
 
@@ -2959,6 +2968,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       }
 
       final OBaseIndexEngine engine = indexEngines.get(indexId);
+      assert engine.getId() == indexId;
+
       return callback.callEngine(engine);
     } catch (final Exception e) {
       rollback = true;
@@ -2978,6 +2989,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       checkIndexId(indexId);
 
       final OBaseIndexEngine engine = indexEngines.get(indexId);
+      assert engine.getId() == indexId;
+
       makeStorageDirty();
 
       ((OIndexEngine) engine).update(key, valueCreator);
@@ -2999,7 +3012,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
     try {
       if (transaction.get() != null) {
-        doPutRidIndexEntry(indexId, key, value);
+        putRidIndexEntryInternal(indexId, key, value);
         return;
       }
 
@@ -3011,7 +3024,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         checkLowDiskSpaceRequestsAndReadOnlyConditions();
 
-        doPutRidIndexEntry(indexId, key, value);
+        putRidIndexEntryInternal(indexId, key, value);
       } finally {
         stateLock.releaseReadLock();
       }
@@ -3026,11 +3039,14 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  private void doPutRidIndexEntry(final int indexId, final Object key, final ORID value) throws OInvalidIndexEngineIdException {
+  public void putRidIndexEntryInternal(final int indexId, final Object key, final ORID value)
+      throws OInvalidIndexEngineIdException {
     try {
       checkIndexId(indexId);
 
       final OBaseIndexEngine engine = indexEngines.get(indexId);
+      assert engine.getId() == indexId;
+
       makeStorageDirty();
 
       ((OV1IndexEngine) engine).put(key, value);
@@ -3081,6 +3097,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       checkIndexId(indexId);
 
       final OBaseIndexEngine engine = indexEngines.get(indexId);
+      assert engine.getId() == indexId;
+
       makeStorageDirty();
 
       return ((OMultiValueIndexEngine) engine).remove(key, value);
@@ -3131,6 +3149,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       checkIndexId(indexId);
 
       final OBaseIndexEngine engine = indexEngines.get(indexId);
+      assert engine.getId() == indexId;
+
       makeStorageDirty();
 
       ((OIndexEngine) engine).put(key, value);
@@ -3191,6 +3211,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       checkIndexId(indexId);
 
       final OBaseIndexEngine engine = indexEngines.get(indexId);
+      assert engine.getId() == indexId;
+
       makeStorageDirty();
 
       if (engine instanceof OIndexEngine) {
@@ -3239,6 +3261,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.getFirstKey();
   }
@@ -3275,6 +3298,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.getLastKey();
   }
@@ -3315,6 +3339,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.iterateEntriesBetween(rangeFrom, fromInclusive, rangeTo, toInclusive, ascSortOrder, transformer);
   }
@@ -3353,6 +3378,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.iterateEntriesMajor(fromKey, isInclusive, ascSortOrder, transformer);
   }
@@ -3391,6 +3417,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.iterateEntriesMinor(toKey, isInclusive, ascSortOrder, transformer);
   }
@@ -3429,6 +3456,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.cursor(valuesTransformer);
   }
@@ -3467,6 +3495,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.descCursor(valuesTransformer);
   }
@@ -3503,6 +3532,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.keyCursor();
   }
@@ -3541,6 +3571,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.size(transformer);
   }
@@ -3577,6 +3608,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     checkIndexId(indexId);
 
     final OBaseIndexEngine engine = indexEngines.get(indexId);
+    assert engine.getId() == indexId;
 
     return engine.hasRangeQuerySupport();
   }

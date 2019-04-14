@@ -65,8 +65,8 @@ public class OLuceneFullTextIndexEngine extends OLuceneIndexEngineAbstract {
   private OLuceneQueryBuilder    queryBuilder;
   private final AtomicLong bonsayFileId = new AtomicLong(0);
 
-  public OLuceneFullTextIndexEngine(OStorage storage, String idxName) {
-    super(storage, idxName);
+  public OLuceneFullTextIndexEngine(final int id, OStorage storage, String idxName) {
+    super(id, storage, idxName);
     builder = new OLuceneDocumentBuilder();
 
   }

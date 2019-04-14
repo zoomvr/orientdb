@@ -42,6 +42,7 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValuePutCO;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -95,11 +96,14 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
   private       OType[]              keyTypes;
   private       OEncryption          encryption;
 
+  private final int indexId;
+
   public OCellBTreeSingleValue(final String name, final String dataFileExtension, final String nullFileExtension,
-      final OAbstractPaginatedStorage storage) {
+      final OAbstractPaginatedStorage storage, final int indexId) {
     super(storage, name, dataFileExtension, name + dataFileExtension);
     acquireExclusiveLock();
     try {
+      this.indexId = indexId;
       this.nullFileExtension = nullFileExtension;
     } finally {
       releaseExclusiveLock();
@@ -328,6 +332,10 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
             updateSize(sizeDiff);
           }
 
+          atomicOperation.addComponentOperation(
+              new OCellBTreeSingleValuePutCO(rawKey, serializedValue, oldRawValue, keySerializer.getId(), indexId,
+                  encryption != null ? encryption.name() : null));
+
         } else {
           final OCacheEntry cacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
 
@@ -349,6 +357,24 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
             }
 
             nullBucket.setValue(value);
+
+            final byte[] serializedValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
+            OShortSerializer.INSTANCE.serializeNative((short) value.getClusterId(), serializedValue, 0);
+            OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
+
+            final byte[] oldRawValue;
+
+            if (oldValue != null) {
+              oldRawValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
+              OShortSerializer.INSTANCE.serializeNative((short) oldValue.getClusterId(), oldRawValue, 0);
+              OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
+            } else {
+              oldRawValue = null;
+            }
+
+            atomicOperation.addComponentOperation(
+                new OCellBTreeSingleValuePutCO(null, serializedValue, oldRawValue, keySerializer.getId(), indexId,
+                    encryption != null ? encryption.name() : null));
 
           } finally {
             releasePageFromWrite(cacheEntry);
@@ -1372,10 +1398,11 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
    * Indicates search behavior in case of {@link OCompositeKey} keys that have less amount of internal keys are used, whether
    * lowest or highest partially matched key should be used.
    */
-  private enum PartialSearchMode {/**
-   * Any partially matched key will be used as search result.
-   */
-  NONE,
+  private enum PartialSearchMode {
+    /**
+     * Any partially matched key will be used as search result.
+     */
+    NONE,
     /**
      * The biggest partially matched key will be used as search result.
      */
@@ -1384,7 +1411,8 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
     /**
      * The smallest partially matched key will be used as search result.
      */
-    LOWEST_BOUNDARY}
+    LOWEST_BOUNDARY
+  }
 
   public interface OSBTreeCursor<K, V> {
     Map.Entry<K, V> next(int prefetchSize);

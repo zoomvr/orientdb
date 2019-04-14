@@ -119,7 +119,7 @@ public final class OHashIndexFactory implements OIndexFactory {
   }
 
   @Override
-  public final OBaseIndexEngine createIndexEngine(final String algorithm, final String name, final Boolean durableInNonTxMode,
+  public final OBaseIndexEngine createIndexEngine(final int indexId, final String algorithm, final String name, final Boolean durableInNonTxMode,
       final OStorage storage, final int version, final int apiVersion, final boolean multiValue,
       final Map<String, String> engineProperties) {
     final OIndexEngine indexEngine;
@@ -128,14 +128,14 @@ public final class OHashIndexFactory implements OIndexFactory {
     switch (storageType) {
     case "memory":
     case "plocal":
-      indexEngine = new OHashTableIndexEngine(name, (OAbstractPaginatedStorage) storage, version);
+      indexEngine = new OHashTableIndexEngine(indexId, name, (OAbstractPaginatedStorage) storage, version);
       break;
     case "distributed":
       // DISTRIBUTED CASE: HANDLE IT AS FOR LOCAL
-      indexEngine = new OHashTableIndexEngine(name, (OAbstractPaginatedStorage) storage.getUnderlying(), version);
+      indexEngine = new OHashTableIndexEngine(indexId, name, (OAbstractPaginatedStorage) storage.getUnderlying(), version);
       break;
     case "remote":
-      indexEngine = new ORemoteIndexEngine(name);
+      indexEngine = new ORemoteIndexEngine(indexId, name);
       break;
     default:
       throw new OIndexException("Unsupported storage type: " + storageType);

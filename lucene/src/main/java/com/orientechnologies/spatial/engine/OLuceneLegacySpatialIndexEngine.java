@@ -70,8 +70,8 @@ public class OLuceneLegacySpatialIndexEngine extends OLuceneSpatialIndexEngineAb
 
   OShapeBuilderLegacy legacyBuilder = OShapeBuilderLegacyImpl.INSTANCE;
 
-  public OLuceneLegacySpatialIndexEngine(OStorage storage, String indexName, OShapeBuilder factory) {
-    super(storage, indexName, factory);
+  public OLuceneLegacySpatialIndexEngine(final int id, OStorage storage, String indexName, OShapeBuilder factory) {
+    super(id, storage, indexName, factory);
   }
 
   private Set<OIdentifiable> legacySearch(Object key, OLuceneTxChanges changes) throws IOException {

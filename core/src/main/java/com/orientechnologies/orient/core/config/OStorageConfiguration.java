@@ -15,7 +15,7 @@ public interface OStorageConfiguration {
   String DEFAULT_CHARSET               = "UTF-8";
   String DEFAULT_DATE_FORMAT           = "yyyy-MM-dd";
   String DEFAULT_DATETIME_FORMAT       = "yyyy-MM-dd HH:mm:ss";
-  int    CURRENT_VERSION               = 22;
+  int    CURRENT_VERSION               = 23;
   int    CURRENT_BINARY_FORMAT_VERSION = 13;
 
   SimpleDateFormat getDateTimeFormatInstance();
@@ -54,7 +54,7 @@ public interface OStorageConfiguration {
 
   boolean isValidationEnabled();
 
-  OStorageConfiguration.IndexEngineData getIndexEngine(String name);
+  OStorageConfiguration.IndexEngineData getIndexEngine(String name, final int defaultIndexId);
 
   String getRecordSerializer();
 
@@ -83,6 +83,7 @@ public interface OStorageConfiguration {
   int getMaxKeySize();
 
   final class IndexEngineData {
+    private final int                 indexId;
     private final String              name;
     private final String              algorithm;
     private final String              indexType;
@@ -100,10 +101,12 @@ public interface OStorageConfiguration {
     private final String              encryption;
     private final String              encryptionOptions;
 
-    public IndexEngineData(final String name, final String algorithm, String indexType, final Boolean durableInNonTxMode,
-        final int version, final int apiVersion, final boolean multivalue, final byte valueSerializerId, final byte keySerializedId,
-        final boolean isAutomatic, final OType[] keyTypes, final boolean nullValuesSupport, final int keySize,
-        final String encryption, final String encryptionOptions, final Map<String, String> engineProperties) {
+    public IndexEngineData(final int indexId, final String name, final String algorithm, String indexType,
+        final Boolean durableInNonTxMode, final int version, final int apiVersion, final boolean multivalue,
+        final byte valueSerializerId, final byte keySerializedId, final boolean isAutomatic, final OType[] keyTypes,
+        final boolean nullValuesSupport, final int keySize, final String encryption, final String encryptionOptions,
+        final Map<String, String> engineProperties) {
+      this.indexId = indexId;
       this.name = name;
       this.algorithm = algorithm;
       this.indexType = indexType;
@@ -123,6 +126,10 @@ public interface OStorageConfiguration {
         this.engineProperties = null;
       else
         this.engineProperties = new HashMap<>(engineProperties);
+    }
+
+    public int getIndexId() {
+      return indexId;
     }
 
     public int getKeySize() {

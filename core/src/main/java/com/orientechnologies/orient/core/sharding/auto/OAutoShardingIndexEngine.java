@@ -67,11 +67,18 @@ public final class OAutoShardingIndexEngine implements OIndexEngine {
   private final String                           name;
   private       int                              partitionSize = 1;
   private final AtomicLong                       bonsayFileId  = new AtomicLong(0);
+  private final int                              id;
 
-  OAutoShardingIndexEngine(final String iName, final OAbstractPaginatedStorage iStorage, final int iVersion) {
+  OAutoShardingIndexEngine(final int id, final String iName, final OAbstractPaginatedStorage iStorage, final int iVersion) {
+    this.id = id;
     this.name = iName;
     this.storage = iStorage;
     this.version = iVersion;
+  }
+
+  @Override
+  public int getId() {
+    return id;
   }
 
   @Override

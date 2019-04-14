@@ -45,8 +45,8 @@ import static com.orientechnologies.lucene.builder.OLuceneQueryBuilder.EMPTY_MET
 
 public class OLuceneGeoSpatialIndexEngine extends OLuceneSpatialIndexEngineAbstract {
 
-  public OLuceneGeoSpatialIndexEngine(OStorage storage, String name, OShapeBuilder factory) {
-    super(storage, name, factory);
+  public OLuceneGeoSpatialIndexEngine(final int id, OStorage storage, String name, OShapeBuilder factory) {
+    super(id, storage, name, factory);
   }
 
   @Override

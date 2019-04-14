@@ -130,20 +130,20 @@ public class OAutoShardingIndexFactory implements OIndexFactory {
   }
 
   @Override
-  public OBaseIndexEngine createIndexEngine(final String algorithm, final String name, final Boolean durableInNonTxMode,
+  public OBaseIndexEngine createIndexEngine(final int indexId, final String algorithm, final String name, final Boolean durableInNonTxMode,
       final OStorage storage, final int version, int apiVersion, boolean multiValue, final Map<String, String> engineProperties) {
 
     final OIndexEngine indexEngine;
 
     final String storageType = storage.getType();
     if (storageType.equals("memory") || storageType.equals("plocal"))
-      indexEngine = new OAutoShardingIndexEngine(name, (OAbstractPaginatedStorage) storage, version);
+      indexEngine = new OAutoShardingIndexEngine(indexId, name, (OAbstractPaginatedStorage) storage, version);
     else if (storageType.equals("distributed"))
       // DISTRIBUTED CASE: HANDLE IT AS FOR LOCAL
-      indexEngine = new OAutoShardingIndexEngine(name, (OAbstractPaginatedStorage) storage.getUnderlying(), version);
+      indexEngine = new OAutoShardingIndexEngine(indexId, name, (OAbstractPaginatedStorage) storage.getUnderlying(), version);
     else if (storageType.equals("remote"))
       // MANAGE REMOTE SHARDED INDEX TO CALL THE INTERESTED SERVER
-      indexEngine = new ORemoteIndexEngine(name);
+      indexEngine = new ORemoteIndexEngine(indexId, name);
     else
       throw new OIndexException("Unsupported storage type: " + storageType);
 

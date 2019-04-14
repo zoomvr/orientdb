@@ -30,8 +30,11 @@ public final class OCellBTreeMultiValueIndexEngine implements OMultiValueIndexEn
 
   private final OCellBTreeMultiValue<Object> sbTree;
   private final String                       name;
+  private final int id;
 
-  public OCellBTreeMultiValueIndexEngine(String name, OAbstractPaginatedStorage storage, final int version) {
+  public OCellBTreeMultiValueIndexEngine(final int id, String name, OAbstractPaginatedStorage storage, final int version) {
+    this.id = id;
+
     this.name = name;
     if (version == 1) {
       this.sbTree = new OCellBTreeMultiValueV1<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, storage);
@@ -49,6 +52,11 @@ public final class OCellBTreeMultiValueIndexEngine implements OMultiValueIndexEn
 
   @Override
   public void flush() {
+  }
+
+  @Override
+  public int getId() {
+    return id;
   }
 
   @Override

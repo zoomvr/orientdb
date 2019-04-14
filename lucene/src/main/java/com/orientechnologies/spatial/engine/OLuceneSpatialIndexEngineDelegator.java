@@ -57,8 +57,10 @@ public class OLuceneSpatialIndexEngineDelegator implements OLuceneIndexEngine, O
   private final int                               version;
   private final String                            indexName;
   private       OLuceneSpatialIndexEngineAbstract delegate;
+  private final int                               id;
 
-  public OLuceneSpatialIndexEngineDelegator(String name, Boolean durableInNonTxMode, OStorage storage, int version) {
+  public OLuceneSpatialIndexEngineDelegator(final int id, String name, Boolean durableInNonTxMode, OStorage storage, int version) {
+    this.id = id;
 
     this.indexName = name;
     this.durableInNonTxMode = durableInNonTxMode;
@@ -71,14 +73,19 @@ public class OLuceneSpatialIndexEngineDelegator implements OLuceneIndexEngine, O
     if (delegate == null) {
       if (OClass.INDEX_TYPE.SPATIAL.name().equalsIgnoreCase(indexType)) {
         if (indexDefinition.getFields().size() > 1) {
-          delegate = new OLuceneLegacySpatialIndexEngine(storage, indexName, OShapeFactory.INSTANCE);
+          delegate = new OLuceneLegacySpatialIndexEngine(id, storage, indexName, OShapeFactory.INSTANCE);
         } else {
-          delegate = new OLuceneGeoSpatialIndexEngine(storage, indexName, OShapeFactory.INSTANCE);
+          delegate = new OLuceneGeoSpatialIndexEngine(id, storage, indexName, OShapeFactory.INSTANCE);
         }
       }
       delegate.init(indexName, indexType, indexDefinition, isAutomatic, metadata);
     }
 
+  }
+
+  @Override
+  public int getId() {
+    return id;
   }
 
   @Override

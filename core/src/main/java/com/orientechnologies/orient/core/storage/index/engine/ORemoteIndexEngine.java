@@ -40,9 +40,16 @@ import java.util.Map;
  */
 public class ORemoteIndexEngine implements OIndexEngine {
   private final String name;
+  private final int id;
 
-  public ORemoteIndexEngine(String name) {
+  public ORemoteIndexEngine(final int id, String name) {
+    this.id = id;
     this.name = name;
+  }
+
+  @Override
+  public int getId() {
+    return id;
   }
 
   @Override
