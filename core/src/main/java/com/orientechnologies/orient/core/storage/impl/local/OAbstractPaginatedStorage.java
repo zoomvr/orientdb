@@ -157,6 +157,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.ind
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineDeleteCO;
 import com.orientechnologies.orient.core.storage.impl.local.statistic.OPerformanceStatisticManager;
 import com.orientechnologies.orient.core.storage.impl.local.statistic.OSessionStoragePerformanceStatistic;
+import com.orientechnologies.orient.core.storage.impl.local.txapprover.OTxApprover;
 import com.orientechnologies.orient.core.storage.index.engine.OHashTableIndexEngine;
 import com.orientechnologies.orient.core.storage.index.engine.OSBTreeIndexEngine;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OIndexRIDContainerSBTree;
@@ -194,6 +195,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TimeZone;
@@ -270,10 +272,14 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   private volatile   OLowDiskSpaceInformation lowDiskSpace;
   private volatile   boolean                  modificationLock;
   private volatile   boolean                  readLock;
+
+  private volatile OTxApprover txApprover = () -> {
+  };
+
   /**
    * Set of pages which were detected as broken and need to be repaired.
    */
-  private final      Set<OPair<String, Long>> brokenPages      = Collections.newSetFromMap(new ConcurrentHashMap<>(0));
+  private final Set<OPair<String, Long>> brokenPages = Collections.newSetFromMap(new ConcurrentHashMap<>(0));
 
   private volatile Throwable dataFlushException;
 
@@ -986,7 +992,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     return id;
   }
 
-  public final boolean setClusterStatus(final int clusterId, final OStorageClusterConfiguration.STATUS iStatus) {
+  private void setClusterStatus(final int clusterId, final OStorageClusterConfiguration.STATUS status) {
     try {
       checkOpenness();
       stateLock.acquireWriteLock();
@@ -1000,16 +1006,16 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         final OCluster cluster = clusters.get(clusterId);
         if (cluster == null) {
-          return false;
+          return;
         }
 
-        if (iStatus == OStorageClusterConfiguration.STATUS.OFFLINE && cluster instanceof OOfflineCluster
-            || iStatus == OStorageClusterConfiguration.STATUS.ONLINE && !(cluster instanceof OOfflineCluster)) {
-          return false;
+        if (status == OStorageClusterConfiguration.STATUS.OFFLINE && cluster instanceof OOfflineCluster
+            || status == OStorageClusterConfiguration.STATUS.ONLINE && !(cluster instanceof OOfflineCluster)) {
+          return;
         }
 
         final OCluster newCluster;
-        if (iStatus == OStorageClusterConfiguration.STATUS.OFFLINE) {
+        if (status == OStorageClusterConfiguration.STATUS.OFFLINE) {
           cluster.close(true);
           newCluster = new OOfflineCluster(clusterId, cluster.getName());
 
@@ -1038,10 +1044,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         // UPDATE CONFIGURATION
         makeStorageDirty();
-        ((OClusterBasedStorageConfiguration) configuration).setClusterStatus(clusterId, iStatus);
+        ((OClusterBasedStorageConfiguration) configuration).setClusterStatus(clusterId, status);
 
         makeFullCheckpoint();
-        return true;
       } catch (final Exception e) {
         throw OException.wrapException(new OStorageException("Error while removing cluster '" + clusterId + "'"), e);
       } finally {
@@ -2271,6 +2276,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             checkReadOnlyConditions();
 
             commitIndexes(indexOperations, atomicOperation);
+
+            txApprover.approveTx();
           } catch (final IOException | RuntimeException e) {
             rollback = true;
             if (e instanceof RuntimeException) {
@@ -2566,6 +2573,43 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       throw logAndPrepareForRethrow(ee);
     } catch (final Throwable t) {
       throw logAndPrepareForRethrow(t);
+    }
+  }
+
+  /**
+   * This method is used in tests to be sure that we verify correct version of index implementation
+   */
+  public boolean checkIndexEngineType(int indexId, Class<?> cls) {
+    stateLock.acquireReadLock();
+    try {
+      checkOpenness();
+
+      indexId = extractInternalId(indexId);
+      final OBaseIndexEngine indexEngine = indexEngines.get(indexId);
+      assert indexId == indexEngine.getId();
+
+      return cls.isAssignableFrom(indexEngine.getClass());
+    } catch (final RuntimeException ee) {
+      throw logAndPrepareForRethrow(ee);
+    } catch (final Error ee) {
+      throw logAndPrepareForRethrow(ee);
+    } catch (final Throwable t) {
+      throw logAndPrepareForRethrow(t);
+    } finally {
+      stateLock.releaseReadLock();
+    }
+  }
+
+  public void setTxApprover(final OTxApprover txApprover) {
+    stateLock.acquireWriteLock();
+    try {
+      checkOpenness();
+
+      Objects.requireNonNull(txApprover, "TX approver can not be set to null");
+
+      this.txApprover = txApprover;
+    } finally {
+      stateLock.releaseWriteLock();
     }
   }
 
