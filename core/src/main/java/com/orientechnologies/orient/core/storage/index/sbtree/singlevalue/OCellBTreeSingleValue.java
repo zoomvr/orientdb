@@ -43,6 +43,7 @@ import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedSt
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValuePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValueRemoveCO;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -493,7 +494,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
 
   public ORID remove(K key) throws IOException {
     boolean rollback = false;
-    startAtomicOperation(true);
+    final OAtomicOperation atomicOperation = startAtomicOperation(true);
     try {
       acquireExclusiveLock();
       try {
@@ -507,13 +508,46 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
             return null;
           }
 
+          final byte[] serializedKey = keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes);
+
+          final byte[] rawKey;
+          if (encryption == null) {
+            rawKey = serializedKey;
+          } else {
+            final byte[] encryptedKey = encryption.encrypt(serializedKey);
+
+            rawKey = new byte[OIntegerSerializer.INT_SIZE + encryptedKey.length];
+            OIntegerSerializer.INSTANCE.serializeNative(encryptedKey.length, rawKey, 0);
+            System.arraycopy(encryptedKey, 0, rawKey, OIntegerSerializer.INT_SIZE, encryptedKey.length);
+          }
+
           removedValue = removeKey(bucketSearchResult);
+
+          assert removedValue != null;
+
+          final byte[] prevValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
+          OShortSerializer.INSTANCE.serializeNative((short) removedValue.getClusterId(), prevValue, 0);
+          OLongSerializer.INSTANCE.serializeNative(removedValue.getClusterPosition(), prevValue, OShortSerializer.SHORT_SIZE);
+
+          atomicOperation.addComponentOperation(
+              new OCellBTreeSingleValueRemoveCO(keySerializer.getId(), indexId, encryption != null ? encryption.name() : null,
+                  rawKey, prevValue));
         } else {
           if (getFilledUpTo(nullBucketFileId) == 0) {
             return null;
           }
 
           removedValue = removeNullBucket();
+
+          if (removedValue != null) {
+            final byte[] prevValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
+            OShortSerializer.INSTANCE.serializeNative((short) removedValue.getClusterId(), prevValue, 0);
+            OLongSerializer.INSTANCE.serializeNative(removedValue.getClusterPosition(), prevValue, OShortSerializer.SHORT_SIZE);
+
+            atomicOperation.addComponentOperation(
+                new OCellBTreeSingleValueRemoveCO(keySerializer.getId(), indexId, encryption != null ? encryption.name() : null,
+                    null, prevValue));
+          }
         }
         return removedValue;
       } finally {
