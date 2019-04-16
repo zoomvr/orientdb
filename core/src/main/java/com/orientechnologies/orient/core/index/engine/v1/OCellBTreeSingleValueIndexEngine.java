@@ -27,7 +27,7 @@ public final class OCellBTreeSingleValueIndexEngine implements OSingleValueIndex
 
   private final OCellBTreeSingleValue<Object> sbTree;
   private final String                        name;
-  private final int id;
+  private final int                           id;
 
   public OCellBTreeSingleValueIndexEngine(final int id, String name, OAbstractPaginatedStorage storage, final int indexId) {
     this.id = id;
@@ -106,7 +106,12 @@ public final class OCellBTreeSingleValueIndexEngine implements OSingleValueIndex
   @Override
   public void clear() {
     try {
-      sbTree.clear();
+      final OCellBTreeSingleValue.OSBTreeKeyCursor<Object> cursor = sbTree.keyCursor();
+      Object key = cursor.next(-1);
+      while (key != null) {
+        sbTree.remove(key);
+        key = cursor.next(-1);
+      }
     } catch (IOException e) {
       throw OException.wrapException(new OIndexException("Error during clear of index " + name), e);
     }
