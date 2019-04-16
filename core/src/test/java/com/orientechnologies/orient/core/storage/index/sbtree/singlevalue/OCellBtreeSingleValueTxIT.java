@@ -13,6 +13,8 @@ import com.orientechnologies.orient.core.index.OIndexManager;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
+import com.orientechnologies.orient.core.sql.executor.OResult;
+import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.txapprover.OTxApprover;
 import org.junit.After;
@@ -32,7 +34,7 @@ public class OCellBtreeSingleValueTxIT {
   @Before
   public void before() throws Exception {
     final String buildDirectory =
-        System.getProperty("buildDirectory", ".") + File.separator + OCellBtreeSingleValueTxIT.class.getSimpleName();
+        System.getProperty("buildDirectory", "./target") + File.separator + OCellBtreeSingleValueTxIT.class.getSimpleName();
 
     dbName = "localSingleCellBTreeTXTest";
     final File dbDirectory = new File(buildDirectory, dbName);
@@ -125,6 +127,57 @@ public class OCellBtreeSingleValueTxIT {
     }
   }
 
+  @Test
+  public void testKeyDelete() {
+    final int keysCount = 1_000_000;
+
+    try (ODatabaseSession session = orientDB.open(dbName, "admin", "admin")) {
+      for (int i = 0; i < keysCount; i++) {
+        final ODocument document = new ODocument("TestClass");
+        document.field("prop", Integer.toString(i));
+        document.save();
+      }
+
+      for (int i = 0; i < keysCount; i++) {
+        session.begin();
+        try {
+          if (i % 3 == 0) {
+            storage.setTxApprover(new GoTxApprover());
+          } else {
+            storage.setTxApprover(new NoGoTxApprover());
+          }
+
+          try (OResultSet resultSet = session.query("select * from TestClass where prop = ?", Integer.toString(i))) {
+            Assert.assertTrue(resultSet.hasNext());
+            final OResult result = resultSet.next();
+            final ODocument document = (ODocument) result.getRecord().orElseThrow(RuntimeException::new);
+            document.delete();
+          }
+
+          session.commit();
+        } catch (NoGoException e) {
+          //skip
+        }
+      }
+
+      final OIndexManager indexManager = session.getMetadata().getIndexManager();
+      @SuppressWarnings("unchecked")
+      final OIndex<ORID> index = (OIndex<ORID>) indexManager.getIndex("TestIndex");
+
+      for (int i = 0; i < keysCount; i++) {
+        if (i % 3 == 0) {
+          Assert.assertNull(index.get(Integer.toString(i)));
+        } else {
+          final String key = Integer.toString(i);
+          final ORID rid = index.get(key);
+          final ODocument document = session.load(rid);
+
+          Assert.assertEquals(key, document.field("prop"));
+        }
+      }
+    }
+  }
+
   private static class GoTxApprover implements OTxApprover {
     @Override
     public void approveTx() {
@@ -140,7 +193,7 @@ public class OCellBtreeSingleValueTxIT {
   }
 
   private static class NoGoException extends RuntimeException implements OHighLevelException {
-    public NoGoException() {
+    NoGoException() {
     }
   }
 }

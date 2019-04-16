@@ -100,10 +100,10 @@ public class OCellBTreeSingleValueRemoveCO extends OComponentOperationRecord {
       final OEncryption encryption = encryptionFactory.getEncryption(encryptionName, encryptionKey);
       final byte[] decryptedKey = encryption.decrypt(key, OIntegerSerializer.INT_SIZE, key.length - OIntegerSerializer.INT_SIZE);
 
-      return keySerializer.deserialize(decryptedKey, 0);
+      return keySerializer.deserializeNativeObject(decryptedKey, 0);
     }
 
-    return keySerializer.deserialize(key, 0);
+    return keySerializer.deserializeNativeObject(key, 0);
   }
 
   @Override
