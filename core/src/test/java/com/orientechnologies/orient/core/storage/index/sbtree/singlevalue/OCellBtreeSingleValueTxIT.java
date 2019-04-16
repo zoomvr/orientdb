@@ -178,6 +178,70 @@ public class OCellBtreeSingleValueTxIT {
     }
   }
 
+  @Test
+  public void testKeyAddDelete() throws Exception {
+    final int keysCount = 1_000_000;
+
+    try (ODatabaseSession session = orientDB.open(dbName, "admin", "admin")) {
+      for (int i = 0; i < keysCount; i++) {
+        final ODocument document = new ODocument("TestClass");
+        document.field("prop", Integer.toString(i));
+        document.save();
+      }
+
+      for (int i = 0; i < keysCount; i++) {
+        session.begin();
+        try {
+          if (i % 3 == 0) {
+            storage.setTxApprover(new GoTxApprover());
+          } else {
+            storage.setTxApprover(new NoGoTxApprover());
+          }
+
+          try (OResultSet resultSet = session.query("select * from TestClass where prop = ?", Integer.toString(i))) {
+            Assert.assertTrue(resultSet.hasNext());
+            final OResult result = resultSet.next();
+            final ODocument document = (ODocument) result.getRecord().orElseThrow(RuntimeException::new);
+            document.delete();
+          }
+
+          final ODocument document = new ODocument("TestClass");
+          document.field("prop", Integer.toString(i + keysCount));
+          document.save();
+
+          session.commit();
+        } catch (NoGoException e) {
+          //skip
+        }
+      }
+
+      final OIndexManager indexManager = session.getMetadata().getIndexManager();
+      @SuppressWarnings("unchecked")
+      final OIndex<ORID> index = (OIndex<ORID>) indexManager.getIndex("TestIndex");
+
+      for (int i = 0; i < keysCount; i++) {
+        if (i % 3 == 0) {
+          Assert.assertNull(index.get(Integer.toString(i)));
+
+          final String key = Integer.toString(i + keysCount);
+          final ORID rid = index.get(key);
+          final ODocument document = session.load(rid);
+
+          Assert.assertEquals(key, document.field("prop"));
+        } else {
+          Assert.assertNull(index.get(Integer.toString(i + keysCount)));
+
+          final String key = Integer.toString(i);
+          final ORID rid = index.get(key);
+          final ODocument document = session.load(rid);
+
+          Assert.assertEquals(key, document.field("prop"));
+        }
+      }
+    }
+
+  }
+
   private static class GoTxApprover implements OTxApprover {
     @Override
     public void approveTx() {
