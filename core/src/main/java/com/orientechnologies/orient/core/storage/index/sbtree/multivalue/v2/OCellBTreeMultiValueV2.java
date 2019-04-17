@@ -25,6 +25,8 @@ import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
+import com.orientechnologies.common.serialization.types.OLongSerializer;
+import com.orientechnologies.common.serialization.types.OShortSerializer;
 import com.orientechnologies.common.types.OModifiableLong;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.encryption.OEncryption;
@@ -40,6 +42,7 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBTreeMultiValueV2PutCO;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OSBTree;
 import com.orientechnologies.orient.core.storage.index.sbtree.multivalue.OCellBTreeMultiValue;
 
@@ -103,11 +106,15 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
   private       OSBTree<OMultiValueEntry, Byte> multiContainer;
   private final OModifiableLong                 mIdCounter = new OModifiableLong();
 
+  private final int indexId;
+
   public OCellBTreeMultiValueV2(final String name, final String dataFileExtension, final String nullFileExtension,
-      final String containerExtension, final OAbstractPaginatedStorage storage) {
+      final String containerExtension, final OAbstractPaginatedStorage storage, final int indexId) {
     super(storage, name, dataFileExtension, name + dataFileExtension);
+
     acquireExclusiveLock();
     try {
+      this.indexId = indexId;
       this.nullFileExtension = nullFileExtension;
       this.containerExtension = containerExtension;
     } finally {
@@ -341,6 +348,14 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           releasePageFromWrite(keyBucketCacheEntry);
 
           updateSize(1);
+
+          final byte[] serializedValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
+          OShortSerializer.INSTANCE.serializeNative((short) value.getClusterId(), serializedValue, 0);
+          OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
+
+          atomicOperation.addComponentOperation(
+              new OCellBTreeMultiValueV2PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId,
+                  keyToInsert, serializedValue));
         } else {
           final OCacheEntry nullCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
 
@@ -352,6 +367,14 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           }
 
           updateSize(1);
+
+          final byte[] serializedValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
+          OShortSerializer.INSTANCE.serializeNative((short) value.getClusterId(), serializedValue, 0);
+          OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
+
+          atomicOperation.addComponentOperation(
+              new OCellBTreeMultiValueV2PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId, null,
+                  serializedValue));
         }
       } finally {
         releaseExclusiveLock();
@@ -1644,10 +1667,11 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
    * Indicates search behavior in case of {@link OCompositeKey} keys that have less amount of internal keys are used, whether
    * lowest or highest partially matched key should be used.
    */
-  private enum PartialSearchMode {/**
-   * Any partially matched key will be used as search result.
-   */
-  NONE,
+  private enum PartialSearchMode {
+    /**
+     * Any partially matched key will be used as search result.
+     */
+    NONE,
     /**
      * The biggest partially matched key will be used as search result.
      */
@@ -1656,7 +1680,8 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
     /**
      * The smallest partially matched key will be used as search result.
      */
-    LOWEST_BOUNDARY}
+    LOWEST_BOUNDARY
+  }
 
   private static final class BucketSearchResult {
     private final int  itemIndex;

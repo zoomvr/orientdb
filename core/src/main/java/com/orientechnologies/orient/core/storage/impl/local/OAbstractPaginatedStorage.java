@@ -3119,7 +3119,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
     try {
       if (transaction.get() != null) {
-        return doRemoveRidIndexEntry(indexId, key, value);
+        return removeRidIndexEntryInternal(indexId, key, value);
       }
 
       checkOpenness();
@@ -3130,7 +3130,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         checkLowDiskSpaceRequestsAndReadOnlyConditions();
 
-        return doRemoveRidIndexEntry(indexId, key, value);
+        return removeRidIndexEntryInternal(indexId, key, value);
       } finally {
         stateLock.releaseReadLock();
       }
@@ -3145,7 +3145,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  private boolean doRemoveRidIndexEntry(final int indexId, final Object key, final ORID value)
+  public boolean removeRidIndexEntryInternal(final int indexId, final Object key, final ORID value)
       throws OInvalidIndexEngineIdException {
     try {
       checkIndexId(indexId);

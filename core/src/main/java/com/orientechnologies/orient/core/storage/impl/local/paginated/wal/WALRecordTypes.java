@@ -27,4 +27,6 @@ public final class WALRecordTypes {
 
   public static final byte CELL_BTREE_SINGLE_VALUE_PUT_CO    = 23;
   public static final byte CELL_BTREE_SINGLE_VALUE_DELETE_CO = 24;
+
+  public static final byte CELL_BTREE_MULTI_VALUE_PUT_CO = 25;
 }

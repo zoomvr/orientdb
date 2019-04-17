@@ -30,7 +30,7 @@ public final class OCellBTreeMultiValueIndexEngine implements OMultiValueIndexEn
 
   private final OCellBTreeMultiValue<Object> sbTree;
   private final String                       name;
-  private final int id;
+  private final int                          id;
 
   public OCellBTreeMultiValueIndexEngine(final int id, String name, OAbstractPaginatedStorage storage, final int version) {
     this.id = id;
@@ -40,7 +40,7 @@ public final class OCellBTreeMultiValueIndexEngine implements OMultiValueIndexEn
       this.sbTree = new OCellBTreeMultiValueV1<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, storage);
     } else if (version == 2) {
       this.sbTree = new OCellBTreeMultiValueV2<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, M_CONTAINER_EXTENSION,
-          storage);
+          storage, id);
     } else {
       throw new IllegalStateException("Invalid tree version " + version);
     }
