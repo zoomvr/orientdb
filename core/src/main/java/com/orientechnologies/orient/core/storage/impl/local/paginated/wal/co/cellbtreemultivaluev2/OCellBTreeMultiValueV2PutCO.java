@@ -21,7 +21,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.OCo
 
 import java.nio.ByteBuffer;
 
-public class OCellBTreeMultiValueV2_PutCO extends OComponentOperationRecord {
+public class OCellBTreeMultiValueV2PutCO extends OComponentOperationRecord {
   private byte keySerializerId;
   private int  indexId;
 
@@ -30,10 +30,10 @@ public class OCellBTreeMultiValueV2_PutCO extends OComponentOperationRecord {
   private byte[] key;
   private byte[] value;
 
-  public OCellBTreeMultiValueV2_PutCO() {
+  public OCellBTreeMultiValueV2PutCO() {
   }
 
-  public OCellBTreeMultiValueV2_PutCO(final String encryptionName, final byte keySerializerId, final int indexId, final byte[] key,
+  public OCellBTreeMultiValueV2PutCO(final String encryptionName, final byte keySerializerId, final int indexId, final byte[] key,
       final byte[] value) {
     this.keySerializerId = keySerializerId;
     this.indexId = indexId;
