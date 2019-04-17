@@ -42,7 +42,7 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBTreeMultiValueV2PutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBTreeMultiValueV2_PutCO;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OSBTree;
 import com.orientechnologies.orient.core.storage.index.sbtree.multivalue.OCellBTreeMultiValue;
 
@@ -354,7 +354,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
 
           atomicOperation.addComponentOperation(
-              new OCellBTreeMultiValueV2PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId,
+              new OCellBTreeMultiValueV2_PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId,
                   keyToInsert, serializedValue));
         } else {
           final OCacheEntry nullCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
@@ -373,7 +373,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
 
           atomicOperation.addComponentOperation(
-              new OCellBTreeMultiValueV2PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId, null,
+              new OCellBTreeMultiValueV2_PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId, null,
                   serializedValue));
         }
       } finally {

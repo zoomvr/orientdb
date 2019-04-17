@@ -22,7 +22,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     final byte[] value = new byte[23];
     random.nextBytes(value);
 
-    OCellBTreeMultiValueV2PutCO co = new OCellBTreeMultiValueV2PutCO(encryptionName, keySerializerId, indexId, key, value);
+    OCellBTreeMultiValueV2_PutCO co = new OCellBTreeMultiValueV2_PutCO(encryptionName, keySerializerId, indexId, key, value);
     co.setOperationUnitId(operationUnitId);
 
     final int size = co.serializedSize();
@@ -31,7 +31,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     int pos = co.toStream(stream, 1);
     Assert.assertEquals(size + 1, pos);
 
-    OCellBTreeMultiValueV2PutCO restoredCO = new OCellBTreeMultiValueV2PutCO();
+    OCellBTreeMultiValueV2_PutCO restoredCO = new OCellBTreeMultiValueV2_PutCO();
     pos = restoredCO.fromStream(stream, 1);
 
     Assert.assertEquals(size + 1, pos);
@@ -58,7 +58,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     final byte[] value = new byte[23];
     random.nextBytes(value);
 
-    OCellBTreeMultiValueV2PutCO co = new OCellBTreeMultiValueV2PutCO(encryptionName, keySerializerId, indexId, key, value);
+    OCellBTreeMultiValueV2_PutCO co = new OCellBTreeMultiValueV2_PutCO(encryptionName, keySerializerId, indexId, key, value);
     co.setOperationUnitId(operationUnitId);
 
     final int size = co.serializedSize();
@@ -67,7 +67,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     int pos = co.toStream(stream, 1);
     Assert.assertEquals(size + 1, pos);
 
-    OCellBTreeMultiValueV2PutCO restoredCO = new OCellBTreeMultiValueV2PutCO();
+    OCellBTreeMultiValueV2_PutCO restoredCO = new OCellBTreeMultiValueV2_PutCO();
     pos = restoredCO.fromStream(stream, 1);
 
     Assert.assertEquals(size + 1, pos);
