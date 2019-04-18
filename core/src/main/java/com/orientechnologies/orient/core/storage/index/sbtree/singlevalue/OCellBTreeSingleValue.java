@@ -334,7 +334,7 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           }
 
           atomicOperation.addComponentOperation(
-              new OCellBTreeSingleValuePutCO(rawKey, serializedValue, oldRawValue, keySerializer.getId(), indexId,
+              new OCellBTreeSingleValuePutCO(rawKey, value, oldValue, keySerializer.getId(), indexId,
                   encryption != null ? encryption.name() : null));
 
         } else {
@@ -363,18 +363,8 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
             OShortSerializer.INSTANCE.serializeNative((short) value.getClusterId(), serializedValue, 0);
             OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
 
-            final byte[] oldRawValue;
-
-            if (oldValue != null) {
-              oldRawValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
-              OShortSerializer.INSTANCE.serializeNative((short) oldValue.getClusterId(), oldRawValue, 0);
-              OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
-            } else {
-              oldRawValue = null;
-            }
-
             atomicOperation.addComponentOperation(
-                new OCellBTreeSingleValuePutCO(null, serializedValue, oldRawValue, keySerializer.getId(), indexId,
+                new OCellBTreeSingleValuePutCO(null, value, oldValue, keySerializer.getId(), indexId,
                     encryption != null ? encryption.name() : null));
 
           } finally {
@@ -525,13 +515,9 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
 
           assert removedValue != null;
 
-          final byte[] prevValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
-          OShortSerializer.INSTANCE.serializeNative((short) removedValue.getClusterId(), prevValue, 0);
-          OLongSerializer.INSTANCE.serializeNative(removedValue.getClusterPosition(), prevValue, OShortSerializer.SHORT_SIZE);
-
           atomicOperation.addComponentOperation(
               new OCellBTreeSingleValueRemoveCO(keySerializer.getId(), indexId, encryption != null ? encryption.name() : null,
-                  rawKey, prevValue));
+                  rawKey, removedValue));
         } else {
           if (getFilledUpTo(nullBucketFileId) == 0) {
             return null;
@@ -540,13 +526,9 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
           removedValue = removeNullBucket();
 
           if (removedValue != null) {
-            final byte[] prevValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
-            OShortSerializer.INSTANCE.serializeNative((short) removedValue.getClusterId(), prevValue, 0);
-            OLongSerializer.INSTANCE.serializeNative(removedValue.getClusterPosition(), prevValue, OShortSerializer.SHORT_SIZE);
-
             atomicOperation.addComponentOperation(
                 new OCellBTreeSingleValueRemoveCO(keySerializer.getId(), indexId, encryption != null ? encryption.name() : null,
-                    null, prevValue));
+                    null, removedValue));
           }
         }
         return removedValue;

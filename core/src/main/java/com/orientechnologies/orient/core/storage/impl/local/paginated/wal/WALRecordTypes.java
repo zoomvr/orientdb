@@ -26,7 +26,8 @@ public final class WALRecordTypes {
   public static final byte INDEX_ENGINE_DELETE_CO = 22;
 
   public static final byte CELL_BTREE_SINGLE_VALUE_PUT_CO    = 23;
-  public static final byte CELL_BTREE_SINGLE_VALUE_DELETE_CO = 24;
+  public static final byte CELL_BTREE_SINGLE_VALUE_REMOVE_CO = 24;
 
-  public static final byte CELL_BTREE_MULTI_VALUE_PUT_CO = 25;
+  public static final byte CELL_BTREE_MULTI_VALUE_PUT_CO          = 25;
+  public static final byte CELL_BTREE_MULTI_VALUE_REMOVE_ENTRY_CO = 26;
 }

@@ -1,5 +1,7 @@
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue;
 
+import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import org.junit.Assert;
 import org.junit.Test;
@@ -16,11 +18,8 @@ public class OCellBTreeSingleValuePutCOSerializationTest {
     final byte[] key = new byte[12];
     random.nextBytes(key);
 
-    final byte[] value = new byte[34];
-    random.nextBytes(value);
-
-    final byte[] oldValue = new byte[23];
-    random.nextBytes(oldValue);
+    final ORID value = new ORecordId(12, 38);
+    final ORID oldValue = new ORecordId(34, 56);
 
     final byte keySerializerId = 12;
 
@@ -44,7 +43,7 @@ public class OCellBTreeSingleValuePutCOSerializationTest {
     Assert.assertEquals(operationUnitId, restoredCO.getOperationUnitId());
 
     Assert.assertArrayEquals(key, restoredCO.getKey());
-    Assert.assertArrayEquals(value, restoredCO.getValue());
+    Assert.assertEquals(value, restoredCO.getValue());
     Assert.assertEquals(keySerializerId, restoredCO.getKeySerializerId());
     Assert.assertEquals(indexId, restoredCO.getIndexId());
     Assert.assertEquals(encryptionName, restoredCO.getEncryptionName());
@@ -58,10 +57,8 @@ public class OCellBTreeSingleValuePutCOSerializationTest {
 
     final byte[] key = null;
 
-    final byte[] value = new byte[34];
-    random.nextBytes(value);
-
-    final byte[] oldValue = null;
+    final ORID value = new ORecordId(12, 38);
+    final ORID oldValue = null;
 
     final byte keySerializerId = 12;
 
@@ -85,7 +82,7 @@ public class OCellBTreeSingleValuePutCOSerializationTest {
     Assert.assertEquals(operationUnitId, restoredCO.getOperationUnitId());
 
     Assert.assertArrayEquals(key, restoredCO.getKey());
-    Assert.assertArrayEquals(value, restoredCO.getValue());
+    Assert.assertEquals(value, restoredCO.getValue());
     Assert.assertEquals(keySerializerId, restoredCO.getKeySerializerId());
     Assert.assertEquals(indexId, restoredCO.getIndexId());
     Assert.assertEquals(encryptionName, restoredCO.getEncryptionName());

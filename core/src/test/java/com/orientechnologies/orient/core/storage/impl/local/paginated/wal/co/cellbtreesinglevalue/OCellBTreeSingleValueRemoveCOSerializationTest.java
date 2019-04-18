@@ -1,5 +1,7 @@
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue;
 
+import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import org.junit.Assert;
 import org.junit.Test;
@@ -20,8 +22,7 @@ public class OCellBTreeSingleValueRemoveCOSerializationTest {
     final byte[] key = new byte[23];
     random.nextBytes(key);
 
-    final byte[] prevValue = new byte[12];
-    random.nextBytes(prevValue);
+    final ORID prevValue = new ORecordId(12, 38);
 
     OCellBTreeSingleValueRemoveCO co = new OCellBTreeSingleValueRemoveCO(keySerializerId, indexId, encryptionName, key, prevValue);
     co.setOperationUnitId(operationUnitId);
@@ -54,8 +55,7 @@ public class OCellBTreeSingleValueRemoveCOSerializationTest {
 
     final byte[] key = null;
 
-    final byte[] prevValue = new byte[12];
-    random.nextBytes(prevValue);
+    final ORID prevValue = new ORecordId(12, 38);
 
     OCellBTreeSingleValueRemoveCO co = new OCellBTreeSingleValueRemoveCO(keySerializerId, indexId, encryptionName, key, prevValue);
     co.setOperationUnitId(operationUnitId);

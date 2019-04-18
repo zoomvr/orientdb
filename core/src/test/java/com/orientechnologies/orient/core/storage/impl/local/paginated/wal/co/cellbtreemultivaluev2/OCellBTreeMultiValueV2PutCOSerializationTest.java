@@ -1,5 +1,7 @@
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2;
 
+import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import org.junit.Assert;
 import org.junit.Test;
@@ -19,8 +21,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     final byte[] key = new byte[12];
     random.nextBytes(key);
 
-    final byte[] value = new byte[23];
-    random.nextBytes(value);
+    final ORID value = new ORecordId(12, 38);
 
     OCellBTreeMultiValueV2PutCO co = new OCellBTreeMultiValueV2PutCO(encryptionName, keySerializerId, indexId, key, value);
     co.setOperationUnitId(operationUnitId);
@@ -41,7 +42,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     Assert.assertEquals(indexId, restoredCO.getIndexId());
 
     Assert.assertArrayEquals(key, restoredCO.getKey());
-    Assert.assertArrayEquals(value, restoredCO.getValue());
+    Assert.assertEquals(value, restoredCO.getValue());
   }
 
   @Test
@@ -52,11 +53,8 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     final byte keySerializerId = 12;
     final int indexId = 456;
 
-    final Random random = new Random();
     final byte[] key = null;
-
-    final byte[] value = new byte[23];
-    random.nextBytes(value);
+    final ORID value = new ORecordId(12, 38);
 
     OCellBTreeMultiValueV2PutCO co = new OCellBTreeMultiValueV2PutCO(encryptionName, keySerializerId, indexId, key, value);
     co.setOperationUnitId(operationUnitId);
@@ -77,6 +75,6 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     Assert.assertEquals(indexId, restoredCO.getIndexId());
 
     Assert.assertArrayEquals(key, restoredCO.getKey());
-    Assert.assertArrayEquals(value, restoredCO.getValue());
+    Assert.assertEquals(value, restoredCO.getValue());
   }
 }

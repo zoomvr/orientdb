@@ -24,7 +24,10 @@ import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OEmptyWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OWriteableWALRecord;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBTreeMultiValueV2PutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBtreeMultiValueV2RemoveEntryCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValuePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValueRemoveCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateRecordCO;
@@ -43,7 +46,10 @@ import java.util.Map;
 
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.ATOMIC_UNIT_END_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.ATOMIC_UNIT_START_RECORD;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_MULTI_VALUE_PUT_CO;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_MULTI_VALUE_REMOVE_ENTRY_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_SINGLE_VALUE_PUT_CO;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_SINGLE_VALUE_REMOVE_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CHECKPOINT_END_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_CREATE_RECORD_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_DELETE_RECORD_CO;
@@ -179,6 +185,15 @@ public final class OWALRecordsFactory {
     case CELL_BTREE_SINGLE_VALUE_PUT_CO:
       walRecord = new OCellBTreeSingleValuePutCO();
       break;
+    case CELL_BTREE_SINGLE_VALUE_REMOVE_CO:
+      walRecord = new OCellBTreeSingleValueRemoveCO();
+      break;
+    case CELL_BTREE_MULTI_VALUE_PUT_CO:
+      walRecord = new OCellBTreeMultiValueV2PutCO();
+      break;
+    case CELL_BTREE_MULTI_VALUE_REMOVE_ENTRY_CO:
+      walRecord = new OCellBtreeMultiValueV2RemoveEntryCO();
+      break;
     default:
       if (idToTypeMap.containsKey(content[0]))
         try {
@@ -191,6 +206,8 @@ public final class OWALRecordsFactory {
     }
 
     walRecord.fromStream(content, 1);
+
+    assert walRecord.getId() == content[0];
 
     return walRecord;
   }

@@ -1,4 +1,4 @@
-package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue;
+package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2;
 
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
@@ -14,19 +14,17 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.ind
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-public class OCellBTreeSingleValuePutCO extends OAbstractIndexCO {
+public class OCellBtreeMultiValueV2RemoveEntryCO extends OAbstractIndexCO {
   private ORID value;
-  private ORID oldValue;
 
-  public OCellBTreeSingleValuePutCO() {
+  public OCellBtreeMultiValueV2RemoveEntryCO() {
   }
 
-  public OCellBTreeSingleValuePutCO(final byte[] key, final ORID value, final ORID oldValue, final byte keySerializerId,
-      final int indexId, final String encryptionName) {
+  public OCellBtreeMultiValueV2RemoveEntryCO(final int indexId, final byte keySerializerId, final String encryptionName,
+      final byte[] key, final ORID value) {
     super(indexId, encryptionName, keySerializerId, key);
 
     this.value = value;
-    this.oldValue = oldValue;
   }
 
   public ORID getValue() {
@@ -35,10 +33,10 @@ public class OCellBTreeSingleValuePutCO extends OAbstractIndexCO {
 
   @Override
   public void redo(final OAbstractPaginatedStorage storage) throws IOException {
-    final Object deserializedKey = deserializeKey(storage);
+    final Object key = deserializeKey(storage);
 
     try {
-      storage.putRidIndexEntryInternal(indexId, deserializedKey, value);
+      storage.removeRidIndexEntryInternal(indexId, key, value);
     } catch (OInvalidIndexEngineIdException e) {
       throw OException.wrapException(new OStorageException("Can not redo operation for index with id " + indexId), e);
     }
@@ -46,22 +44,19 @@ public class OCellBTreeSingleValuePutCO extends OAbstractIndexCO {
 
   @Override
   public void undo(final OAbstractPaginatedStorage storage) throws IOException {
-    final Object deserializedKey = deserializeKey(storage);
+    final Object key = deserializeKey(storage);
 
     try {
-      if (oldValue == null) {
-        storage.removeKeyFromIndexInternal(indexId, deserializedKey);
-      } else {
-        storage.putRidIndexEntryInternal(indexId, deserializedKey, oldValue);
-      }
+      storage.putRidIndexEntryInternal(indexId, key, value);
     } catch (OInvalidIndexEngineIdException e) {
-      throw OException.wrapException(new OStorageException("Can not undo operation for index with id " + indexId), e);
+      throw OException.wrapException(new OStorageException("Can not redo operation for index with id " + indexId), e);
     }
   }
 
   @Override
   protected void serializeToByteBuffer(final ByteBuffer buffer) {
     super.serializeToByteBuffer(buffer);
+
     buffer.putShort((short) value.getClusterId());
     buffer.putLong(value.getClusterPosition());
   }
@@ -77,12 +72,12 @@ public class OCellBTreeSingleValuePutCO extends OAbstractIndexCO {
   }
 
   @Override
-  public byte getId() {
-    return WALRecordTypes.CELL_BTREE_SINGLE_VALUE_PUT_CO;
+  public int serializedSize() {
+    return super.serializedSize() + OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE;
   }
 
   @Override
-  public int serializedSize() {
-    return super.serializedSize() + OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE;
+  public byte getId() {
+    return WALRecordTypes.CELL_BTREE_MULTI_VALUE_REMOVE_ENTRY_CO;
   }
 }

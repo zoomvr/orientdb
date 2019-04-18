@@ -25,8 +25,6 @@ import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
 import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
-import com.orientechnologies.common.serialization.types.OLongSerializer;
-import com.orientechnologies.common.serialization.types.OShortSerializer;
 import com.orientechnologies.common.types.OModifiableLong;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.encryption.OEncryption;
@@ -43,6 +41,7 @@ import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedSt
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBTreeMultiValueV2PutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBtreeMultiValueV2RemoveEntryCO;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OSBTree;
 import com.orientechnologies.orient.core.storage.index.sbtree.multivalue.OCellBTreeMultiValue;
 
@@ -315,8 +314,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           OCacheEntry keyBucketCacheEntry = loadPageForWrite(fileId, bucketSearchResult.getLastPathItem(), false, true);
           Bucket<K> keyBucket = new Bucket<>(keyBucketCacheEntry, keySerializer, encryption, multiContainer);
 
-          final byte[] keyToInsert;
-          keyToInsert = serializeKey(serializedKey);
+          final byte[] keyToInsert = serializeKey(serializedKey);
 
           final boolean isNew;
           int insertionIndex;
@@ -349,13 +347,9 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
 
           updateSize(1);
 
-          final byte[] serializedValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
-          OShortSerializer.INSTANCE.serializeNative((short) value.getClusterId(), serializedValue, 0);
-          OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
-
           atomicOperation.addComponentOperation(
               new OCellBTreeMultiValueV2PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId,
-                  keyToInsert, serializedValue));
+                  keyToInsert, value));
         } else {
           final OCacheEntry nullCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
 
@@ -368,13 +362,9 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
 
           updateSize(1);
 
-          final byte[] serializedValue = new byte[OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE];
-          OShortSerializer.INSTANCE.serializeNative((short) value.getClusterId(), serializedValue, 0);
-          OLongSerializer.INSTANCE.serializeNative(value.getClusterPosition(), serializedValue, OShortSerializer.SHORT_SIZE);
-
           atomicOperation.addComponentOperation(
               new OCellBTreeMultiValueV2PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId, null,
-                  serializedValue));
+                  value));
         }
       } finally {
         releaseExclusiveLock();
@@ -690,7 +680,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
 
   public boolean remove(K key, final ORID value) throws IOException {
     boolean rollback = false;
-    startAtomicOperation(true);
+    final OAtomicOperation atomicOperation = startAtomicOperation(true);
     try {
       boolean removed;
       acquireExclusiveLock();
@@ -782,6 +772,10 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
 
           if (removed) {
             updateSize(-1);
+
+            final byte[] serializedKey = keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes);
+            atomicOperation.addComponentOperation(new OCellBtreeMultiValueV2RemoveEntryCO(indexId, keySerializer.getId(),
+                (encryption != null ? encryption.name() : null), serializeKey(serializedKey), value));
           }
         } else {
           final OCacheEntry nullBucketCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
@@ -794,6 +788,9 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
 
           if (removed) {
             updateSize(-1);
+
+            atomicOperation.addComponentOperation(new OCellBtreeMultiValueV2RemoveEntryCO(indexId, keySerializer.getId(),
+                (encryption != null ? encryption.name() : null), null, value));
           }
         }
       } finally {
