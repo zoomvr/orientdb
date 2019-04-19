@@ -26,6 +26,7 @@ import com.orientechnologies.common.serialization.types.OBinarySerializer;
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.encryption.OEncryption;
+import com.orientechnologies.orient.core.exception.ONonEmptyComponentCanNotBeRemovedException;
 import com.orientechnologies.orient.core.exception.OTooBigIndexKeyException;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.index.OAlwaysGreaterKey;
@@ -501,7 +502,7 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
       acquireExclusiveLock();
       try {
         if (size() > 0) {
-          throw new OCellBTreeMultiValueException("Only empty tries can be removed", this);
+          throw new ONonEmptyComponentCanNotBeRemovedException(getName() + " : Only empty tries can be removed");
         }
 
         deleteFile(fileId);
