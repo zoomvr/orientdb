@@ -423,6 +423,10 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
     try {
       acquireExclusiveLock();
       try {
+        if (size() > 0) {
+          throw new OCellBTreeMultiValueException("Only empty tries can be removed", this);
+        }
+
         deleteFile(fileId);
         deleteFile(nullBucketFileId);
 
