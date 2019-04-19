@@ -402,6 +402,9 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
     try {
       acquireExclusiveLock();
       try {
+        if (size() > 0) {
+          throw new OCellBTreeSingleValueException("Only empty tries can be removed", this);
+        }
         deleteFile(fileId);
         deleteFile(nullBucketFileId);
       } finally {
