@@ -1347,4 +1347,14 @@ public class OStorageConfigurationImpl implements OSerializableStream, OStorageC
       lock.releaseWriteLock();
     }
   }
+
+  @Override
+  public String getUuid() {
+    throw  new UnsupportedOperationException();
+  }
+
+  @Override
+  public void setUuid(String uuid) {
+    throw new UnsupportedOperationException();
+  }
 }

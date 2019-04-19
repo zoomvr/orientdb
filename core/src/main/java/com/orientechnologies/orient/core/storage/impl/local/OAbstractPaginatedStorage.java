@@ -201,6 +201,7 @@ import java.util.SortedSet;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadFactory;
@@ -288,6 +289,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   private final Map<String, OBaseIndexEngine> indexEngineNameMap = new HashMap<>();
   private final List<OBaseIndexEngine>        indexEngines       = new ArrayList<>();
   private       boolean                       wereDataRestoredAfterOpen;
+  private       UUID                          uuid;
 
   private final LongAdder fullCheckpointCount = new LongAdder();
 
@@ -392,6 +394,12 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
         }
 
         initConfiguration(contextConfiguration);
+        String uuid = configuration.getUuid();
+        if (uuid == null) {
+          uuid = UUID.randomUUID().toString();
+          configuration.setUuid(uuid);
+        }
+        this.uuid = UUID.fromString(uuid);
 
         checkPageSizeAndRelatedParameters();
 
@@ -590,6 +598,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           throw new OStorageExistsException("Cannot create new storage '" + getURL() + "' because it already exists");
         }
 
+        uuid = UUID.randomUUID();
         initLockingStrategy(contextConfiguration);
 
         initWalAndDiskCache(contextConfiguration);
@@ -598,6 +607,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         configuration = new OClusterBasedStorageConfiguration(this);
         ((OClusterBasedStorageConfiguration) configuration).create(contextConfiguration);
+        configuration.setUuid(uuid.toString());
 
         componentsFactory = new OCurrentStorageComponentsFactory(configuration);
 
@@ -991,6 +1001,11 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   public final int getId() {
     return id;
   }
+
+  public UUID getUuid() {
+    return uuid;
+  }
+
 
   private void setClusterStatus(final int clusterId, final OStorageClusterConfiguration.STATUS status) {
     try {
