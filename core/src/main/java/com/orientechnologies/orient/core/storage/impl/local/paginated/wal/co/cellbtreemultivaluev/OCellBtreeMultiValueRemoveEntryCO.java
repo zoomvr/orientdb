@@ -1,4 +1,4 @@
-package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2;
+package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev;
 
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
@@ -14,13 +14,13 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.ind
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-public class OCellBtreeMultiValueV2RemoveEntryCO extends OAbstractIndexCO {
+public class OCellBtreeMultiValueRemoveEntryCO extends OAbstractIndexCO {
   private ORID value;
 
-  public OCellBtreeMultiValueV2RemoveEntryCO() {
+  public OCellBtreeMultiValueRemoveEntryCO() {
   }
 
-  public OCellBtreeMultiValueV2RemoveEntryCO(final int indexId, final byte keySerializerId, final String encryptionName,
+  public OCellBtreeMultiValueRemoveEntryCO(final int indexId, final byte keySerializerId, final String encryptionName,
       final byte[] key, final ORID value) {
     super(indexId, encryptionName, keySerializerId, key);
 

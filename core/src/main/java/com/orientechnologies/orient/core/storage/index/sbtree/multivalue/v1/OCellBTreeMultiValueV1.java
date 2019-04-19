@@ -38,6 +38,8 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBTreeMultiValuePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBtreeMultiValueRemoveEntryCO;
 import com.orientechnologies.orient.core.storage.index.sbtree.multivalue.OCellBTreeMultiValue;
 
 import java.io.IOException;
@@ -87,6 +89,8 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
   private final Comparator<? super K> comparator = ODefaultComparator.INSTANCE;
   private final String                nullFileExtension;
 
+  private final int indexId;
+
   private long fileId;
   private long nullBucketFileId;
 
@@ -95,11 +99,12 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
   private OType[]              keyTypes;
   private OEncryption          encryption;
 
-  public OCellBTreeMultiValueV1(final String name, final String dataFileExtension, final String nullFileExtension,
-      final OAbstractPaginatedStorage storage) {
+  public OCellBTreeMultiValueV1(final int indexId, final String name, final String dataFileExtension,
+      final String nullFileExtension, final OAbstractPaginatedStorage storage) {
     super(storage, name, dataFileExtension, name + dataFileExtension);
     acquireExclusiveLock();
     try {
+      this.indexId = indexId;
       this.nullFileExtension = nullFileExtension;
     } finally {
       releaseExclusiveLock();
@@ -317,8 +322,7 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
 
           UpdateBucketSearchResult bucketSearchResult = findBucketForUpdate(key);
 
-          OCacheEntry keyBucketCacheEntry = loadPageForWrite(fileId, bucketSearchResult.getLastPathItem(), false,
-              true);
+          OCacheEntry keyBucketCacheEntry = loadPageForWrite(fileId, bucketSearchResult.getLastPathItem(), false, true);
           Bucket<K> keyBucket = new Bucket<>(keyBucketCacheEntry, keySerializer, encryption);
 
           final byte[] keyToInsert;
@@ -354,6 +358,10 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
           releasePageFromWrite(keyBucketCacheEntry);
 
           updateSize(1);
+
+          atomicOperation.addComponentOperation(
+              new OCellBTreeMultiValuePutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId,
+                  keyToInsert, value));
         } else {
           final int freeListHeader;
 
@@ -430,6 +438,9 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
           }
 
           updateSize(1);
+          atomicOperation.addComponentOperation(
+              new OCellBTreeMultiValuePutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId, null,
+                  value));
         }
       } finally {
         releaseExclusiveLock();
@@ -442,8 +453,7 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
     }
   }
 
-  private void addToValueList(final ONullEntryPoint entryPointBucket, final int pageIndex)
-      throws IOException {
+  private void addToValueList(final ONullEntryPoint entryPointBucket, final int pageIndex) throws IOException {
     if (entryPointBucket.getFirstPage() == -1) {
       entryPointBucket.setFirsPage(pageIndex);
     }
@@ -621,7 +631,7 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
   @Override
   public boolean remove(K key, final ORID value) throws IOException {
     boolean rollback = false;
-    startAtomicOperation(true);
+    final OAtomicOperation atomicOperation = startAtomicOperation(true);
 
     try {
       boolean removed;
@@ -714,6 +724,10 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
 
           if (removed) {
             updateSize(-1);
+
+            final byte[] serializedKey = keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes);
+            atomicOperation.addComponentOperation(new OCellBtreeMultiValueRemoveEntryCO(indexId, keySerializer.getId(),
+                (encryption != null ? encryption.name() : null), serializeKey(serializedKey), value));
           }
         } else {
           final int firstPage;
@@ -787,6 +801,9 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
 
           if (removed) {
             updateSize(-1);
+
+            atomicOperation.addComponentOperation(new OCellBtreeMultiValueRemoveEntryCO(indexId, keySerializer.getId(),
+                (encryption != null ? encryption.name() : null), null, value));
           }
         }
       } finally {
@@ -1681,10 +1698,11 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
    * Indicates search behavior in case of {@link OCompositeKey} keys that have less amount of internal keys are used, whether
    * lowest or highest partially matched key should be used.
    */
-  private enum PartialSearchMode {/**
-   * Any partially matched key will be used as search result.
-   */
-  NONE,
+  private enum PartialSearchMode {
+    /**
+     * Any partially matched key will be used as search result.
+     */
+    NONE,
     /**
      * The biggest partially matched key will be used as search result.
      */
@@ -1693,7 +1711,8 @@ public final class OCellBTreeMultiValueV1<K> extends ODurableComponent implement
     /**
      * The smallest partially matched key will be used as search result.
      */
-    LOWEST_BOUNDARY}
+    LOWEST_BOUNDARY
+  }
 
   private static final class BucketSearchResult {
     private final int  itemIndex;

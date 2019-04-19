@@ -24,8 +24,8 @@ import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OEmptyWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OWriteableWALRecord;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBTreeMultiValueV2PutCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBtreeMultiValueV2RemoveEntryCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBTreeMultiValuePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBtreeMultiValueRemoveEntryCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValuePutCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValueRemoveCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineCreateCO;
@@ -189,10 +189,10 @@ public final class OWALRecordsFactory {
       walRecord = new OCellBTreeSingleValueRemoveCO();
       break;
     case CELL_BTREE_MULTI_VALUE_PUT_CO:
-      walRecord = new OCellBTreeMultiValueV2PutCO();
+      walRecord = new OCellBTreeMultiValuePutCO();
       break;
     case CELL_BTREE_MULTI_VALUE_REMOVE_ENTRY_CO:
-      walRecord = new OCellBtreeMultiValueV2RemoveEntryCO();
+      walRecord = new OCellBtreeMultiValueRemoveEntryCO();
       break;
     default:
       if (idToTypeMap.containsKey(content[0]))

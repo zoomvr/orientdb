@@ -40,8 +40,8 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBTreeMultiValueV2PutCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2.OCellBtreeMultiValueV2RemoveEntryCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBTreeMultiValuePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBtreeMultiValueRemoveEntryCO;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OSBTree;
 import com.orientechnologies.orient.core.storage.index.sbtree.multivalue.OCellBTreeMultiValue;
 
@@ -348,7 +348,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           updateSize(1);
 
           atomicOperation.addComponentOperation(
-              new OCellBTreeMultiValueV2PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId,
+              new OCellBTreeMultiValuePutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId,
                   keyToInsert, value));
         } else {
           final OCacheEntry nullCacheEntry = loadPageForWrite(nullBucketFileId, 0, false, true);
@@ -363,7 +363,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           updateSize(1);
 
           atomicOperation.addComponentOperation(
-              new OCellBTreeMultiValueV2PutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId, null,
+              new OCellBTreeMultiValuePutCO((encryption != null ? encryption.name() : null), keySerializer.getId(), indexId, null,
                   value));
         }
       } finally {
@@ -655,7 +655,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
             updateSize(-1);
 
             final byte[] serializedKey = keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes);
-            atomicOperation.addComponentOperation(new OCellBtreeMultiValueV2RemoveEntryCO(indexId, keySerializer.getId(),
+            atomicOperation.addComponentOperation(new OCellBtreeMultiValueRemoveEntryCO(indexId, keySerializer.getId(),
                 (encryption != null ? encryption.name() : null), serializeKey(serializedKey), value));
           }
         } else {
@@ -670,7 +670,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           if (removed) {
             updateSize(-1);
 
-            atomicOperation.addComponentOperation(new OCellBtreeMultiValueV2RemoveEntryCO(indexId, keySerializer.getId(),
+            atomicOperation.addComponentOperation(new OCellBtreeMultiValueRemoveEntryCO(indexId, keySerializer.getId(),
                 (encryption != null ? encryption.name() : null), null, value));
           }
         }

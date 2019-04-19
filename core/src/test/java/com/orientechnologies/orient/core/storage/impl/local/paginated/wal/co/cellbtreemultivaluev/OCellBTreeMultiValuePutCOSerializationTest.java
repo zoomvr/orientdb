@@ -1,4 +1,4 @@
-package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2;
+package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev;
 
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
@@ -8,7 +8,7 @@ import org.junit.Test;
 
 import java.util.Random;
 
-public class OCellBTreeMultiValueV2PutCOSerializationTest {
+public class OCellBTreeMultiValuePutCOSerializationTest {
   @Test
   public void testSerialization() {
     OOperationUnitId operationUnitId = OOperationUnitId.generateId();
@@ -23,7 +23,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
 
     final ORID value = new ORecordId(12, 38);
 
-    OCellBTreeMultiValueV2PutCO co = new OCellBTreeMultiValueV2PutCO(encryptionName, keySerializerId, indexId, key, value);
+    OCellBTreeMultiValuePutCO co = new OCellBTreeMultiValuePutCO(encryptionName, keySerializerId, indexId, key, value);
     co.setOperationUnitId(operationUnitId);
 
     final int size = co.serializedSize();
@@ -32,7 +32,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     int pos = co.toStream(stream, 1);
     Assert.assertEquals(size + 1, pos);
 
-    OCellBTreeMultiValueV2PutCO restoredCO = new OCellBTreeMultiValueV2PutCO();
+    OCellBTreeMultiValuePutCO restoredCO = new OCellBTreeMultiValuePutCO();
     pos = restoredCO.fromStream(stream, 1);
 
     Assert.assertEquals(size + 1, pos);
@@ -56,7 +56,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     final byte[] key = null;
     final ORID value = new ORecordId(12, 38);
 
-    OCellBTreeMultiValueV2PutCO co = new OCellBTreeMultiValueV2PutCO(encryptionName, keySerializerId, indexId, key, value);
+    OCellBTreeMultiValuePutCO co = new OCellBTreeMultiValuePutCO(encryptionName, keySerializerId, indexId, key, value);
     co.setOperationUnitId(operationUnitId);
 
     final int size = co.serializedSize();
@@ -65,7 +65,7 @@ public class OCellBTreeMultiValueV2PutCOSerializationTest {
     int pos = co.toStream(stream, 1);
     Assert.assertEquals(size + 1, pos);
 
-    OCellBTreeMultiValueV2PutCO restoredCO = new OCellBTreeMultiValueV2PutCO();
+    OCellBTreeMultiValuePutCO restoredCO = new OCellBTreeMultiValuePutCO();
     pos = restoredCO.fromStream(stream, 1);
 
     Assert.assertEquals(size + 1, pos);

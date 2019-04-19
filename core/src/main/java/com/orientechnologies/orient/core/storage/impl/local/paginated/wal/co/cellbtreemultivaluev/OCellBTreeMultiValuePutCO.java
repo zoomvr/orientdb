@@ -1,4 +1,4 @@
-package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2;
+package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev;
 
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
@@ -13,13 +13,13 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.ind
 
 import java.nio.ByteBuffer;
 
-public class OCellBTreeMultiValueV2PutCO extends OAbstractIndexCO {
+public class OCellBTreeMultiValuePutCO extends OAbstractIndexCO {
   private ORID value;
 
-  public OCellBTreeMultiValueV2PutCO() {
+  public OCellBTreeMultiValuePutCO() {
   }
 
-  public OCellBTreeMultiValueV2PutCO(final String encryptionName, final byte keySerializerId, final int indexId, final byte[] key,
+  public OCellBTreeMultiValuePutCO(final String encryptionName, final byte keySerializerId, final int indexId, final byte[] key,
       final ORID value) {
     super(indexId, encryptionName, keySerializerId, key);
     this.value = value;

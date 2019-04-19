@@ -1,4 +1,4 @@
-package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev2;
+package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev;
 
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
@@ -8,7 +8,7 @@ import org.junit.Test;
 
 import java.util.Random;
 
-public class OCellBtreeMultiValueV2RemoveEntryCOSerializationTest {
+public class OCellBtreeMultiValueRemoveEntryCOSerializationTest {
   @Test
   public void testSerialization() {
     OOperationUnitId operationUnitId = OOperationUnitId.generateId();
@@ -23,7 +23,7 @@ public class OCellBtreeMultiValueV2RemoveEntryCOSerializationTest {
 
     final ORID value = new ORecordId(12, 38);
 
-    OCellBtreeMultiValueV2RemoveEntryCO co = new OCellBtreeMultiValueV2RemoveEntryCO(indexId, keySerializerId, encryptionName, key,
+    OCellBtreeMultiValueRemoveEntryCO co = new OCellBtreeMultiValueRemoveEntryCO(indexId, keySerializerId, encryptionName, key,
         value);
     co.setOperationUnitId(operationUnitId);
 
@@ -32,7 +32,7 @@ public class OCellBtreeMultiValueV2RemoveEntryCOSerializationTest {
     int pos = co.toStream(stream, 1);
 
     Assert.assertEquals(size + 1, pos);
-    OCellBtreeMultiValueV2RemoveEntryCO restoredCO = new OCellBtreeMultiValueV2RemoveEntryCO();
+    OCellBtreeMultiValueRemoveEntryCO restoredCO = new OCellBtreeMultiValueRemoveEntryCO();
     pos = restoredCO.fromStream(stream, 1);
 
     Assert.assertEquals(size + 1, pos);

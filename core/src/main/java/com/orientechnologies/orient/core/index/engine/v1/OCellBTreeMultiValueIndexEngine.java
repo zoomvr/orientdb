@@ -37,7 +37,7 @@ public final class OCellBTreeMultiValueIndexEngine implements OMultiValueIndexEn
 
     this.name = name;
     if (version == 1) {
-      this.sbTree = new OCellBTreeMultiValueV1<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, storage);
+      this.sbTree = new OCellBTreeMultiValueV1<>(id, name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, storage);
     } else if (version == 2) {
       this.sbTree = new OCellBTreeMultiValueV2<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, M_CONTAINER_EXTENSION,
           storage, id);
