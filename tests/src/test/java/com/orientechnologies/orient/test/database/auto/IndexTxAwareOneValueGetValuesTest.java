@@ -1,10 +1,11 @@
 package com.orientechnologies.orient.test.database.auto;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
+import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import com.orientechnologies.orient.core.id.ORecordId;
+import com.orientechnologies.orient.core.index.OIndex;
+import com.orientechnologies.orient.core.index.OIndexCursor;
+import com.orientechnologies.orient.core.index.OIndexTxAwareOneValue;
+import com.orientechnologies.orient.core.sql.OCommandSQL;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -12,12 +13,10 @@ import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
-import com.orientechnologies.orient.core.db.record.OIdentifiable;
-import com.orientechnologies.orient.core.id.ORecordId;
-import com.orientechnologies.orient.core.index.OIndex;
-import com.orientechnologies.orient.core.index.OIndexCursor;
-import com.orientechnologies.orient.core.index.OIndexTxAwareOneValue;
-import com.orientechnologies.orient.core.sql.OCommandSQL;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 @Test
 public class IndexTxAwareOneValueGetValuesTest extends DocumentDBBaseTest {
@@ -180,7 +179,7 @@ public class IndexTxAwareOneValueGetValuesTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, null);
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetValuesTest"));
     cursor = index.iterateEntries(Arrays.asList(1, 2), true);
@@ -218,7 +217,7 @@ public class IndexTxAwareOneValueGetValuesTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, null);
     index.put(1, new ORecordId(clusterId, 1));
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetValuesTest"));
@@ -298,7 +297,7 @@ public class IndexTxAwareOneValueGetValuesTest extends DocumentDBBaseTest {
     index.put(1, new ORecordId(clusterId, 1));
     index.put(2, new ORecordId(clusterId, 2));
 
-    index.remove(1);
+    index.remove(1, null);
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetValuesTest"));
     Set<OIdentifiable> result = new HashSet<OIdentifiable>();

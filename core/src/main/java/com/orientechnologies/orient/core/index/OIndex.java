@@ -39,11 +39,7 @@ public interface OIndex<T> extends Comparable<OIndex<T>> {
   /**
    * Creates the index.
    *
-   * @param name
    * @param clusterIndexName Cluster name where to place the TreeMap
-   * @param clustersToIndex
-   * @param rebuild
-   * @param progressListener
    */
   OIndex<T> create(String name, OIndexDefinition indexDefinition, String clusterIndexName, Set<String> clustersToIndex,
       boolean rebuild, OProgressListener progressListener);
@@ -83,15 +79,6 @@ public interface OIndex<T> extends Comparable<OIndex<T>> {
    * @return The index instance itself to allow in chain calls
    */
   OIndex<T> put(Object iKey, OIdentifiable iValue);
-
-  /**
-   * Removes an entry by its key.
-   *
-   * @param key The entry's key to remove
-   *
-   * @return True if the entry has been found and removed, otherwise false
-   */
-  boolean remove(Object key);
 
   /**
    * Removes an entry by its key and value.
@@ -306,9 +293,6 @@ public interface OIndex<T> extends Comparable<OIndex<T>> {
    *
    * @return amount of times  when index was rebuilt since the start of the storage.
    *
-   * @see com.orientechnologies.orient.core.sql.OCommandExecutorSQLSelect#searchForIndexes(com.orientechnologies.orient.core.metadata.schema.OClass)
-   * @see com.orientechnologies.orient.core.sql.OCommandExecutorSQLSelect#getIndexCursors(com.orientechnologies.orient.core.metadata.schema.OClass)
-   * @see com.orientechnologies.orient.core.sql.OCommandExecutorSQLSelect#getOptimizedSortCursor(com.orientechnologies.orient.core.metadata.schema.OClass)
    * @see com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage#command(com.orientechnologies.orient.core.command.OCommandRequestText)
    * @see OIndexChangesWrapper
    * @see com.orientechnologies.orient.core.exception.OIndexIsRebuildingException

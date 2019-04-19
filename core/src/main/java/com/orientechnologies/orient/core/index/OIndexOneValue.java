@@ -80,6 +80,27 @@ public abstract class OIndexOneValue extends OIndexAbstract<OIdentifiable> {
     }
   }
 
+  public boolean remove(Object key) {
+    key = getCollatingValue(key);
+
+    acquireSharedLock();
+    try {
+      while (true)
+        try {
+          return storage.removeKeyFromIndex(indexId, key);
+        } catch (OInvalidIndexEngineIdException ignore) {
+          doReloadIndexEngine();
+        }
+    } finally {
+      releaseSharedLock();
+    }
+  }
+
+  @Override
+  public boolean remove(final Object key, final OIdentifiable iRID) {
+    return remove(key);
+  }
+
   public OIndexOneValue create(final String name, final OIndexDefinition indexDefinition, final String clusterIndexName,
       final Set<String> clustersToIndex, boolean rebuild, final OProgressListener progressListener) {
     return (OIndexOneValue) super

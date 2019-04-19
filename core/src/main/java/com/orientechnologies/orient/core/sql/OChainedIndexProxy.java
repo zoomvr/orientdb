@@ -463,10 +463,6 @@ public class OChainedIndexProxy<T> implements OIndex<T> {
     throw new UnsupportedOperationException("Not allowed operation");
   }
 
-  public boolean remove(Object key) {
-    throw new UnsupportedOperationException("Not allowed operation");
-  }
-
   public boolean remove(Object iKey, OIdentifiable iRID) {
     throw new UnsupportedOperationException("Not allowed operation");
   }

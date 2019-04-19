@@ -503,25 +503,6 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
     return documentIndexed;
   }
 
-  public boolean remove(Object key, final OIdentifiable value) {
-    return remove(key);
-  }
-
-  public boolean remove(Object key) {
-    key = getCollatingValue(key);
-
-    acquireSharedLock();
-    try {
-      while (true)
-        try {
-          return storage.removeKeyFromIndex(indexId, key);
-        } catch (OInvalidIndexEngineIdException ignore) {
-          doReloadIndexEngine();
-        }
-    } finally {
-      releaseSharedLock();
-    }
-  }
 
   public OIndex<T> clear() {
     acquireSharedLock();
@@ -851,7 +832,7 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
 
   private void removeFromSnapshot(Object key) {
     // storage will delay real operations till the end of tx
-    remove(key);
+    remove(key, null);
   }
 
   protected void clearSnapshot(IndexTxSnapshot indexTxSnapshot) {

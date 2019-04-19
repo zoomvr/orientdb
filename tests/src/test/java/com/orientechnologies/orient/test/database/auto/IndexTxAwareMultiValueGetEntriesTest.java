@@ -35,11 +35,9 @@ public class IndexTxAwareMultiValueGetEntriesTest extends DocumentDBBaseTest {
   public void beforeClass() throws Exception {
     super.beforeClass();
 
-    database
-        .getMetadata()
-        .getIndexManager()
-        .createIndex("idxTxAwareMultiValueGetEntriesTest", "NOTUNIQUE", new OSimpleKeyIndexDefinition(OType.INTEGER), null,
-            null, null);
+    database.getMetadata().getIndexManager()
+        .createIndex("idxTxAwareMultiValueGetEntriesTest", "NOTUNIQUE", new OSimpleKeyIndexDefinition(OType.INTEGER), null, null,
+            null);
 
   }
 
@@ -200,7 +198,8 @@ public class IndexTxAwareMultiValueGetEntriesTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, new ORecordId(clusterId, positions.get(0)));
+    index.remove(1, new ORecordId(clusterId, positions.get(1)));
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareMultiValueGetEntriesTest"));
     Set<OIdentifiable> resultTwo = new HashSet<OIdentifiable>();

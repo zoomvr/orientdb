@@ -61,7 +61,7 @@ public class ODictionary<T extends Object> {
   }
 
   public boolean remove(final String iKey) {
-    return index.remove(iKey);
+    return index.remove(iKey, null);
   }
 
   public long size() {

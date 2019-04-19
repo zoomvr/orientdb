@@ -36,6 +36,8 @@ import java.util.Map;
 public interface OIndexEngine extends OBaseIndexEngine {
   int VERSION = 0;
 
+  boolean remove(Object key) throws IOException;
+
   void put(Object key, Object value) throws IOException;
 
   void update(Object key, OIndexKeyUpdater<Object> updater) throws IOException;

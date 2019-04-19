@@ -78,9 +78,6 @@ public class OIndexAbstractDelegate<T> implements OIndex<T> {
     return delegate.getVersion();
   }
 
-  public boolean remove(final Object key) {
-    return delegate.remove(key);
-  }
 
   public boolean remove(final Object iKey, final OIdentifiable iRID) {
     return delegate.remove(iKey, iRID);

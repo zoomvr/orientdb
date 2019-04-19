@@ -173,7 +173,7 @@ public class IndexTxAwareOneValueGetEntriesTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, new ORecordId(clusterId, 1));
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetEntriesTest"));
     Set<OIdentifiable> resultTwo = new HashSet<OIdentifiable>();
@@ -210,7 +210,7 @@ public class IndexTxAwareOneValueGetEntriesTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, new ORecordId(clusterId, 1));
     index.put(1, new ORecordId(clusterId, 1));
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetEntriesTest"));
@@ -285,7 +285,7 @@ public class IndexTxAwareOneValueGetEntriesTest extends DocumentDBBaseTest {
     index.put(1, new ORecordId(clusterId, 1));
     index.put(2, new ORecordId(clusterId, 2));
 
-    index.remove(1);
+    index.remove(1, new ORecordId(clusterId, 1));
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetEntriesTest"));
     Set<OIdentifiable> result = new HashSet<OIdentifiable>();

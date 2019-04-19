@@ -27,7 +27,6 @@ import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges.OPERATION;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey.OTransactionIndexEntry;
-import com.orientechnologies.orient.core.tx.OTransactionRealAbstract;
 
 import java.util.Map.Entry;
 
@@ -51,7 +50,8 @@ public abstract class OIndexTxAware<T> extends OIndexAbstractDelegate<T> {
     /**
      * Any partially matched key will be used as search result.
      */
-    NONE, /**
+    NONE,
+    /**
      * The biggest partially matched key will be used as search result.
      */
     HIGHEST_BOUNDARY,
@@ -115,13 +115,6 @@ public abstract class OIndexTxAware<T> extends OIndexAbstractDelegate<T> {
 
     database.getMicroOrRegularTransaction().addIndexEntry(delegate, super.getName(), OPERATION.PUT, iKey, iValue);
     return this;
-  }
-
-  @Override
-  public boolean remove(Object key) {
-    key = getCollatingValue(key);
-    database.getMicroOrRegularTransaction().addIndexEntry(delegate, super.getName(), OPERATION.REMOVE, key, null);
-    return true;
   }
 
   @Override

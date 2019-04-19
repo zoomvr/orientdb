@@ -90,17 +90,19 @@ public class OLuceneIndexNotUnique extends OIndexAbstract<Set<OIdentifiable>> im
   }
 
   @Override
-  public boolean remove(Object key) {
-    return super.remove(key);
-  }
-
-  @Override
   public OIndexAbstract<Set<OIdentifiable>> removeCluster(String iClusterName) {
     acquireExclusiveLock();
     try {
       if (clustersToIndex.remove(iClusterName)) {
         updateConfiguration();
-        remove("_CLUSTER:" + storage.getClusterByName(iClusterName).getId());
+        final String key = "_CLUSTER:" + storage.getClusterByName(iClusterName).getId();
+        final OIndexCursor cursor = iterateEntriesBetween(key, true, key, true, true);
+
+        Map.Entry<Object, OIdentifiable> entry = cursor.nextEntry();
+        while (entry != null) {
+          remove(entry.getKey(), entry.getValue());
+          entry = cursor.nextEntry();
+        }
       }
 
       return this;

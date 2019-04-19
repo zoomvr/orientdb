@@ -31,7 +31,11 @@ import com.orientechnologies.orient.core.sql.executor.OInternalResultSet;
 import com.orientechnologies.orient.core.sql.executor.OResult;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -55,7 +59,7 @@ public abstract class OIndexRemote<T> implements OIndex<T> {
   private final static String QUERY_GET_ENTRIES     = "select from index:`%s` where key in [%s]";
 
   private final static String QUERY_PUT         = "insert into index:`%s` (key,rid) values (?,?)";
-  private final static String QUERY_REMOVE      = "delete from index:`%s` where key = ?";
+  final static String QUERY_REMOVE      = "delete from index:`%s` where key = ?";
   private final static String QUERY_REMOVE2     = "delete from index:`%s` where key = ? and rid = ?";
   private final static String QUERY_REMOVE3     = "delete from index:`%s` where rid = ?";
   private final static String QUERY_CONTAINS    = "select count(*) as size from index:`%s` where key = ?";
@@ -163,14 +167,6 @@ public abstract class OIndexRemote<T> implements OIndex<T> {
     return this;
   }
 
-  public boolean remove(final Object key) {
-    try(OResultSet result = getDatabase().command(String.format(QUERY_REMOVE, name), key)) {
-      if (!result.hasNext()) {
-        return false;
-      }
-      return ((long) result.next().getProperty("count")) > 0;
-    }
-  }
 
   public boolean remove(final Object iKey, final OIdentifiable iRID) {
     final long deleted;

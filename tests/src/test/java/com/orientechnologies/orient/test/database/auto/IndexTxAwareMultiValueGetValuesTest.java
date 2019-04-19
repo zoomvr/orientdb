@@ -25,10 +25,10 @@ import java.util.Set;
 @Test
 public class IndexTxAwareMultiValueGetValuesTest extends DocumentDBBaseTest {
 
-	@Parameters(value = "url")
-	public IndexTxAwareMultiValueGetValuesTest(@Optional String url) {
-		super(url);
-	}
+  @Parameters(value = "url")
+  public IndexTxAwareMultiValueGetValuesTest(@Optional String url) {
+    super(url);
+  }
 
   @BeforeClass
   public void beforeClass() throws Exception {
@@ -37,12 +37,11 @@ public class IndexTxAwareMultiValueGetValuesTest extends DocumentDBBaseTest {
     database.command(new OCommandSQL("create index idxTxAwareMultiValueGetValuesTest notunique INTEGER")).execute();
   }
 
-
   @AfterMethod
   public void afterMethod() throws Exception {
     database.command(new OCommandSQL("delete from index:idxTxAwareMultiValueGetValuesTest")).execute();
 
-		super.afterMethod();
+    super.afterMethod();
   }
 
   @Test
@@ -195,7 +194,8 @@ public class IndexTxAwareMultiValueGetValuesTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, new ORecordId(clusterId, positions.get(0)));
+    index.remove(1, new ORecordId(clusterId, positions.get(1)));
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareMultiValueGetValuesTest"));
     Set<OIdentifiable> resultTwo = new HashSet<OIdentifiable>();

@@ -165,7 +165,8 @@ public class IndexTxAwareMultiValueGetTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, new ORecordId(clusterId, positions.get(0)));
+    index.remove(1, new ORecordId(clusterId, positions.get(1)));
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareMultiValueGetTest"));
     Assert.assertNull(((OIndexTxAwareMultiValue) index).get(1));

@@ -2839,7 +2839,16 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
       makeStorageDirty();
       final OBaseIndexEngine engine = indexEngines.get(indexId);
-      return engine.remove(key);
+      if (engine.getEngineAPIVersion() == OIndexEngine.VERSION) {
+        return ((OIndexEngine) engine).remove(key);
+      } else {
+        final OV1IndexEngine v1IndexEngine = (OV1IndexEngine) engine;
+        if (!v1IndexEngine.isMultiValue()) {
+          return ((OSingleValueIndexEngine) engine).remove(key);
+        } else {
+          throw new OStorageException("To remove entry from multi-value index not only key but value also should be provided");
+        }
+      }
     } catch (final IOException e) {
       throw OException.wrapException(new OStorageException("Error during removal of entry with key " + key + " from index "), e);
     }

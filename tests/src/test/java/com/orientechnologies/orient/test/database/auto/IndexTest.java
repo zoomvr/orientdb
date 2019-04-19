@@ -1070,7 +1070,7 @@ public class IndexTest extends ObjectDBBaseTest {
     v2.save();
 
     Assert.assertNotNull(idx);
-    idx.remove(0);
+    idx.remove(0, v0);
     idx.put(52, v);
 
     db.commit();
@@ -1117,7 +1117,7 @@ public class IndexTest extends ObjectDBBaseTest {
     v.save();
 
     Assert.assertNotNull(idx);
-    idx.remove(0);
+    idx.remove(0, v0);
 
     idx.put(52, v);
     idx.put(54, v2);

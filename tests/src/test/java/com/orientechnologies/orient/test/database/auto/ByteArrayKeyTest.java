@@ -49,9 +49,7 @@ public class ByteArrayKeyTest extends DocumentDBBaseTest {
 
     compositeByteArrayKeyTest.createIndex("compositeByteArrayKey", OClass.INDEX_TYPE.UNIQUE, "byteArrayKey", "intKey");
 
-    database
-        .getMetadata()
-        .getIndexManager()
+    database.getMetadata().getIndexManager()
         .createIndex("byte-array-manualIndex-notunique", "NOTUNIQUE", new OSimpleKeyIndexDefinition(OType.BINARY), null, null,
             null);
   }
@@ -143,18 +141,6 @@ public class ByteArrayKeyTest extends DocumentDBBaseTest {
     OIndex<?> index = database.getMetadata().getIndexManager().getIndex("compositeByteArrayKey");
     Assert.assertEquals(index.get(new OCompositeKey(key1, 1)), doc1);
     Assert.assertEquals(index.get(new OCompositeKey(key2, 2)), doc2);
-  }
-
-  @Test(dependsOnMethods = { "testUsage" })
-  public void testRemove() {
-    byte[] key1 = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1 };
-    byte[] key2 = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 2 };
-
-    OIndex<?> index = getManualIndex();
-    Assert.assertTrue(index.remove(key1));
-
-    Assert.assertNull(index.get(key1));
-    Assert.assertNotNull(index.get(key2));
   }
 
   public void testRemoveKeyValue() {

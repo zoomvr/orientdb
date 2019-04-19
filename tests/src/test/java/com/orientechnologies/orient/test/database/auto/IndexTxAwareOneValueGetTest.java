@@ -1,16 +1,15 @@
 package com.orientechnologies.orient.test.database.auto;
 
+import com.orientechnologies.orient.core.id.ORecordId;
+import com.orientechnologies.orient.core.index.OIndex;
+import com.orientechnologies.orient.core.index.OIndexTxAwareOneValue;
+import com.orientechnologies.orient.core.sql.OCommandSQL;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
-
-import com.orientechnologies.orient.core.id.ORecordId;
-import com.orientechnologies.orient.core.index.OIndex;
-import com.orientechnologies.orient.core.index.OIndexTxAwareOneValue;
-import com.orientechnologies.orient.core.sql.OCommandSQL;
 
 @Test
 public class IndexTxAwareOneValueGetTest extends DocumentDBBaseTest {
@@ -147,7 +146,7 @@ public class IndexTxAwareOneValueGetTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, null);
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetTest"));
     Assert.assertNull(index.get(1));
@@ -179,7 +178,7 @@ public class IndexTxAwareOneValueGetTest extends DocumentDBBaseTest {
 
     database.begin();
 
-    index.remove(1);
+    index.remove(1, null);
     index.put(1, new ORecordId(clusterId, 1));
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetTest"));
@@ -238,7 +237,7 @@ public class IndexTxAwareOneValueGetTest extends DocumentDBBaseTest {
 
     final int clusterId = database.getDefaultClusterId();
     index.put(1, new ORecordId(clusterId, 1));
-    index.remove(1);
+    index.remove(1, null);
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetTest"));
     Assert.assertNull(index.get(1));
@@ -258,7 +257,7 @@ public class IndexTxAwareOneValueGetTest extends DocumentDBBaseTest {
 
     final int clusterId = database.getDefaultClusterId();
     index.put(1, new ORecordId(clusterId, 1));
-    index.remove(1);
+    index.remove(1, null);
 
     Assert.assertNotNull(database.getTransaction().getIndexChanges("idxTxAwareOneValueGetTest"));
     Assert.assertNull(index.get(1));
