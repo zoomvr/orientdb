@@ -118,7 +118,22 @@ public final class OCellBTreeMultiValueIndexEngine implements OMultiValueIndexEn
   @Override
   public void clear() {
     try {
-      sbTree.clear();
+      final Object firstKey = sbTree.firstKey();
+      final Object lastKey = sbTree.lastKey();
+
+      if (firstKey == null) {
+        return;
+      }
+
+      final OCellBTreeMultiValue.OCellBTreeCursor<Object, ORID> cursor = sbTree
+          .iterateEntriesBetween(firstKey, true, lastKey, true, true);
+
+      Map.Entry<Object, ORID> entry = cursor.next(-1);
+      while (entry != null) {
+        sbTree.remove(entry.getKey(), entry.getValue());
+        entry = cursor.next(-1);
+      }
+
     } catch (IOException e) {
       throw OException.wrapException(new OIndexException("Error during clearing of index " + name), e);
     }

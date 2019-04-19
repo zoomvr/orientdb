@@ -18,8 +18,6 @@ public interface OCellBTreeMultiValue<K> {
 
   void close();
 
-  void clear() throws IOException;
-
   void delete() throws IOException;
 
   void deleteWithoutLoad() throws IOException;
