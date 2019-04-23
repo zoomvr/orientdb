@@ -26,8 +26,6 @@ public interface OBaseIndexEngine {
 
   void delete() throws IOException;
 
-  void deleteWithoutLoad(String indexName) throws IOException;
-
   boolean contains(Object key);
 
   void clear() throws IOException;
