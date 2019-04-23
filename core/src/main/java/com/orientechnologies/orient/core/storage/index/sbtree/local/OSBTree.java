@@ -480,41 +480,6 @@ public class OSBTree<K, V> extends ODurableComponent {
     }
   }
 
-  public void clear() throws IOException {
-    boolean rollback = false;
-    startAtomicOperation(true);
-    try {
-      acquireExclusiveLock();
-      try {
-        truncateFile(fileId);
-
-        if (nullPointerSupport) {
-          truncateFile(nullBucketFileId);
-        }
-
-        OCacheEntry cacheEntry = loadPageForWrite(fileId, ROOT_INDEX, false, true);
-        if (cacheEntry == null) {
-          cacheEntry = addPage(fileId);
-        }
-
-        try {
-          final OSBTreeBucket<K, V> rootBucket = new OSBTreeBucket<>(cacheEntry, true, keySerializer, keyTypes, valueSerializer,
-              encryption);
-          rootBucket.setTreeSize(0);
-        } finally {
-          releasePageFromWrite(cacheEntry);
-        }
-      } finally {
-        releaseExclusiveLock();
-      }
-    } catch (final Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
-    }
-  }
-
   public void delete() throws IOException {
     boolean rollback = false;
     startAtomicOperation(false);

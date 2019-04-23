@@ -141,7 +141,12 @@ public class OSBTreeIndexEngine implements OIndexEngine {
   @Override
   public void clear() {
     try {
-      sbTree.clear();
+      final OSBTree.OSBTreeKeyCursor<Object> keyCursor = sbTree.keyCursor();
+      Object key = keyCursor.next(-1);
+      while (key != null) {
+        sbTree.remove(key);
+        key = keyCursor.next(-1);
+      }
     } catch (IOException e) {
       throw OException.wrapException(new OIndexException("Error during clear index " + name), e);
     }
