@@ -502,32 +502,6 @@ public class OSBTree<K, V> extends ODurableComponent {
     }
   }
 
-  public void deleteWithoutLoad() throws IOException {
-    boolean rollback = false;
-    startAtomicOperation(false);
-    try {
-      acquireExclusiveLock();
-      try {
-        if (isFileExists(getFullName())) {
-          final long fileId = openFile(getFullName());
-          deleteFile(fileId);
-        }
-
-        if (isFileExists(getName() + nullFileExtension)) {
-          final long nullFileId = openFile(getName() + nullFileExtension);
-          deleteFile(nullFileId);
-        }
-      } finally {
-        releaseExclusiveLock();
-      }
-    } catch (final Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
-    }
-  }
-
   public void load(final String name, final OBinarySerializer<K> keySerializer, final OBinarySerializer<V> valueSerializer,
       final OType[] keyTypes, final int keySize, final boolean nullPointerSupport, final OEncryption encryption) {
     acquireExclusiveLock();

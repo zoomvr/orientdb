@@ -506,41 +506,6 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
     }
   }
 
-  @Override
-  public void deleteWithoutLoad(final String name) throws IOException {
-    boolean rollback = false;
-    startAtomicOperation(false);
-    try {
-      acquireExclusiveLock();
-      try {
-        if (isFileExists(name + metadataConfigurationFileExtension)) {
-          fileStateId = openFile(name + metadataConfigurationFileExtension);
-          deleteFile(fileStateId);
-        }
-
-        directory = new OHashTableDirectory(treeStateFileExtension, name, getFullName(), storage);
-        directory.deleteWithoutOpen();
-
-        if (isFileExists(name + nullBucketFileExtension)) {
-          final long nullBucketId = openFile(name + nullBucketFileExtension);
-          deleteFile(nullBucketId);
-        }
-
-        if (isFileExists(getFullName())) {
-          final long fileId = openFile(getFullName());
-          deleteFile(fileId);
-        }
-      } finally {
-        releaseExclusiveLock();
-      }
-    } catch (final Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
-    }
-  }
-
   private OHashIndexBucket.Entry<K, V>[] convertBucketToEntries(final OHashIndexBucket<K, V> bucket, final int startIndex,
       final int endIndex) {
     @SuppressWarnings("unchecked")
