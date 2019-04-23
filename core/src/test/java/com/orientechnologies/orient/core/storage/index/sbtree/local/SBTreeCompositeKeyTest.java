@@ -31,7 +31,7 @@ public class SBTreeCompositeKeyTest extends DatabaseAbstractTest {
   @Before
   public void beforeMethod() throws Exception {
     localSBTree = new OSBTree<>("localSBTreeCompositeKeyTest", ".sbt", ".nbt",
-        (OAbstractPaginatedStorage) database.getStorage().getUnderlying());
+        (OAbstractPaginatedStorage) database.getStorage().getUnderlying(), 42);
     localSBTree.create(OCompositeKeySerializer.INSTANCE, OLinkSerializer.INSTANCE, null, 2, false, null);
 
     for (double i = 1; i < 4; i++) {

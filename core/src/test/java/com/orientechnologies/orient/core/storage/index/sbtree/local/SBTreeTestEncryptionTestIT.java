@@ -28,7 +28,7 @@ public class SBTreeTestEncryptionTestIT extends SBTreeTestIT {
     databaseDocumentTx = orientDB.open(dbName, "admin", "admin");
 
     sbTree = new OSBTree<>("sbTreeEncrypted", ".sbt", ".nbt",
-        (OAbstractPaginatedStorage) ((ODatabaseInternal) databaseDocumentTx).getStorage());
+        (OAbstractPaginatedStorage) ((ODatabaseInternal) databaseDocumentTx).getStorage(), 24);
 
     final OEncryption encryption = OEncryptionFactory.INSTANCE.getEncryption("aes/gcm", "T1JJRU5UREJfSVNfQ09PTA==");
     sbTree.create(OIntegerSerializer.INSTANCE, OLinkSerializer.INSTANCE, null, 1, false, encryption);

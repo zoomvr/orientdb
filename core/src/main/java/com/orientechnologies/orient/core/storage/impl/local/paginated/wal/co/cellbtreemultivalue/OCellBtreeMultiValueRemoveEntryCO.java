@@ -1,4 +1,4 @@
-package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev;
+package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivalue;
 
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OLongSerializer;

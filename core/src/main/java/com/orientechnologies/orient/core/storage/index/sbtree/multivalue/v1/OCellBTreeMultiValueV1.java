@@ -39,8 +39,8 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBTreeMultiValuePutCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBtreeMultiValueRemoveEntryCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivalue.OCellBTreeMultiValuePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivalue.OCellBtreeMultiValueRemoveEntryCO;
 import com.orientechnologies.orient.core.storage.index.sbtree.multivalue.OCellBTreeMultiValue;
 
 import java.io.IOException;

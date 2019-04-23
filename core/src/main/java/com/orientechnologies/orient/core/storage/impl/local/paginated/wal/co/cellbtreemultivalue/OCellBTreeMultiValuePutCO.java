@@ -1,4 +1,4 @@
-package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev;
+package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivalue;
 
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
@@ -47,7 +47,7 @@ public class OCellBTreeMultiValuePutCO extends OAbstractIndexCO {
     try {
       storage.removeRidIndexEntryInternal(indexId, deserializedKey, value);
     } catch (OInvalidIndexEngineIdException e) {
-      throw OException.wrapException(new OStorageException("Can not redo operation for index with id " + indexId), e);
+      throw OException.wrapException(new OStorageException("Can not undo operation for index with id " + indexId), e);
     }
   }
 

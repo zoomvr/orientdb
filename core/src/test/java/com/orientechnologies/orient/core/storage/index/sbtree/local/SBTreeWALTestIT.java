@@ -101,7 +101,7 @@ public class SBTreeWALTestIT extends SBTreeTestIT {
 
     actualWriteCache = actualStorage.getWriteCache();
 
-    sbTree = new OSBTree<>("actualSBTree", ".sbt", ".nbt", actualStorage);
+    sbTree = new OSBTree<>("actualSBTree", ".sbt", ".nbt", actualStorage, 24);
     sbTree.create(OIntegerSerializer.INSTANCE, OLinkSerializer.INSTANCE, null, 1, false, null);
   }
 

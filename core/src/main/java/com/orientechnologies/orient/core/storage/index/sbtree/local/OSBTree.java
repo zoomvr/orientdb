@@ -40,6 +40,7 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreePutCO;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -96,12 +97,14 @@ public class OSBTree<K, V> extends ODurableComponent {
   private              boolean               nullPointerSupport;
   private final        AtomicLong            bonsayFileId     = new AtomicLong(0);
   private              OEncryption           encryption;
+  private final        int                   indexId;
 
   public OSBTree(final String name, final String dataFileExtension, final String nullFileExtension,
-      final OAbstractPaginatedStorage storage) {
+      final OAbstractPaginatedStorage storage, final int indexId) {
     super(storage, name, dataFileExtension, name + dataFileExtension);
     acquireExclusiveLock();
     try {
+      this.indexId = indexId;
       this.nullFileExtension = nullFileExtension;
     } finally {
       releaseExclusiveLock();
@@ -346,6 +349,12 @@ public class OSBTree<K, V> extends ODurableComponent {
             if (sizeDiff != 0) {
               updateSize(sizeDiff);
             }
+
+            if (indexId >= 0) {
+              atomicOperation.addComponentOperation(
+                  new OSBTreePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(), rawKey,
+                      valueSerializer.getId(), value));
+            }
           } else if (updatedValue.isRemove()) {
             removeKey(bucketSearchResult);
             releasePageFromWrite(keyBucketCacheEntry);
@@ -397,6 +406,12 @@ public class OSBTree<K, V> extends ODurableComponent {
               }
 
               nullBucket.setValue(treeValue);
+
+              if (indexId >= 0) {
+                atomicOperation.addComponentOperation(
+                    new OSBTreePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(), null,
+                        valueSerializer.getId(), value));
+              }
             } else if (updatedValue.isRemove()) {
               removeNullBucket();
             } else //noinspection StatementWithEmptyBody
@@ -1486,10 +1501,11 @@ public class OSBTree<K, V> extends ODurableComponent {
    * Indicates search behavior in case of {@link OCompositeKey} keys that have less amount of internal keys are used, whether
    * lowest or highest partially matched key should be used.
    */
-  private enum PartialSearchMode {/**
-   * Any partially matched key will be used as search result.
-   */
-  NONE,
+  private enum PartialSearchMode {
+    /**
+     * Any partially matched key will be used as search result.
+     */
+    NONE,
     /**
      * The biggest partially matched key will be used as search result.
      */
@@ -1498,7 +1514,8 @@ public class OSBTree<K, V> extends ODurableComponent {
     /**
      * The smallest partially matched key will be used as search result.
      */
-    LOWEST_BOUNDARY}
+    LOWEST_BOUNDARY
+  }
 
   public interface OSBTreeCursor<K, V> {
     Map.Entry<K, V> next(int prefetchSize);

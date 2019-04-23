@@ -24,8 +24,8 @@ import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OEmptyWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OWriteableWALRecord;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBTreeMultiValuePutCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBtreeMultiValueRemoveEntryCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivalue.OCellBTreeMultiValuePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivalue.OCellBtreeMultiValueRemoveEntryCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValuePutCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValueRemoveCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineCreateCO;
@@ -33,6 +33,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.pag
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateRecordCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterUpdateRecordCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreePutCO;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import net.jpountz.lz4.LZ4Compressor;
@@ -64,6 +65,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_START_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_CREATE_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.NON_TX_OPERATION_PERFORMED_WAL_RECORD;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_PUT_CO;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -193,6 +195,9 @@ public final class OWALRecordsFactory {
       break;
     case CELL_BTREE_MULTI_VALUE_REMOVE_ENTRY_CO:
       walRecord = new OCellBtreeMultiValueRemoveEntryCO();
+      break;
+    case SBTREE_PUT_CO:
+      walRecord = new OSBTreePutCO();
       break;
     default:
       if (idToTypeMap.containsKey(content[0]))

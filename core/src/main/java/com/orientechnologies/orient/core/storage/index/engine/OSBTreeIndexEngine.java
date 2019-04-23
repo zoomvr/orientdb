@@ -62,7 +62,7 @@ public class OSBTreeIndexEngine implements OIndexEngine {
     this.name = name;
     this.version = version;
 
-    sbTree = new OSBTree<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, storage);
+    sbTree = new OSBTree<>(name, DATA_FILE_EXTENSION, NULL_BUCKET_FILE_EXTENSION, storage, id);
   }
 
   @Override

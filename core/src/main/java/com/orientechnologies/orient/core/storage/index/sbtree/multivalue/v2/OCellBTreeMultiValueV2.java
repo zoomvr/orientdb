@@ -41,8 +41,8 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBTreeMultiValuePutCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivaluev.OCellBtreeMultiValueRemoveEntryCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivalue.OCellBTreeMultiValuePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreemultivalue.OCellBtreeMultiValueRemoveEntryCO;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OSBTree;
 import com.orientechnologies.orient.core.storage.index.sbtree.multivalue.OCellBTreeMultiValue;
 
@@ -170,7 +170,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
           releasePageFromWrite(nullBucketEntry);
         }
 
-        multiContainer = new OSBTree<>(getName(), containerExtension, null, storage);
+        multiContainer = new OSBTree<>(getName(), containerExtension, null, storage, -1);
         multiContainer.create(MultiValueEntrySerializer.INSTANCE, OByteSerializer.INSTANCE, null, 1, false, null);
       } finally {
         releaseExclusiveLock();
@@ -481,7 +481,7 @@ public final class OCellBTreeMultiValueV2<K> extends ODurableComponent implement
       this.encryption = encryption;
       this.keySerializer = keySerializer;
 
-      multiContainer = new OSBTree<>(getName(), containerExtension, null, storage);
+      multiContainer = new OSBTree<>(getName(), containerExtension, null, storage, indexId);
       multiContainer.load(getName(), MultiValueEntrySerializer.INSTANCE, OByteSerializer.INSTANCE, null, 1, false, null);
 
       final OCacheEntry entryPointCacheEntry = loadPageForRead(fileId, ENTRY_POINT_INDEX, false);
