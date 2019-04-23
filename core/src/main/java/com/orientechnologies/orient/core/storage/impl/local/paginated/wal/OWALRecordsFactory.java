@@ -34,6 +34,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.pag
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterUpdateRecordCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreeRemoveCO;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import net.jpountz.lz4.LZ4Compressor;
@@ -66,6 +67,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_CREATE_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.NON_TX_OPERATION_PERFORMED_WAL_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_PUT_CO;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_REMOVE_CO;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -198,6 +200,9 @@ public final class OWALRecordsFactory {
       break;
     case SBTREE_PUT_CO:
       walRecord = new OSBTreePutCO();
+      break;
+    case SBTREE_REMOVE_CO:
+      walRecord = new OSBTreeRemoveCO();
       break;
     default:
       if (idToTypeMap.containsKey(content[0]))

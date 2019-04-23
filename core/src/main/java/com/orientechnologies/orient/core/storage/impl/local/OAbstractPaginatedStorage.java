@@ -3195,7 +3195,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
     try {
       if (transaction.get() != null) {
-        internalPutIndexValue(indexId, key, value);
+        putIndexValueInternal(indexId, key, value);
         return;
       }
 
@@ -3207,7 +3207,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         checkLowDiskSpaceRequestsAndReadOnlyConditions();
 
-        internalPutIndexValue(indexId, key, value);
+        putIndexValueInternal(indexId, key, value);
       } finally {
         stateLock.releaseReadLock();
       }
@@ -3222,7 +3222,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  public void internalPutIndexValue(final int indexId, final Object key, final Object value) throws OInvalidIndexEngineIdException {
+  public void putIndexValueInternal(final int indexId, final Object key, final Object value) throws OInvalidIndexEngineIdException {
     try {
       checkIndexId(indexId);
 
