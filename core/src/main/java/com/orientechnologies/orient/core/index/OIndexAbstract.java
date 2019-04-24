@@ -35,6 +35,7 @@ import com.orientechnologies.orient.core.exception.OConfigurationException;
 import com.orientechnologies.orient.core.exception.OInvalidIndexEngineIdException;
 import com.orientechnologies.orient.core.exception.OTooBigIndexKeyException;
 import com.orientechnologies.orient.core.index.engine.OBaseIndexEngine;
+import com.orientechnologies.orient.core.index.engine.OV1IndexEngine;
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.ORecord;
@@ -69,17 +70,17 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
 
-  static final String                    CONFIG_MAP_RID  = "mapRid";
-  private static final   String                    CONFIG_CLUSTERS = "clusters";
-  final                  String                    type;
-  protected final        ODocument                 metadata;
-  protected final        OAbstractPaginatedStorage storage;
-  private final          String                    databaseName;
-  private final          String                    name;
-  private final          OReadersWriterSpinLock    rwLock          = new OReadersWriterSpinLock();
-  private final          AtomicLong                rebuildVersion  = new AtomicLong();
-  private final          int                       version;
-  volatile               IndexConfiguration        configuration;
+  static final         String                    CONFIG_MAP_RID  = "mapRid";
+  private static final String                    CONFIG_CLUSTERS = "clusters";
+  final                String                    type;
+  protected final      ODocument                 metadata;
+  protected final      OAbstractPaginatedStorage storage;
+  private final        String                    databaseName;
+  private final        String                    name;
+  private final        OReadersWriterSpinLock    rwLock          = new OReadersWriterSpinLock();
+  private final        AtomicLong                rebuildVersion  = new AtomicLong();
+  private final        int                       version;
+  volatile             IndexConfiguration        configuration;
   String valueContainerAlgorithm;
 
   protected int indexId    = -1;
@@ -210,8 +211,8 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
         OLogManager.instance().error(this, "Error during deletion of index '%s'", e, name);
       }
 
-      indexId = storage.addIndexEngine(name, algorithm, type, indexDefinition, valueSerializer, isAutomatic(), true, version, 1,
-          this instanceof OIndexMultiValues, getEngineProperties(), clustersToIndex, metadata);
+      indexId = storage.addIndexEngine(name, algorithm, type, indexDefinition, valueSerializer, isAutomatic(), true, version,
+          OV1IndexEngine.API_VERSION, this instanceof OIndexMultiValues, getEngineProperties(), clustersToIndex, metadata);
       apiVersion = OAbstractPaginatedStorage.extractEngineAPIVersion(indexId);
 
       assert indexId >= 0;
@@ -428,8 +429,8 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
       removeValuesContainer();
 
       indexId = storage
-          .addIndexEngine(name, algorithm, type, indexDefinition, determineValueSerializer(), isAutomatic(), true, version, 1,
-              this instanceof OIndexMultiValues, getEngineProperties(), clustersToIndex, metadata);
+          .addIndexEngine(name, algorithm, type, indexDefinition, determineValueSerializer(), isAutomatic(), true, version,
+              OV1IndexEngine.API_VERSION, this instanceof OIndexMultiValues, getEngineProperties(), clustersToIndex, metadata);
       apiVersion = OAbstractPaginatedStorage.extractEngineAPIVersion(indexId);
 
       onIndexEngineChange(indexId);
@@ -502,7 +503,6 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
     }
     return documentIndexed;
   }
-
 
   public OIndex<T> clear() {
     acquireSharedLock();
