@@ -37,7 +37,7 @@ public class OLocalHashTableEncryptionTestIT extends OLocalHashTableBase {
 
     OSHA256HashFunction<Integer> SHA256HashFunction = new OSHA256HashFunction<>(OIntegerSerializer.INSTANCE);
 
-    localHashTable = new OLocalHashTable<>("localHashTableEncryptionTest", ".imc", ".tsc", ".obf", ".nbh",
+    localHashTable = new OLocalHashTable<>("localHashTableEncryptionTest", 42, ".imc", ".tsc", ".obf", ".nbh",
         (OAbstractPaginatedStorage) ((ODatabaseInternal) databaseDocumentTx).getStorage());
 
     localHashTable

@@ -30,6 +30,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cel
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValueRemoveCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineDeleteCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.localhashtable.OLocalHashTablePutCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterAllocatePositionCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateRecordCO;
@@ -70,6 +71,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_START_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_CREATE_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_DELETE_CO;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.LOCAL_HASHTABLE_PUT_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.NON_TX_OPERATION_PERFORMED_WAL_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_PUT_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_REMOVE_CO;
@@ -214,6 +216,9 @@ public final class OWALRecordsFactory {
       break;
     case SBTREE_REMOVE_CO:
       walRecord = new OSBTreeRemoveCO();
+      break;
+    case LOCAL_HASHTABLE_PUT_CO:
+      walRecord = new OLocalHashTablePutCO();
       break;
     default:
       if (idToTypeMap.containsKey(content[0]))

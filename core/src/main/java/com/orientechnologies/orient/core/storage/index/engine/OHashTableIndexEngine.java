@@ -74,7 +74,7 @@ public final class OHashTableIndexEngine implements OIndexEngine {
     if (version < 2) {
       throw new IllegalStateException("Unsupported version of hash index");
     } else {
-      hashTable = new OLocalHashTable<>(name, METADATA_FILE_EXTENSION, TREE_FILE_EXTENSION, BUCKET_FILE_EXTENSION,
+      hashTable = new OLocalHashTable<>(name, id, METADATA_FILE_EXTENSION, TREE_FILE_EXTENSION, BUCKET_FILE_EXTENSION,
           NULL_BUCKET_FILE_EXTENSION, storage);
     }
 

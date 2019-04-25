@@ -13,7 +13,9 @@ import com.orientechnologies.orient.core.index.engine.OIndexEngine;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.localhashtable.OLocalHashTablePutCO;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -108,11 +110,14 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
 
   private OEncryption encryption;
 
-  public OLocalHashTable(final String name, final String metadataConfigurationFileExtension, final String treeStateFileExtension,
-      final String bucketFileExtension, final String nullBucketFileExtension,
+  private final int indexId;
+
+  public OLocalHashTable(final String name, final int indexId, final String metadataConfigurationFileExtension,
+      final String treeStateFileExtension, final String bucketFileExtension, final String nullBucketFileExtension,
       final OAbstractPaginatedStorage abstractPaginatedStorage) {
     super(abstractPaginatedStorage, name, bucketFileExtension, name + bucketFileExtension);
 
+    this.indexId = indexId;
     this.metadataConfigurationFileExtension = metadataConfigurationFileExtension;
     this.treeStateFileExtension = treeStateFileExtension;
     this.nullBucketFileExtension = nullBucketFileExtension;
@@ -1107,7 +1112,7 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
 
   private boolean put(K key, final V value, final OBaseIndexEngine.Validator<K, V> validator) throws IOException {
     boolean rollback = false;
-    startAtomicOperation(true);
+    final OAtomicOperation atomicOperation = startAtomicOperation(true);
     try {
       acquireExclusiveLock();
       try {
@@ -1124,7 +1129,7 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
 
         key = keySerializer.preprocess(key, (Object[]) keyTypes);
 
-        return doPut(key, value, validator);
+        return doPut(key, value, validator, atomicOperation);
       } finally {
         releaseExclusiveLock();
       }
@@ -1137,7 +1142,8 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
   }
 
   @SuppressWarnings("unchecked")
-  private boolean doPut(final K key, V value, final OIndexEngine.Validator<K, V> validator) throws IOException {
+  private boolean doPut(final K key, V value, final OIndexEngine.Validator<K, V> validator, final OAtomicOperation atomicOperation)
+      throws IOException {
     int sizeDiff = 0;
 
     if (key == null) {
@@ -1151,10 +1157,11 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
         isNew = false;
       }
 
+      final V oldValue;
       try {
         final ONullBucket<V> nullBucket = new ONullBucket<>(cacheEntry, valueSerializer, isNew);
 
-        final V oldValue = nullBucket.getValue();
+        oldValue = nullBucket.getValue();
 
         if (validator != null) {
           final Object result = validator.validate(null, oldValue, value);
@@ -1176,6 +1183,12 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
       }
 
       changeSize(sizeDiff);
+
+      atomicOperation.addComponentOperation(
+          new OLocalHashTablePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(), null,
+              valueSerializer.getId(), valueSerializer.serializeNativeAsWhole(value),
+              oldValue != null ? valueSerializer.serializeNativeAsWhole(oldValue) : null));
+
       return true;
     } else {
       final long hashCode = keyHashFunction.hashCode(key);
@@ -1194,8 +1207,8 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
             encryption);
         final int index = bucket.getIndex(hashCode, key);
 
+        final V oldValue = index > -1 ? bucket.getValue(index) : null;
         if (validator != null) {
-          final V oldValue = index > -1 ? bucket.getValue(index) : null;
           final Object result = validator.validate(key, oldValue, value);
           if (result == OBaseIndexEngine.Validator.IGNORE) {
             return false;
@@ -1208,11 +1221,25 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
           final int updateResult = bucket.updateEntry(index, value);
           if (updateResult == 0) {
             changeSize(sizeDiff);
+
+            atomicOperation.addComponentOperation(
+                new OLocalHashTablePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(),
+                    keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes), valueSerializer.getId(),
+                    valueSerializer.serializeNativeAsWhole(value),
+                    oldValue != null ? valueSerializer.serializeNativeAsWhole(oldValue) : null));
+
             return true;
           }
 
           if (updateResult == 1) {
             changeSize(sizeDiff);
+
+            atomicOperation.addComponentOperation(
+                new OLocalHashTablePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(),
+                    keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes), valueSerializer.getId(),
+                    valueSerializer.serializeNativeAsWhole(value),
+                    oldValue != null ? valueSerializer.serializeNativeAsWhole(oldValue) : null));
+
             return true;
           }
 
@@ -1226,6 +1253,12 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
           sizeDiff++;
 
           changeSize(sizeDiff);
+
+          atomicOperation.addComponentOperation(
+              new OLocalHashTablePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(),
+                  keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes), valueSerializer.getId(),
+                  valueSerializer.serializeNativeAsWhole(value),
+                  oldValue != null ? valueSerializer.serializeNativeAsWhole(oldValue) : null));
           return true;
         }
 
@@ -1289,7 +1322,7 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
       }
 
       changeSize(sizeDiff);
-      doPut(key, value, null /* already validated */);
+      doPut(key, value, null /* already validated */, atomicOperation);
       return true;
     }
 

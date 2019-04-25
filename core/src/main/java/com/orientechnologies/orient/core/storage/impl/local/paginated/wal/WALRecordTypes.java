@@ -33,4 +33,6 @@ public final class WALRecordTypes {
 
   public static final byte SBTREE_PUT_CO    = 27;
   public static final byte SBTREE_REMOVE_CO = 28;
+
+  public static final byte LOCAL_HASHTABLE_PUT_CO = 29;
 }
