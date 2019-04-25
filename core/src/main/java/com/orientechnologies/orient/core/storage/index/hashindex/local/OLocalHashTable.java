@@ -6,6 +6,7 @@ import com.orientechnologies.common.util.OCommonConst;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.exception.OLocalHashTableException;
+import com.orientechnologies.orient.core.exception.ONonEmptyComponentCanNotBeRemovedException;
 import com.orientechnologies.orient.core.exception.OTooBigIndexKeyException;
 import com.orientechnologies.orient.core.index.OIndexException;
 import com.orientechnologies.orient.core.index.engine.OBaseIndexEngine;
@@ -1036,6 +1037,10 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
     try {
       acquireExclusiveLock();
       try {
+        if (size() > 0) {
+          throw new ONonEmptyComponentCanNotBeRemovedException(getName() + " : Only empty hash tables can be removed");
+        }
+
         directory.delete();
         deleteFile(fileStateId);
         deleteFile(fileId);
