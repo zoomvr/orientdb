@@ -65,10 +65,8 @@ public final class OAtomicOperation {
   }
 
   public void addComponentOperation(final OComponentOperationRecord componentOperation) {
-    if (!rollback) {
-      componentOperation.setOperationUnitId(operationUnitId);
-      pendingComponentOperations.add(componentOperation);
-    }
+    componentOperation.setOperationUnitId(operationUnitId);
+    pendingComponentOperations.add(componentOperation);
   }
 
   public OOperationUnitId getOperationUnitId() {
@@ -135,10 +133,12 @@ public final class OAtomicOperation {
     }
     rollbackInProgress = false;
 
-    pendingComponentOperations.clear();
-
     final OLogSequenceNumber lsn;
     if (useWAL && writeAheadLog != null) {
+      for (OComponentOperationRecord operationRecord : pendingComponentOperations) {
+        writeAheadLog.log(operationRecord);
+      }
+
       lsn = writeAheadLog.logAtomicOperationEndRecord(getOperationUnitId(), true, this.startLSN, getMetadata());
     } else {
       lsn = null;

@@ -121,7 +121,7 @@ public final class OPaginatedClusterUpdateRecordCO extends OComponentOperationRe
   @Override
   public int serializedSize() {
     return super.serializedSize() + 5 * OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE + 2 * OByteSerializer.BYTE_SIZE
-        + recordContent.length;
+        + recordContent.length + oldRecordContent.length;
   }
 
   @Override
