@@ -1,5 +1,7 @@
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster;
 
+import com.orientechnologies.common.serialization.types.OByteSerializer;
+import com.orientechnologies.common.serialization.types.OShortSerializer;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.OComponentOperationRecord;
@@ -19,14 +21,29 @@ public class OPaginatedClusterAllocatePositionCO extends OComponentOperationReco
     this.recordType = recordType;
   }
 
+  public int getClusterId() {
+    return clusterId;
+  }
+
+  public byte getRecordType() {
+    return recordType;
+  }
+
   @Override
   protected void serializeToByteBuffer(final ByteBuffer buffer) {
-    //do nothing
+    buffer.putShort((short) clusterId);
+    buffer.put(recordType);
   }
 
   @Override
   protected void deserializeFromByteBuffer(final ByteBuffer buffer) {
-    //do nothing
+    this.clusterId = buffer.getShort();
+    this.recordType = buffer.get();
+  }
+
+  @Override
+  public int serializedSize() {
+    return super.serializedSize() + OShortSerializer.SHORT_SIZE + OByteSerializer.BYTE_SIZE;
   }
 
   @Override

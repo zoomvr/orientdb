@@ -39,5 +39,6 @@ public class OPaginatedClusterCreateRecordCOSerializationTest {
     Assert.assertEquals(recordVersion, restoredCreateRecordCO.getRecordVersion());
     Assert.assertEquals(recordType, restoredCreateRecordCO.getRecordType());
     Assert.assertEquals(allocatedPosition, restoredCreateRecordCO.getAllocatedPosition());
+    Assert.assertEquals(recordPosition, restoredCreateRecordCO.getRecordPosition());
   }
 }

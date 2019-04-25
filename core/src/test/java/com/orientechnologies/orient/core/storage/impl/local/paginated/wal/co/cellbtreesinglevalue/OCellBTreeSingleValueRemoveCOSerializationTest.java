@@ -41,6 +41,7 @@ public class OCellBTreeSingleValueRemoveCOSerializationTest {
     Assert.assertEquals(indexId, restoredCO.getIndexId());
     Assert.assertEquals(encryptionName, restoredCO.getEncryptionName());
     Assert.assertArrayEquals(key, restoredCO.getKey());
+    Assert.assertEquals(prevValue, restoredCO.getPrevValue());
   }
 
   @Test
@@ -73,6 +74,7 @@ public class OCellBTreeSingleValueRemoveCOSerializationTest {
     Assert.assertEquals(operationUnitId, restoredCO.getOperationUnitId());
     Assert.assertEquals(indexId, restoredCO.getIndexId());
     Assert.assertEquals(encryptionName, restoredCO.getEncryptionName());
+    Assert.assertEquals(prevValue, restoredCO.getPrevValue());
     Assert.assertArrayEquals(key, restoredCO.getKey());
   }
 }

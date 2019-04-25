@@ -63,6 +63,18 @@ public final class OPaginatedClusterUpdateRecordCO extends OComponentOperationRe
     return recordType;
   }
 
+  byte[] getOldRecordContent() {
+    return oldRecordContent;
+  }
+
+  int getOldRecordVersion() {
+    return oldRecordVersion;
+  }
+
+  byte getOldRecordType() {
+    return oldRecordType;
+  }
+
   @Override
   public void undo(final OAbstractPaginatedStorage storage) throws IOException {
     storage.updateRecordInternal(clusterId, clusterPosition, oldRecordContent, oldRecordVersion, oldRecordType);
@@ -78,6 +90,12 @@ public final class OPaginatedClusterUpdateRecordCO extends OComponentOperationRe
 
     buffer.putInt(recordVersion);
     buffer.put(recordType);
+
+    buffer.putInt(oldRecordContent.length);
+    buffer.put(oldRecordContent);
+
+    buffer.putInt(oldRecordVersion);
+    buffer.put(oldRecordType);
   }
 
   @Override
@@ -91,11 +109,18 @@ public final class OPaginatedClusterUpdateRecordCO extends OComponentOperationRe
 
     recordVersion = buffer.getInt();
     recordType = buffer.get();
+
+    final int oldRecordContentLen = buffer.getInt();
+    oldRecordContent = new byte[oldRecordContentLen];
+    buffer.get(oldRecordContent);
+
+    oldRecordVersion = buffer.getInt();
+    oldRecordType = buffer.get();
   }
 
   @Override
   public int serializedSize() {
-    return super.serializedSize() + 3 * OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE + OByteSerializer.BYTE_SIZE
+    return super.serializedSize() + 5 * OIntegerSerializer.INT_SIZE + OLongSerializer.LONG_SIZE + 2 * OByteSerializer.BYTE_SIZE
         + recordContent.length;
   }
 

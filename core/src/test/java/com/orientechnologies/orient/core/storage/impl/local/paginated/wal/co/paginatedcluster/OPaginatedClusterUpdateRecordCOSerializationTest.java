@@ -48,8 +48,12 @@ public class OPaginatedClusterUpdateRecordCOSerializationTest {
     Assert.assertEquals(clusterPosition, restoredUpdateRecordCO.getClusterPosition());
 
     Assert.assertArrayEquals(recordContent, restoredUpdateRecordCO.getRecordContent());
+    Assert.assertArrayEquals(oldRecordContent, restoredUpdateRecordCO.getOldRecordContent());
 
     Assert.assertEquals(recordVersion, restoredUpdateRecordCO.getRecordVersion());
     Assert.assertEquals(recordType, restoredUpdateRecordCO.getRecordType());
+
+    Assert.assertEquals(oldRecordVersion, restoredUpdateRecordCO.getOldRecordVersion());
+    Assert.assertEquals(oldRecordType, restoredUpdateRecordCO.getOldRecordType());
   }
 }

@@ -39,6 +39,10 @@ public class OSBTreePutCO extends OAbstractIndexCO {
     return value;
   }
 
+  public byte[] getPrevValue() {
+    return prevValue;
+  }
+
   @Override
   public void redo(final OAbstractPaginatedStorage storage) {
     final Object key = deserializeKey(storage);
@@ -85,6 +89,14 @@ public class OSBTreePutCO extends OAbstractIndexCO {
 
     buffer.putInt(value.length);
     buffer.put(value);
+
+    if (prevValue == null) {
+      buffer.put((byte) 0);
+    } else {
+      buffer.put((byte) 1);
+      buffer.putInt(prevValue.length);
+      buffer.put(prevValue);
+    }
   }
 
   @Override
@@ -97,11 +109,18 @@ public class OSBTreePutCO extends OAbstractIndexCO {
 
     this.value = new byte[valueLen];
     buffer.get(this.value);
+
+    if (buffer.get() > 0) {
+      final int prevValueLen = buffer.getInt();
+      prevValue = new byte[prevValueLen];
+      buffer.get(prevValue);
+    }
   }
 
   @Override
   public int serializedSize() {
-    return super.serializedSize() + OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + value.length;
+    return super.serializedSize() + 2 * OByteSerializer.BYTE_SIZE + OIntegerSerializer.INT_SIZE + value.length + (
+        prevValue != null ? (OIntegerSerializer.INT_SIZE + prevValue.length) : 0);
   }
 
   @Override

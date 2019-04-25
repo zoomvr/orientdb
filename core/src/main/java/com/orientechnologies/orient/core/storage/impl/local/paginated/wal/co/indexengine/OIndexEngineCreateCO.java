@@ -110,6 +110,10 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     return nullValuesSupport;
   }
 
+  public int getIndexId() {
+    return indexId;
+  }
+
   @Override
   public void redo(final OAbstractPaginatedStorage storage) throws IOException {
     final OBinarySerializerFactory binarySerializerFactory = OBinarySerializerFactory.getInstance();
@@ -163,6 +167,7 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     }
 
     buffer.put(nullValuesSupport ? (byte) 1 : (byte) 0);
+    buffer.putInt(indexId);
   }
 
   @Override
@@ -202,6 +207,7 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     }
 
     nullValuesSupport = buffer.get() == 1;
+    indexId = buffer.getInt();
   }
 
   @Override
@@ -225,6 +231,7 @@ public class OIndexEngineCreateCO extends OComponentOperationRecord {
     }
 
     size += OByteSerializer.BYTE_SIZE;
+    size += OIntegerSerializer.INT_SIZE;
 
     return super.serializedSize() + size;
   }

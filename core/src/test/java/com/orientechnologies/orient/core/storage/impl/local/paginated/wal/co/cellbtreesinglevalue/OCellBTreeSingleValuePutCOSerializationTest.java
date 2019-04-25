@@ -47,6 +47,7 @@ public class OCellBTreeSingleValuePutCOSerializationTest {
     Assert.assertEquals(keySerializerId, restoredCO.getKeySerializerId());
     Assert.assertEquals(indexId, restoredCO.getIndexId());
     Assert.assertEquals(encryptionName, restoredCO.getEncryptionName());
+    Assert.assertEquals(oldValue, restoredCO.getOldValue());
   }
 
   @Test
@@ -86,5 +87,6 @@ public class OCellBTreeSingleValuePutCOSerializationTest {
     Assert.assertEquals(keySerializerId, restoredCO.getKeySerializerId());
     Assert.assertEquals(indexId, restoredCO.getIndexId());
     Assert.assertEquals(encryptionName, restoredCO.getEncryptionName());
+    Assert.assertEquals(oldValue, restoredCO.getOldValue());
   }
 }

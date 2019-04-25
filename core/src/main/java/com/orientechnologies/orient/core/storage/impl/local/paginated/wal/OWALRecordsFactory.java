@@ -29,9 +29,12 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cel
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValuePutCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValueRemoveCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineCreateCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineDeleteCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterAllocatePositionCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateRecordCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteRecordCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterUpdateRecordCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreePutCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreeRemoveCO;
@@ -53,6 +56,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_SINGLE_VALUE_PUT_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_SINGLE_VALUE_REMOVE_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CHECKPOINT_END_RECORD;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_ALLOCATE_RECORD_POSITION_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_CREATE_RECORD_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_DELETE_RECORD_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_UPDATE_RECORD_CO;
@@ -65,6 +69,7 @@ import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_END_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_START_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_CREATE_CO;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_DELETE_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.NON_TX_OPERATION_PERFORMED_WAL_RECORD;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_PUT_CO;
 import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_REMOVE_CO;
@@ -174,17 +179,23 @@ public final class OWALRecordsFactory {
     case DELETE_CLUSTER_CO:
       walRecord = new OPaginatedClusterDeleteCO();
       break;
-    case CLUSTER_CREATE_RECORD_CO:
-      walRecord = new OPaginatedClusterCreateRecordCO();
+    case CLUSTER_ALLOCATE_RECORD_POSITION_CO:
+      walRecord = new OPaginatedClusterAllocatePositionCO();
       break;
-    case CLUSTER_DELETE_RECORD_CO:
+    case CLUSTER_CREATE_RECORD_CO:
       walRecord = new OPaginatedClusterCreateRecordCO();
       break;
     case CLUSTER_UPDATE_RECORD_CO:
       walRecord = new OPaginatedClusterUpdateRecordCO();
       break;
+    case CLUSTER_DELETE_RECORD_CO:
+      walRecord = new OPaginatedClusterDeleteRecordCO();
+      break;
     case INDEX_ENGINE_CREATE_CO:
       walRecord = new OIndexEngineCreateCO();
+      break;
+    case INDEX_ENGINE_DELETE_CO:
+      walRecord = new OIndexEngineDeleteCO();
       break;
     case CELL_BTREE_SINGLE_VALUE_PUT_CO:
       walRecord = new OCellBTreeSingleValuePutCO();

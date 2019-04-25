@@ -1,6 +1,7 @@
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue;
 
 import com.orientechnologies.common.exception.OException;
+import com.orientechnologies.common.serialization.types.OByteSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.common.serialization.types.OShortSerializer;
 import com.orientechnologies.orient.core.exception.OInvalidIndexEngineIdException;
@@ -33,6 +34,10 @@ public class OCellBTreeSingleValuePutCO extends OAbstractIndexCO {
     return value;
   }
 
+  public ORID getOldValue() {
+    return oldValue;
+  }
+
   @Override
   public void redo(final OAbstractPaginatedStorage storage) throws IOException {
     final Object deserializedKey = deserializeKey(storage);
@@ -62,8 +67,17 @@ public class OCellBTreeSingleValuePutCO extends OAbstractIndexCO {
   @Override
   protected void serializeToByteBuffer(final ByteBuffer buffer) {
     super.serializeToByteBuffer(buffer);
+
     buffer.putShort((short) value.getClusterId());
     buffer.putLong(value.getClusterPosition());
+
+    if (oldValue == null) {
+      buffer.put((byte) 0);
+    } else {
+      buffer.put((byte) 1);
+      buffer.putShort((short) oldValue.getClusterId());
+      buffer.putLong(oldValue.getClusterPosition());
+    }
   }
 
   @Override
@@ -74,6 +88,13 @@ public class OCellBTreeSingleValuePutCO extends OAbstractIndexCO {
     final long clusterPosition = buffer.getLong();
 
     this.value = new ORecordId(clusterId, clusterPosition);
+
+    if (buffer.get() == 1) {
+      final int oldClusterId = buffer.getShort();
+      final long oldClusterPosition = buffer.getLong();
+
+      this.oldValue = new ORecordId(oldClusterId, oldClusterPosition);
+    }
   }
 
   @Override
@@ -83,6 +104,7 @@ public class OCellBTreeSingleValuePutCO extends OAbstractIndexCO {
 
   @Override
   public int serializedSize() {
-    return super.serializedSize() + OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE;
+    return super.serializedSize() + OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE + OByteSerializer.BYTE_SIZE + (
+        oldValue != null ? (OShortSerializer.SHORT_SIZE + OLongSerializer.LONG_SIZE) : 0);
   }
 }

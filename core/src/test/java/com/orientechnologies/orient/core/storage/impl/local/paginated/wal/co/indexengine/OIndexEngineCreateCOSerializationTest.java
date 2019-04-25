@@ -37,9 +37,11 @@ public class OIndexEngineCreateCOSerializationTest {
 
     final boolean nullValuesSupport = true;
 
+    final int indexId = 12;
+
     OIndexEngineCreateCO indexEngineCreateCO = new OIndexEngineCreateCO(engineName, algorithm, indexType, keySerializerId,
         valueSerializerId, isAutomatic, version, apiVersion, multiValue, engineProperties, keySize, keyTypes, nullValuesSupport,
-        12);
+        indexId);
 
     indexEngineCreateCO.setOperationUnitId(operationUnitId);
 
@@ -64,6 +66,7 @@ public class OIndexEngineCreateCOSerializationTest {
     Assert.assertEquals(apiVersion, restoredIndexEngineCreateCO.getApiVersion());
     Assert.assertEquals(multiValue, restoredIndexEngineCreateCO.isMultiValue());
     Assert.assertEquals(engineProperties, restoredIndexEngineCreateCO.getEngineProperties());
+    Assert.assertEquals(indexId, restoredIndexEngineCreateCO.getIndexId());
 
     Assert.assertEquals(keySize, restoredIndexEngineCreateCO.getKeySize());
     Assert.assertArrayEquals(keyTypes, restoredIndexEngineCreateCO.getKeyTypes());
@@ -94,9 +97,11 @@ public class OIndexEngineCreateCOSerializationTest {
 
     final boolean nullValuesSupport = true;
 
+    final int indexId = 12;
+
     OIndexEngineCreateCO indexEngineCreateCO = new OIndexEngineCreateCO(engineName, algorithm, indexType, keySerializerId,
         valueSerializerId, isAutomatic, version, apiVersion, multiValue, engineProperties, keySize, keyTypes, nullValuesSupport,
-        12);
+        indexId);
 
     indexEngineCreateCO.setOperationUnitId(operationUnitId);
 
@@ -120,6 +125,8 @@ public class OIndexEngineCreateCOSerializationTest {
     Assert.assertEquals(version, restoredIndexEngineCreateCO.getVersion());
     Assert.assertEquals(apiVersion, restoredIndexEngineCreateCO.getApiVersion());
     Assert.assertEquals(multiValue, restoredIndexEngineCreateCO.isMultiValue());
+    Assert.assertEquals(indexId, restoredIndexEngineCreateCO.getIndexId());
+
     Assert.assertEquals(Collections.emptyMap(), restoredIndexEngineCreateCO.getEngineProperties());
 
     Assert.assertEquals(keySize, restoredIndexEngineCreateCO.getKeySize());

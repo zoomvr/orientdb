@@ -51,6 +51,10 @@ public class OPaginatedClusterCreateRecordCO extends OComponentOperationRecord {
     return allocatedPosition;
   }
 
+  public long getRecordPosition() {
+    return recordPosition;
+  }
+
   @Override
   public void undo(final OAbstractPaginatedStorage storage) throws IOException {
     storage.deleteRecordInternal(clusterId, recordPosition);
@@ -69,6 +73,7 @@ public class OPaginatedClusterCreateRecordCO extends OComponentOperationRecord {
     buffer.put(recordType);
     buffer.putInt(recordVersion);
     buffer.putLong(allocatedPosition);
+    buffer.putLong(recordPosition);
   }
 
   @Override
@@ -82,12 +87,13 @@ public class OPaginatedClusterCreateRecordCO extends OComponentOperationRecord {
     recordType = buffer.get();
     recordVersion = buffer.getInt();
     allocatedPosition = buffer.getLong();
+    recordPosition = buffer.getLong();
   }
 
   @Override
   public int serializedSize() {
     return super.serializedSize() + 3 * OIntegerSerializer.INT_SIZE + recordContent.length + OByteSerializer.BYTE_SIZE
-        + OLongSerializer.LONG_SIZE;
+        + 2 * OLongSerializer.LONG_SIZE;
   }
 
   @Override
