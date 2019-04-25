@@ -386,29 +386,6 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
   }
 
   @Override
-  public void clear() throws IOException {
-    boolean rollback = false;
-    startAtomicOperation(true);
-    try {
-      acquireExclusiveLock();
-      try {
-        if (nullKeyIsSupported) {
-          truncateFile(nullBucketFileId);
-        }
-
-        initHashTreeState();
-      } finally {
-        releaseExclusiveLock();
-      }
-    } catch (final Exception e) {
-      rollback = true;
-      throw e;
-    } finally {
-      endAtomicOperation(rollback);
-    }
-  }
-
-  @Override
   public OHashIndexBucket.Entry<K, V>[] higherEntries(final K key) {
     return higherEntries(key, -1);
   }

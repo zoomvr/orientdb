@@ -60,14 +60,39 @@ public class LocalHashTableIterationTestIT {
 
   @After
   public void afterClass() throws Exception {
-    localHashTable.clear();
+    OHashIndexBucket.Entry<Integer, String> entry = localHashTable.firstEntry();
+    if (entry != null) {
+      localHashTable.remove(entry.key);
+
+      OHashIndexBucket.Entry<Integer, String>[] entries = localHashTable.higherEntries(entry.key);
+      while (entries.length > 0) {
+        for (OHashIndexBucket.Entry<Integer, String> se : entries) {
+          localHashTable.remove(se.key);
+        }
+
+        entries = localHashTable.higherEntries(entries[entries.length - 1].key);
+      }
+    }
+
     localHashTable.delete();
     databaseDocumentTx.drop();
   }
 
   @After
   public void afterMethod() throws Exception {
-    localHashTable.clear();
+    OHashIndexBucket.Entry<Integer, String> entry = localHashTable.firstEntry();
+    if (entry != null) {
+      localHashTable.remove(entry.key);
+
+      OHashIndexBucket.Entry<Integer, String>[] entries = localHashTable.higherEntries(entry.key);
+      while (entries.length > 0) {
+        for (OHashIndexBucket.Entry<Integer, String> se : entries) {
+          localHashTable.remove(se.key);
+        }
+
+        entries = localHashTable.higherEntries(entries[entries.length - 1].key);
+      }
+    }
   }
 
   @Test

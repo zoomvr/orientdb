@@ -214,8 +214,21 @@ public final class OAutoShardingIndexEngine implements OIndexEngine {
   public void clear() {
     try {
       if (partitions != null)
-        for (OHashTable<Object, Object> p : partitions)
-          p.clear();
+        for (OHashTable<Object, Object> p : partitions) {
+          OHashIndexBucket.Entry<Object, Object> entry = p.firstEntry();
+          if (entry != null) {
+            p.remove(entry.key);
+
+            OHashIndexBucket.Entry<Object, Object>[] entries = p.higherEntries(entry.key);
+            while (entries.length > 0) {
+              for (OHashIndexBucket.Entry<Object, Object> se : entries) {
+                p.remove(se.key);
+              }
+
+              entries = p.higherEntries(entries[entries.length - 1].key);
+            }
+          }
+        }
     } catch (IOException e) {
       throw OException.wrapException(new OIndexException("Error during clear of index with name " + name), e);
     }

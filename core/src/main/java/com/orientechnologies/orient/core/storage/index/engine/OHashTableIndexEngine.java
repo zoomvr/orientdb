@@ -66,7 +66,7 @@ public final class OHashTableIndexEngine implements OIndexEngine {
   private final int version;
 
   private final String name;
-  private final int id;
+  private final int    id;
 
   public OHashTableIndexEngine(final int id, String name, OAbstractPaginatedStorage storage, int version) {
     this.id = id;
@@ -97,7 +97,8 @@ public final class OHashTableIndexEngine implements OIndexEngine {
 
   @Override
   public void create(OBinarySerializer valueSerializer, boolean isAutomatic, OType[] keyTypes, boolean nullPointerSupport,
-      OBinarySerializer keySerializer, int keySize, Map<String, String> engineProperties, OEncryption encryption) throws IOException {
+      OBinarySerializer keySerializer, int keySize, Map<String, String> engineProperties, OEncryption encryption)
+      throws IOException {
     final OHashFunction<Object> hashFunction;
 
     if (encryption != null) {
@@ -155,7 +156,19 @@ public final class OHashTableIndexEngine implements OIndexEngine {
 
   @Override
   public void clear() throws IOException {
-    hashTable.clear();
+    OHashIndexBucket.Entry<Object, Object> entry = hashTable.firstEntry();
+    if (entry != null) {
+      hashTable.remove(entry.key);
+
+      OHashIndexBucket.Entry<Object, Object>[] entries = hashTable.higherEntries(entry.key);
+      while (entries.length > 0) {
+        for (OHashIndexBucket.Entry<Object, Object> se : entries) {
+          hashTable.remove(se.key);
+        }
+
+        entries = hashTable.higherEntries(entries[entries.length - 1].key);
+      }
+    }
   }
 
   @Override

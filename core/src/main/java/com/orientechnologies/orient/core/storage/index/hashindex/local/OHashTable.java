@@ -54,8 +54,6 @@ public interface OHashTable<K, V> {
 
   V remove(K key) throws IOException;
 
-  void clear() throws IOException;
-
   OHashIndexBucket.Entry<K, V>[] higherEntries(K key);
 
   OHashIndexBucket.Entry<K, V>[] higherEntries(K key, int limit);
