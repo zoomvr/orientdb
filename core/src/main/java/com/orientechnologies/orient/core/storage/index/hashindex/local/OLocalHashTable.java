@@ -16,6 +16,7 @@ import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedSt
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.localhashtable.OLocalHashTablePutCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.localhashtable.OLocalHashTableRemoveCO;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -268,7 +269,7 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
   @Override
   public V remove(K key) throws IOException {
     boolean rollback = false;
-    startAtomicOperation(true);
+    final OAtomicOperation atomicOperation = startAtomicOperation(true);
     try {
       acquireExclusiveLock();
       try {
@@ -318,6 +319,12 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
             changeSize(sizeDiff);
           }
 
+          if (removed != null) {
+            atomicOperation.addComponentOperation(
+                new OLocalHashTableRemoveCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(),
+                    keySerializer.serializeNativeAsWhole(key), valueSerializer.serializeNativeAsWhole(removed),
+                    valueSerializer.getId()));
+          }
           return removed;
         } else {
           if (getFilledUpTo(nullBucketFileId) == 0) {
@@ -344,6 +351,12 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
           }
 
           changeSize(sizeDiff);
+
+          if (removed != null) {
+            atomicOperation.addComponentOperation(
+                new OLocalHashTableRemoveCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(), null,
+                    valueSerializer.serializeNativeAsWhole(removed), valueSerializer.getId()));
+          }
 
           return removed;
         }
