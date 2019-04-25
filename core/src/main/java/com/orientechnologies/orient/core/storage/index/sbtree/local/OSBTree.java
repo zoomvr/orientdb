@@ -355,7 +355,7 @@ public class OSBTree<K, V> extends ODurableComponent {
             if (indexId >= 0) {
               atomicOperation.addComponentOperation(
                   new OSBTreePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(), rawKey,
-                      valueSerializer.getId(), serializeValue));
+                      valueSerializer.getId(), serializeValue, oldRawValue));
             }
           } else if (updatedValue.isRemove()) {
             if (indexId >= 0) {
@@ -395,9 +395,10 @@ public class OSBTree<K, V> extends ODurableComponent {
 
           try {
             final ONullBucket<V> nullBucket = new ONullBucket<>(cacheEntry, valueSerializer, isNew);
-            final OSBTreeValue<V> oldValue = nullBucket.getValue();
-            final V oldValueValue = oldValue == null ? null : readValue(oldValue);
-            final OIndexUpdateAction<V> updatedValue = updater.update(oldValueValue, bonsayFileId);
+            final byte[] oldRawValue = nullBucket.getRawValue();
+            final V oldValue = oldRawValue == null ? null : valueSerializer.deserializeNativeObject(oldRawValue, 0);
+
+            final OIndexUpdateAction<V> updatedValue = updater.update(oldValue, bonsayFileId);
             if (updatedValue.isChange()) {
               final V value = updatedValue.getValue();
               final int valueSize = valueSerializer.getObjectSize(value);
@@ -413,7 +414,7 @@ public class OSBTree<K, V> extends ODurableComponent {
 
               if (validator != null) {
 
-                final Object result = validator.validate(null, oldValueValue, value);
+                final Object result = validator.validate(null, oldValue, value);
                 if (result == OBaseIndexEngine.Validator.IGNORE) {
                   return false;
                 }
@@ -432,7 +433,7 @@ public class OSBTree<K, V> extends ODurableComponent {
 
                 atomicOperation.addComponentOperation(
                     new OSBTreePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(), null,
-                        valueSerializer.getId(), serializeValue));
+                        valueSerializer.getId(), serializeValue, oldRawValue));
               }
             } else if (updatedValue.isRemove()) {
               final V removedValue = removeNullBucket();

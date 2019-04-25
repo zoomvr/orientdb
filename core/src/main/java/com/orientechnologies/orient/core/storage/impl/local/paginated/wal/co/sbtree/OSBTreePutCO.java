@@ -17,15 +17,18 @@ public class OSBTreePutCO extends OAbstractIndexCO {
   private byte   valueSerializerId;
   private byte[] value;
 
+  private byte[] prevValue;
+
   public OSBTreePutCO() {
   }
 
   public OSBTreePutCO(final int indexId, final String encryptionName, final byte keySerializerId, final byte[] key,
-      final byte valueSerializerId, final byte[] value) {
+      final byte valueSerializerId, final byte[] value, final byte[] prevValue) {
     super(indexId, encryptionName, keySerializerId, key);
 
     this.value = value;
     this.valueSerializerId = valueSerializerId;
+    this.prevValue = prevValue;
   }
 
   public byte getValueSerializerId() {
@@ -53,7 +56,12 @@ public class OSBTreePutCO extends OAbstractIndexCO {
     final Object key = deserializeKey(storage);
 
     try {
-      storage.removeKeyFromIndexInternal(indexId, key);
+      if (prevValue == null) {
+        storage.removeKeyFromIndexInternal(indexId, key);
+      } else {
+
+        storage.putIndexValueInternal(indexId, key, deserializePrevValue());
+      }
     } catch (OInvalidIndexEngineIdException e) {
       throw OException.wrapException(new OStorageException("Can not undo operation for index with id " + indexId), e);
     }
@@ -62,6 +70,11 @@ public class OSBTreePutCO extends OAbstractIndexCO {
   private Object deserializeValue() {
     final OBinarySerializer valueSerializer = OBinarySerializerFactory.getInstance().getObjectSerializer(valueSerializerId);
     return valueSerializer.deserializeNativeObject(value, 0);
+  }
+
+  private Object deserializePrevValue() {
+    final OBinarySerializer valueSerializer = OBinarySerializerFactory.getInstance().getObjectSerializer(valueSerializerId);
+    return valueSerializer.deserializeNativeObject(prevValue, 0);
   }
 
   @Override

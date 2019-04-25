@@ -22,7 +22,7 @@ public class OSBTreePutCOSerializationTest {
 
     final byte keySerializerId = 10;
 
-    OSBTreePutCO co = new OSBTreePutCO(indexId, null, keySerializerId, null, valueSerializerId, value);
+    OSBTreePutCO co = new OSBTreePutCO(indexId, null, keySerializerId, null, valueSerializerId, value, null);
     co.setOperationUnitId(operationUnitId);
 
     final int size = co.serializedSize();
