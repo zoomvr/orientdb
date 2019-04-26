@@ -19,7 +19,6 @@
  */
 package com.tinkerpop.blueprints.impls.orient;
 
-import com.orientechnologies.orient.client.remote.OStorageRemote;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.OPartitionedDatabasePool;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
@@ -379,7 +378,6 @@ public class OrientGraphFactory extends OrientConfigurableGraph {
       if (txActive) {
         // REOPEN IT AGAIN
         db.begin();
-        db.getTransaction().setUsingLog(settings.isUseLog());
       }
 
     }

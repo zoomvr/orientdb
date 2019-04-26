@@ -30,7 +30,6 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.storage.OBasicTransaction;
 import com.orientechnologies.orient.core.storage.OStorage;
 
-import java.util.HashMap;
 import java.util.List;
 
 public interface OTransaction extends OBasicTransaction {
@@ -112,19 +111,6 @@ public interface OTransaction extends OBasicTransaction {
 
   @Deprecated
   void clearIndexEntries();
-
-  boolean isUsingLog();
-
-  /**
-   * If you set this flag to false, you are unable to
-   * <ol>
-   * <li>Rollback data changes in case of exception</li>
-   * <li>Restore data in case of server crash</li>
-   * </ol>
-   * <p>
-   * So you practically unable to work in multithreaded environment and keep data consistent.
-   */
-  void setUsingLog(boolean useLog);
 
   void close();
 

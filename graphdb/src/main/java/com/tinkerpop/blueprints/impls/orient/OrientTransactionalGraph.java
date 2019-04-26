@@ -20,16 +20,14 @@
 
 package com.tinkerpop.blueprints.impls.orient;
 
-import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import org.apache.commons.configuration.Configuration;
-
 import com.orientechnologies.common.log.OLogManager;
+import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.OPartitionedDatabasePool;
-import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
 import com.orientechnologies.orient.core.exception.OTransactionException;
 import com.orientechnologies.orient.core.tx.OTransaction.TXSTATUS;
 import com.orientechnologies.orient.core.tx.OTransactionNoTx;
 import com.tinkerpop.blueprints.TransactionalGraph;
+import org.apache.commons.configuration.Configuration;
 
 /**
  * A Blueprints implementation of the graph database OrientDB (http://orientdb.com)
@@ -212,7 +210,6 @@ public abstract class OrientTransactionalGraph extends OrientBaseGraph implement
           + "Disable auto transactions for the graph before starting a manual transaction.");
 
     getDatabase().begin();
-    getDatabase().getTransaction().setUsingLog(settings.isUseLog());
   }
 
   @Override
@@ -228,7 +225,6 @@ public abstract class OrientTransactionalGraph extends OrientBaseGraph implement
 
     if (!txBegun) {
       getDatabase().begin();
-      getDatabase().getTransaction().setUsingLog(settings.isUseLog());
     }
   }
 
@@ -236,7 +232,6 @@ public abstract class OrientTransactionalGraph extends OrientBaseGraph implement
     final boolean txBegun = getDatabase().getTransaction().isActive();
     if (!txBegun) {
       getDatabase().begin();
-      getDatabase().getTransaction().setUsingLog(settings.isUseLog());
     }
   }
 

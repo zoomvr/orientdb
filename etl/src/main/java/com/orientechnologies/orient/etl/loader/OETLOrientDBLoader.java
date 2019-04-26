@@ -27,7 +27,11 @@ import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.exception.OConfigurationException;
 import com.orientechnologies.orient.core.exception.OSchemaException;
 import com.orientechnologies.orient.core.index.OIndex;
-import com.orientechnologies.orient.core.metadata.schema.*;
+import com.orientechnologies.orient.core.metadata.schema.OClass;
+import com.orientechnologies.orient.core.metadata.schema.OClassImpl;
+import com.orientechnologies.orient.core.metadata.schema.OProperty;
+import com.orientechnologies.orient.core.metadata.schema.OSchema;
+import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.storage.ORecordDuplicatedException;
@@ -95,7 +99,6 @@ public class OETLOrientDBLoader extends OETLAbstractLoader implements OETLLoader
     if (tx) {
       if (!db.getTransaction().isActive()) {
         db.begin();
-        db.getTransaction().setUsingLog(txUseLog);
       }
     }
 
@@ -140,7 +143,6 @@ public class OETLOrientDBLoader extends OETLAbstractLoader implements OETLLoader
           log(Level.FINE, "committing document batch %d", progress.get());
           db.commit();
           db.begin();
-          db.getTransaction().setUsingLog(txUseLog);
           batchCounter.set(0);
         }
       }

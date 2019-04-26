@@ -41,7 +41,12 @@ import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionOptimistic;
 import com.orientechnologies.orient.core.tx.OTransactionRecordIndexOperation;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 public class OTransactionOptimisticProxy extends OTransactionOptimistic {
@@ -59,7 +64,6 @@ public class OTransactionOptimisticProxy extends OTransactionOptimistic {
       List<ORecordOperationRequest> operations, ODocument indexChanges, short protocolVersion, ORecordSerializer serializer) {
     super(database);
     clientTxId = id;
-    setUsingLog(usingLong);
     this.operations = operations;
     this.indexChanges = indexChanges;
     this.protocolVersion = protocolVersion;

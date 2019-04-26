@@ -74,13 +74,6 @@ public interface OTransactionInternal extends OBasicTransaction {
   void updateIdentityAfterCommit(ORID oldRID, ORID rid);
 
   /**
-   * Retrieve if log is enabled for the transaction
-   *
-   * @return
-   */
-  boolean isUsingLog();
-
-  /**
    * Extract a single change from a specified record id.
    *
    * @param currentRid the record id for the change.
