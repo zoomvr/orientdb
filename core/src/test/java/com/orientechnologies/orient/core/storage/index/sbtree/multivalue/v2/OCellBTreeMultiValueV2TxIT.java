@@ -56,7 +56,7 @@ public class OCellBTreeMultiValueV2TxIT {
 
     storage = (OAbstractPaginatedStorage) (((ODatabaseInternal) databaseDocumentTx).getStorage());
     final int indexId = storage.loadIndexEngine("TestIndex");
-    storage.checkIndexEngineType(indexId, OCellBTreeMultiValueV2.class);
+    Assert.assertTrue(storage.checkIndexEngineType(indexId, OCellBTreeMultiValueV2.class));
     databaseDocumentTx.close();
   }
 

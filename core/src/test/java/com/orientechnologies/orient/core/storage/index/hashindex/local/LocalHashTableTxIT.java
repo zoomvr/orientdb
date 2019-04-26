@@ -1,4 +1,4 @@
-package com.orientechnologies.orient.core.storage.index.sbtree.local;
+package com.orientechnologies.orient.core.storage.index.hashindex.local;
 
 import com.orientechnologies.common.exception.OHighLevelException;
 import com.orientechnologies.common.io.OFileUtils;
@@ -17,7 +17,7 @@ import com.orientechnologies.orient.core.sql.executor.OResult;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.txapprover.OTxApprover;
-import com.orientechnologies.orient.core.storage.index.engine.OSBTreeIndexEngine;
+import com.orientechnologies.orient.core.storage.index.engine.OHashTableIndexEngine;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -28,7 +28,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public class SBTreeTxIT {
+public class LocalHashTableTxIT {
   private OrientDB orientDB;
 
   private String dbName;
@@ -38,9 +38,9 @@ public class SBTreeTxIT {
   @Before
   public void before() throws Exception {
     final String buildDirectory =
-        System.getProperty("buildDirectory", "./target") + File.separator + SBTreeTxIT.class.getSimpleName();
+        System.getProperty("buildDirectory", "./target") + File.separator + LocalHashTableTxIT.class.getSimpleName();
 
-    dbName = "localSBTreeTXTest";
+    dbName = "localHashTableTXTest";
     final File dbDirectory = new File(buildDirectory, dbName);
     OFileUtils.deleteRecursively(dbDirectory);
 
@@ -51,18 +51,23 @@ public class SBTreeTxIT {
 
     final OClass cls = databaseDocumentTx.createClass("TestClass");
     cls.createProperty("prop", OType.STRING);
-    cls.createIndex("TestIndex", OClass.INDEX_TYPE.NOTUNIQUE.toString(), null, null, "SBTREE", new String[] { "prop" });
+    cls.createIndex("TestIndex", OClass.INDEX_TYPE.NOTUNIQUE_HASH_INDEX, "prop");
 
     final OClass cls2 = databaseDocumentTx.createClass("TestClassTwo");
     cls2.createProperty("prop", OType.STRING);
-    cls2.createIndex("TestIndex2", OClass.INDEX_TYPE.UNIQUE.toString(), null, null, "SBTREE", new String[] { "prop" });
+    cls2.createIndex("TestIndex2", OClass.INDEX_TYPE.UNIQUE_HASH_INDEX, "prop");
 
     storage = (OAbstractPaginatedStorage) (((ODatabaseInternal) databaseDocumentTx).getStorage());
     final int indexIdOne = storage.loadIndexEngine("TestIndex");
-    Assert.assertTrue(storage.checkIndexEngineType(indexIdOne, OSBTreeIndexEngine.class));
+    Assert.assertTrue(storage.checkIndexEngineType(indexIdOne, OHashTableIndexEngine.class));
 
     final int indexIdTwo = storage.loadIndexEngine("TestIndex2");
-    Assert.assertTrue(storage.checkIndexEngineType(indexIdTwo, OSBTreeIndexEngine.class));
+    Assert.assertTrue(storage.checkIndexEngineType(indexIdTwo, OHashTableIndexEngine.class));
+
+    databaseDocumentTx.command("create index TestIndex3 DICTIONARY_HASH_INDEX STRING");
+
+    final int indexIdThree = storage.loadIndexEngine("TestIndex3");
+    Assert.assertTrue(storage.checkIndexEngineType(indexIdThree, OHashTableIndexEngine.class));
 
     databaseDocumentTx.close();
   }
@@ -75,7 +80,7 @@ public class SBTreeTxIT {
 
   @Test
   public void testKeyPut() {
-    final int cycles = 100_000;
+    final int cycles = 1_000_000;
 
     try (ODatabaseSession session = orientDB.open(dbName, "admin", "admin")) {
       for (int i = 0; i < cycles; i++) {
@@ -446,6 +451,62 @@ public class SBTreeTxIT {
         } else {
           Assert.assertTrue(rids.isEmpty());
         }
+      }
+    }
+  }
+
+  @Test
+  public void testUpdateValue() {
+    final int entriesCount = 1_000_000;
+
+    try (ODatabaseSession session = orientDB.open(dbName, "admin", "admin")) {
+      final List<ORID> savedRids = new ArrayList<>();
+
+      final OIndexManager indexManager = session.getMetadata().getIndexManager();
+      final OIndex index = indexManager.getIndex("TestIndex3");
+
+      for (int i = 0; i < entriesCount; i++) {
+        final ODocument document = new ODocument("TestClass");
+        document.save();
+
+        savedRids.add(document.getIdentity());
+        index.put(String.valueOf(i), document.getIdentity());
+      }
+
+      for (int i = 0; i < entriesCount / 10; i++) {
+        if (i % 2 == 0) {
+          storage.setTxApprover(new GoTxApprover());
+        } else {
+          storage.setTxApprover(new NoGoTxApprover());
+        }
+
+        session.begin();
+        try {
+          for (int n = 0; n < 10; n++) {
+            final int k = i * 10 + n;
+            final String key = String.valueOf(k);
+            index.put(key, savedRids.get(savedRids.size() - k - 1));
+          }
+          session.commit();
+        } catch (NoGoException e) {
+          //skip
+        }
+      }
+
+      for (int i = 0; i < entriesCount / 10; i++) {
+        for (int n = 0; n < 10; n++) {
+          final int k = i * 10 + n;
+          final String key = String.valueOf(k);
+
+          final ORID orid = (ORID) index.get(key);
+
+          if (i % 2 == 0) {
+            Assert.assertEquals(savedRids.get(savedRids.size() - k - 1), orid);
+          } else {
+            Assert.assertEquals(savedRids.get(k), orid);
+          }
+        }
+
       }
     }
   }

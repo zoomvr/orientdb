@@ -50,7 +50,7 @@ public class OCellBtreeSingleValueTxIT {
 
     storage = (OAbstractPaginatedStorage) (((ODatabaseInternal) databaseDocumentTx).getStorage());
     final int indexId = storage.loadIndexEngine("TestIndex");
-    storage.checkIndexEngineType(indexId, OCellBTreeSingleValue.class);
+    Assert.assertTrue(storage.checkIndexEngineType(indexId, OCellBTreeSingleValue.class));
     databaseDocumentTx.close();
   }
 

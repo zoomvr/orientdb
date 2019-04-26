@@ -1215,20 +1215,11 @@ public class OLocalHashTable<K, V> extends ODurableComponent implements OHashTab
         if (index > -1) {
           final int updateResult = bucket.updateEntry(index, value);
           if (updateResult == 0) {
-            changeSize(sizeDiff);
-
-            atomicOperation.addComponentOperation(
-                new OLocalHashTablePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(),
-                    keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes), valueSerializer.getId(),
-                    valueSerializer.serializeNativeAsWhole(value),
-                    oldValue != null ? valueSerializer.serializeNativeAsWhole(oldValue) : null));
-
+            //we already keep entry with given key-value.
             return true;
           }
 
           if (updateResult == 1) {
-            changeSize(sizeDiff);
-
             atomicOperation.addComponentOperation(
                 new OLocalHashTablePutCO(indexId, encryption != null ? encryption.name() : null, keySerializer.getId(),
                     keySerializer.serializeNativeAsWhole(key, (Object[]) keyTypes), valueSerializer.getId(),
