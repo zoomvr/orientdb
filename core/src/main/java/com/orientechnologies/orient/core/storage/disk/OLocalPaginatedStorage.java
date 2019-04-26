@@ -193,6 +193,11 @@ public class OLocalPaginatedStorage extends OAbstractPaginatedStorage {
   }
 
   @Override
+  public boolean isDiskBased() {
+    return true;
+  }
+
+  @Override
   public String getURL() {
     return OEngineLocalPaginated.NAME + ":" + url;
   }

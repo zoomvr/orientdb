@@ -19,16 +19,19 @@
  */
 package com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations;
 
+import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OWriteableWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.OComponentOperationRecord;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,9 +44,12 @@ import java.util.Set;
  * @since 12/3/13
  */
 public final class OAtomicOperation {
+  private static final int IN_MEMORY_TX_SIZE_LIMIT = OGlobalConfiguration.STORAGE_IN_MEMORY_TX_SIZE_LIMIT.getValueAsInteger();
+
   private final OLogSequenceNumber        startLSN;
   private final OOperationUnitId          operationUnitId;
   private final OAbstractPaginatedStorage storage;
+  private final OWriteAheadLog            writeAheadLog;
 
   private int     startCounter;
   private boolean rollback;
@@ -53,20 +59,44 @@ public final class OAtomicOperation {
 
   private final Map<String, OAtomicOperationMetadata<?>> metadata = new LinkedHashMap<>();
 
-  private final List<OComponentOperationRecord> pendingComponentOperations = new ArrayList<>();
+  private final List<OComponentOperationRecord> pendingComponentOperations    = new ArrayList<>();
+  private final List<OLogSequenceNumber>        pendingComponentOperationLSNs = new ArrayList<>();
+
+  private boolean diskBasedStorage;
+  private int     inMemoryOperationSize;
 
   public OAtomicOperation(final OLogSequenceNumber startLSN, final OOperationUnitId operationUnitId,
       final OAbstractPaginatedStorage storage) {
     this.startLSN = startLSN;
     this.operationUnitId = operationUnitId;
     this.storage = storage;
+    this.writeAheadLog = storage.getWALInstance();
 
     startCounter = 1;
+
+    diskBasedStorage = storage.isDiskBased();
   }
 
-  public void addComponentOperation(final OComponentOperationRecord componentOperation) {
+  public void addComponentOperation(final OComponentOperationRecord componentOperation) throws IOException {
     componentOperation.setOperationUnitId(operationUnitId);
-    pendingComponentOperations.add(componentOperation);
+
+    if (diskBasedStorage) {
+      final OLogSequenceNumber lsn = writeAheadLog.log(componentOperation);
+      pendingComponentOperationLSNs.add(lsn);
+
+      inMemoryOperationSize += componentOperation.serializedSize();
+
+      if (inMemoryOperationSize < IN_MEMORY_TX_SIZE_LIMIT) {
+        pendingComponentOperations.add(componentOperation);
+      } else {
+        if (!pendingComponentOperations.isEmpty()) {
+          pendingComponentOperations.clear();
+        }
+      }
+    } else {
+      pendingComponentOperations.add(componentOperation);
+    }
+
   }
 
   public OOperationUnitId getOperationUnitId() {
@@ -101,48 +131,108 @@ public final class OAtomicOperation {
     return Collections.unmodifiableMap(metadata);
   }
 
-  OLogSequenceNumber commitTx(final OWriteAheadLog writeAheadLog, final boolean useWAL) throws IOException {
+  OLogSequenceNumber commitTx(final OWriteAheadLog writeAheadLog) throws IOException {
     assert !rollback;
 
     final OLogSequenceNumber lsn;
 
-    if (useWAL && writeAheadLog != null) {
-      for (OComponentOperationRecord operationRecord : pendingComponentOperations) {
-        writeAheadLog.log(operationRecord);
-      }
-
+    if (diskBasedStorage && writeAheadLog != null) {
       lsn = writeAheadLog.logAtomicOperationEndRecord(getOperationUnitId(), false, this.startLSN, getMetadata());
     } else {
       lsn = null;
     }
 
     pendingComponentOperations.clear();
+    pendingComponentOperationLSNs.clear();
+    inMemoryOperationSize = 0;
 
     return lsn;
   }
 
-  OLogSequenceNumber rollbackTx(final OWriteAheadLog writeAheadLog, final boolean useWAL) throws IOException {
+  OLogSequenceNumber rollbackTx(final OWriteAheadLog writeAheadLog) throws IOException {
     assert rollback;
 
-    final List<OComponentOperationRecord> operationsSnapshot = new ArrayList<>(pendingComponentOperations);
-    Collections.reverse(operationsSnapshot);
-
-    rollbackInProgress = true;
-    for (final OComponentOperationRecord operation : operationsSnapshot) {
-      operation.undo(storage);
-    }
-    rollbackInProgress = false;
-
     final OLogSequenceNumber lsn;
-    if (useWAL && writeAheadLog != null) {
-      for (OComponentOperationRecord operationRecord : pendingComponentOperations) {
-        writeAheadLog.log(operationRecord);
+    if (!diskBasedStorage) {
+      final List<OComponentOperationRecord> operationsSnapshot = new ArrayList<>(pendingComponentOperations);
+      Collections.reverse(operationsSnapshot);
+
+      rollbackInProgress = true;
+      for (final OComponentOperationRecord operation : operationsSnapshot) {
+        operation.undo(storage);
+      }
+      rollbackInProgress = false;
+
+      lsn = null;
+    } else {
+      final List<OComponentOperationRecord> operationsSnapshot;
+
+      if (!pendingComponentOperations.isEmpty()) {
+        operationsSnapshot = new ArrayList<>(pendingComponentOperations);
+      } else {
+        operationsSnapshot = new ArrayList<>(pendingComponentOperationLSNs.size());
+        final List<OLogSequenceNumber> lsnSnapshot = new ArrayList<>(pendingComponentOperationLSNs);
+        int operationsLeft = lsnSnapshot.size();
+
+        List<OWriteableWALRecord> walRecords = writeAheadLog.read(lsnSnapshot.get(0), operationsLeft);
+        if (walRecords.isEmpty()) {
+          throw new IllegalArgumentException("Can not fetch WAL records");
+        }
+
+        Iterator<OWriteableWALRecord> walIterator = walRecords.iterator();
+        final Iterator<OLogSequenceNumber> lsnIterator = lsnSnapshot.iterator();
+
+        OLogSequenceNumber coLSN = lsnIterator.next();
+
+        while (operationsLeft > 0) {
+          while (operationsLeft > 0 && walIterator.hasNext()) {
+            final OWriteableWALRecord walRecord = walIterator.next();
+
+            if (walRecord.getLsn().equals(coLSN)) {
+              operationsSnapshot.add((OComponentOperationRecord) walRecord);
+              operationsLeft--;
+
+              if (lsnIterator.hasNext()) {
+                assert operationsLeft > 0;
+                coLSN = lsnIterator.next();
+              } else {
+                assert operationsLeft == 0;
+              }
+            }
+          }
+
+          if (operationsLeft > 0) {
+            walRecords = writeAheadLog.next(operationsSnapshot.get(operationsSnapshot.size() - 1).getLsn(), operationsLeft);
+            if (walRecords.isEmpty()) {
+              throw new IllegalArgumentException("Can not fetch WAL records");
+            }
+
+            walIterator = walRecords.iterator();
+          }
+
+        }
+
+        assert operationsSnapshot.size() == lsnSnapshot.size();
+
       }
 
-      lsn = writeAheadLog.logAtomicOperationEndRecord(getOperationUnitId(), true, this.startLSN, getMetadata());
-    } else {
-      lsn = null;
+      Collections.reverse(operationsSnapshot);
+      rollbackInProgress = true;
+      for (final OComponentOperationRecord operation : operationsSnapshot) {
+        operation.undo(storage);
+      }
+      rollbackInProgress = false;
+
+      if (writeAheadLog != null) {
+        lsn = writeAheadLog.logAtomicOperationEndRecord(getOperationUnitId(), true, this.startLSN, getMetadata());
+      } else {
+        lsn = null;
+      }
     }
+
+    pendingComponentOperations.clear();
+    pendingComponentOperationLSNs.clear();
+    inMemoryOperationSize = 0;
 
     return lsn;
   }

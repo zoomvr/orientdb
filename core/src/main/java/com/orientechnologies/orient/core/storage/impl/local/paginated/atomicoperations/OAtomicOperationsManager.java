@@ -388,9 +388,9 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
           final boolean useWal = useWal();
 
           if (!operation.isRollback()) {
-            lsn = operation.commitTx(writeAheadLog, useWal);
+            lsn = operation.commitTx(writeAheadLog);
           } else {
-            lsn = operation.rollbackTx(writeAheadLog, useWal);
+            lsn = operation.rollbackTx(writeAheadLog);
           }
 
           if (trackAtomicOperations) {

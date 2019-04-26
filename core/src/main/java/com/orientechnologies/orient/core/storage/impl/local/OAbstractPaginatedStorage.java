@@ -477,6 +477,8 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
+  public abstract boolean isDiskBased();
+
   /**
    * This method is called by distributed storage during initialization to indicate that database is used in distributed cluster
    * configuration

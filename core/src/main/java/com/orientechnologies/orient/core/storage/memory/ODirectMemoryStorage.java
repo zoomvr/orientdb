@@ -106,6 +106,11 @@ public class ODirectMemoryStorage extends OAbstractPaginatedStorage {
   }
 
   @Override
+  public boolean isDiskBased() {
+    return false;
+  }
+
+  @Override
   public List<String> backup(final OutputStream out, final Map<String, Object> options, final Callable<Object> callable,
       final OCommandOutputListener iListener, final int compressionLevel, final int bufferSize) throws IOException {
     try {

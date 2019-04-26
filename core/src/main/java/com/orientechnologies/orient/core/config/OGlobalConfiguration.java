@@ -237,6 +237,10 @@ public enum OGlobalConfiguration {// ENVIRONMENT
       "If this flag is set metadata which contains rids of changed records is added at the end of each atomic operation",
       Boolean.class, false),
 
+  STORAGE_IN_MEMORY_TX_SIZE_LIMIT("storage.inMemoryTxSize.limit",
+      "Maximum size of the storage transaction till it will  be cached in memory to speed up rollbacks (in bytes)", Integer.class,
+      1024 * 1024),
+
   STORAGE_INTERNAL_JOURNALED_TX_STREAMING_PORT("storage.internal.journaled.tx.streaming.port", "Activates journaled tx streaming "
       + "on the given TCP/IP port. Used for internal testing purposes only. Never touch it if you don't know what you doing.",
       Integer.class, null),
@@ -257,7 +261,7 @@ public enum OGlobalConfiguration {// ENVIRONMENT
       65536),
 
   WAL_BUFFER_SIZE("storage.wal.bufferSize",
-      "Size of the direct memory WAL buffer which is used inside of " + "the background write thread (in MB)", Integer.class, 128),
+      "Size of the direct memory WAL buffer which is used inside of the background write thread (in MB)", Integer.class, 128),
 
   WAL_SEGMENTS_INTERVAL("storage.wal.segmentsInterval",
       "Maximum interval in time in min. after which new WAL segment will be added", Integer.class, 30),
@@ -1287,4 +1291,5 @@ public enum OGlobalConfiguration {// ENVIRONMENT
 
   public String getDescription() {
     return description;
-  }}
+  }
+}
