@@ -10,9 +10,12 @@ import com.orientechnologies.orient.core.metadata.security.ORole;
 import com.orientechnologies.orient.core.metadata.security.ORule;
 import com.orientechnologies.orient.core.metadata.security.OSecurityUser;
 import com.orientechnologies.orient.core.record.impl.ODocument;
-import com.orientechnologies.orient.core.storage.OAutoshardedStorage;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Callable;
 
 /**
@@ -466,13 +469,8 @@ public class OClassEmbedded extends OClassImpl {
   public OClass truncateCluster(String clusterName) {
     getDatabase().checkSecurity(ORule.ResourceGeneric.CLASS, ORole.PERMISSION_DELETE, name);
 
-    acquireSchemaReadLock();
-    try {
-      final ODatabaseDocumentInternal database = getDatabase();
-      truncateClusterInternal(clusterName, database);
-    } finally {
-      releaseSchemaReadLock();
-    }
+    final ODatabaseDocumentInternal database = getDatabase();
+    truncateClusterInternal(clusterName, database);
 
     return this;
   }

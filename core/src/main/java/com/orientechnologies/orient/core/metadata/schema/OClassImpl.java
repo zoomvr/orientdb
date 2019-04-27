@@ -19,7 +19,6 @@
  */
 package com.orientechnologies.orient.core.metadata.schema;
 
-import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.listener.OProgressListener;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.util.OArrays;
@@ -40,6 +39,8 @@ import com.orientechnologies.orient.core.index.OIndexDefinition;
 import com.orientechnologies.orient.core.index.OIndexDefinitionFactory;
 import com.orientechnologies.orient.core.index.OIndexException;
 import com.orientechnologies.orient.core.index.OIndexManager;
+import com.orientechnologies.orient.core.iterator.ORecordIteratorClass;
+import com.orientechnologies.orient.core.iterator.ORecordIteratorCluster;
 import com.orientechnologies.orient.core.metadata.schema.clusterselection.OClusterSelectionStrategy;
 import com.orientechnologies.orient.core.metadata.security.ORole;
 import com.orientechnologies.orient.core.metadata.security.ORule;
@@ -53,7 +54,6 @@ import com.orientechnologies.orient.core.storage.OCluster;
 import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -676,15 +676,11 @@ public abstract class OClassImpl implements OClass {
       throw new ODatabaseException("Cluster with name " + clusterName + " does not exist");
     }
 
-    try {
-      database.checkForClusterPermissions(clusterName);
-      cluster.truncate();
-    } catch (IOException e) {
-      throw OException.wrapException(new ODatabaseException("Error during truncate of cluster " + clusterName), e);
-    }
-
-    for (OIndex index : getIndexes()) {
-      index.rebuild();
+    database.checkForClusterPermissions(clusterName);
+    final ORecordIteratorCluster<ODocument> iteratorCluster = database.browseCluster(clusterName);
+    while (iteratorCluster.hasNext()) {
+      final ODocument document = iteratorCluster.next();
+      document.delete();
     }
   }
 
@@ -868,7 +864,7 @@ public abstract class OClassImpl implements OClass {
   /**
    * Truncates all the clusters the class uses.
    */
-  public void truncate() throws IOException {
+  public void truncate() {
     ODatabaseDocumentInternal db = getDatabase();
     db.checkSecurity(ORule.ResourceGeneric.CLASS, ORole.PERMISSION_UPDATE);
 
@@ -878,27 +874,12 @@ public abstract class OClassImpl implements OClass {
               + OSecurityShared.RESTRICTED_CLASSNAME + "')");
     }
 
-    final OStorage storage = db.getStorage();
-    acquireSchemaReadLock();
-    try {
-
-      for (int id : clusterIds) {
-        OCluster cl = storage.getClusterById(id);
-        db.checkForClusterPermissions(cl.getName());
-        cl.truncate();
-      }
-      for (OIndex<?> index : getClassIndexes())
-        index.clear();
-
-      Set<OIndex<?>> superclassIndexes = new HashSet<OIndex<?>>();
-      superclassIndexes.addAll(getIndexes());
-      superclassIndexes.removeAll(getClassIndexes());
-      for (OIndex index : superclassIndexes) {
-        index.rebuild();
-      }
-    } finally {
-      releaseSchemaReadLock();
+    final ORecordIteratorClass<ODocument> iteratorClass = db.browseClass(getName(), false);
+    while (iteratorClass.hasNext()) {
+      final ODocument document = iteratorClass.next();
+      document.delete();
     }
+
   }
 
   /**

@@ -21,7 +21,6 @@ import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.metadata.schema.clusterselection.OClusterSelectionStrategy;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -321,7 +320,7 @@ public abstract class OClassAbstractDelegate implements OClass {
   }
 
   @Override
-  public void truncate() throws IOException {
+  public void truncate() {
     delegate.truncate();
   }
 

@@ -19,7 +19,6 @@
  */
 package com.orientechnologies.orient.core.sql;
 
-import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.orient.core.cache.OCommandCache;
 import com.orientechnologies.orient.core.command.OCommandDistributedReplicateRequest;
 import com.orientechnologies.orient.core.command.OCommandRequest;
@@ -29,7 +28,6 @@ import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
@@ -139,17 +137,13 @@ public class OCommandExecutorSQLTruncateClass extends OCommandExecutorSQLAbstrac
       }
     }
 
-    try {
-      schemaClass.truncate();
-      invalidateCommandCache(schemaClass);
-      if (deep) {
-        for (OClass subclass : subclasses) {
-          subclass.truncate();
-          invalidateCommandCache(subclass);
-        }
+    schemaClass.truncate();
+    invalidateCommandCache(schemaClass);
+    if (deep) {
+      for (OClass subclass : subclasses) {
+        subclass.truncate();
+        invalidateCommandCache(subclass);
       }
-    } catch (IOException e) {
-      throw OException.wrapException(new OCommandExecutionException("Error on executing command"), e);
     }
 
     return recs;

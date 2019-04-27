@@ -2,7 +2,6 @@
 /* JavaCCOptions:MULTI=true,NODE_USES_PARSER=false,VISITOR=true,TRACK_TOKENS=true,NODE_PREFIX=O,NODE_EXTENDS=,NODE_FACTORY=,SUPPORT_CLASS_VISIBILITY_PUBLIC=true */
 package com.orientechnologies.orient.core.sql.parser;
 
-import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.orient.core.cache.OCommandCache;
 import com.orientechnologies.orient.core.command.OCommandContext;
 import com.orientechnologies.orient.core.db.ODatabase;
@@ -14,7 +13,6 @@ import com.orientechnologies.orient.core.sql.executor.OInternalResultSet;
 import com.orientechnologies.orient.core.sql.executor.OResultInternal;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
@@ -71,27 +69,22 @@ public class OTruncateClassStatement extends ODDLStatement {
       }
     }
 
-    try {
-      clazz.truncate();
-      OResultInternal result = new OResultInternal();
-      result.setProperty("operation", "truncate class");
-      result.setProperty("className", className.getStringValue());
-      rs.add(result);
-      invalidateCommandCache(clazz, db);
-      if (polymorphic) {
-        for (OClass subclass : subclasses) {
-          subclass.truncate();
-          result = new OResultInternal();
-          result.setProperty("operation", "truncate class");
-          result.setProperty("className", className.getStringValue());
-          rs.add(result);
-          invalidateCommandCache(subclass, db);
-        }
+    clazz.truncate();
+    OResultInternal result = new OResultInternal();
+    result.setProperty("operation", "truncate class");
+    result.setProperty("className", className.getStringValue());
+    rs.add(result);
+    invalidateCommandCache(clazz, db);
+    if (polymorphic) {
+      for (OClass subclass : subclasses) {
+        subclass.truncate();
+        result = new OResultInternal();
+        result.setProperty("operation", "truncate class");
+        result.setProperty("className", className.getStringValue());
+        rs.add(result);
+        invalidateCommandCache(subclass, db);
       }
-    } catch (IOException e) {
-      throw OException.wrapException(new OCommandExecutionException("Error on executing command"), e);
     }
-
 
     return rs;
   }

@@ -19,7 +19,6 @@
  */
 package com.orientechnologies.orient.core.sql;
 
-import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.orient.core.command.OCommandDistributedReplicateRequest;
 import com.orientechnologies.orient.core.command.OCommandRequest;
 import com.orientechnologies.orient.core.command.OCommandRequestText;
@@ -28,14 +27,15 @@ import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
+import com.orientechnologies.orient.core.iterator.ORecordIteratorCluster;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OSchema;
+import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.parser.OIdentifier;
 import com.orientechnologies.orient.core.sql.parser.OTruncateClusterStatement;
 import com.orientechnologies.orient.core.storage.OCluster;
 import com.orientechnologies.orient.core.storage.OStorage;
 
-import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -46,7 +46,7 @@ import java.util.Map;
 public class OCommandExecutorSQLTruncateCluster extends OCommandExecutorSQLAbstract implements OCommandDistributedReplicateRequest {
   public static final String KEYWORD_TRUNCATE = "TRUNCATE";
   public static final String KEYWORD_CLUSTER  = "CLUSTER";
-  private String             clusterName;
+  private             String clusterName;
 
   @SuppressWarnings("unchecked")
   public OCommandExecutorSQLTruncateCluster parse(final OCommandRequest iRequest) {
@@ -123,11 +123,11 @@ public class OCommandExecutorSQLTruncateCluster extends OCommandExecutorSQLAbstr
         throw new ODatabaseException("Cluster with name " + clusterName + " does not exist");
       }
 
-      try {
-        database.checkForClusterPermissions(cluster.getName());
-        cluster.truncate();
-      } catch (IOException ioe) {
-        throw OException.wrapException(new ODatabaseException("Error during truncation of cluster with name " + clusterName), ioe);
+      database.checkForClusterPermissions(cluster.getName());
+      final ORecordIteratorCluster<ODocument> iteratorCluster = database.browseCluster(cluster.getName());
+      while (iteratorCluster.hasNext()) {
+        final ODocument document = iteratorCluster.next();
+        document.delete();
       }
     } else {
       clazz.truncateCluster(clusterName);

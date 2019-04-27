@@ -24,7 +24,6 @@ import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.metadata.schema.clusterselection.OClusterSelectionStrategy;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -236,9 +235,8 @@ public interface OClass extends Comparable<OClass> {
   /**
    * Truncates all the clusters the class uses.
    *
-   * @throws IOException
    */
-  void truncate() throws IOException;
+  void truncate();
 
   /**
    * Tells if the current instance extends the passed schema class (iClass).

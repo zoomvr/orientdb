@@ -150,9 +150,6 @@ public class OClusterRemote implements OCluster {
     throw new UnsupportedOperationException("encryption");
   }
 
-  public void truncate() throws IOException {
-  }
-
   public OPhysicalPosition getPhysicalPosition(OPhysicalPosition iPPosition) throws IOException {
     return null;
   }

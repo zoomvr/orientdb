@@ -1092,11 +1092,6 @@ public final class OPaginatedClusterV0 extends OPaginatedCluster {
   }
 
   @Override
-  public void truncate() {
-    throw new UnsupportedOperationException("Cluster truncation is not supported because it is not durable");
-  }
-
-  @Override
   public OPhysicalPosition getPhysicalPosition(final OPhysicalPosition position) throws IOException {
     atomicOperationsManager.acquireReadLock(this);
     try {

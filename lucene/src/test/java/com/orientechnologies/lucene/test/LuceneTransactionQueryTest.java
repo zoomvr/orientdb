@@ -29,7 +29,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -132,11 +131,7 @@ public class LuceneTransactionQueryTest extends BaseLuceneTest {
 
     OIndex<?> index = db.getMetadata().getIndexManager().getIndex("C1.p1");
     OClass c1 = db.getMetadata().getSchema().getClass("C1");
-    try {
-      c1.truncate();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    c1.truncate();
 
     Assert.assertEquals(index.getSize(), 0);
 
@@ -211,11 +206,7 @@ public class LuceneTransactionQueryTest extends BaseLuceneTest {
 
     OIndex<?> index = db.getMetadata().getIndexManager().getIndex("C1.p1");
     OClass c1 = db.getMetadata().getSchema().getClass("C1");
-    try {
-      c1.truncate();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    c1.truncate();
 
     Assert.assertEquals(index.getSize(), 0);
 
