@@ -6,6 +6,7 @@ import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.OScenarioThreadLocal;
 import com.orientechnologies.orient.core.db.OSharedContext;
 import com.orientechnologies.orient.core.db.OrientDBConfig;
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentEmbedded;
 import com.orientechnologies.orient.core.db.record.OClassTrigger;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
@@ -46,13 +47,23 @@ import com.orientechnologies.orient.distributed.OrientDBDistributed;
 import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitContext;
 import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.coordinator.ddl.ODDLQuerySubmitRequest;
-import com.orientechnologies.orient.distributed.impl.coordinator.transaction.*;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OCreatedRecordResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OIndexOperationRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSequenceActionCoordinatorResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSequenceActionCoordinatorSubmit;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSessionOperationId;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OTransactionResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OTransactionSubmit;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OUpdatedRecordResponse;
 import com.orientechnologies.orient.distributed.impl.metadata.ODistributedContext;
 import com.orientechnologies.orient.distributed.impl.metadata.OSharedContextDistributed;
-import com.orientechnologies.orient.distributed.impl.metadata.OTransactionContext;
 import com.orientechnologies.orient.server.OServer;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -63,11 +74,11 @@ import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DIST
  */
 public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
-  private final String nodeName;
+  private final ONodeIdentity nodeIdentity;
 
-  public ODatabaseDocumentDistributed(OStorage storage, String nodeName) {
+  public ODatabaseDocumentDistributed(OStorage storage, ONodeIdentity nodeIdentity) {
     super(storage);
-    this.nodeName = nodeName;
+    this.nodeIdentity = nodeIdentity;
   }
 
   /**
@@ -76,7 +87,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
    * @return the name of local node in the cluster
    */
   public String getLocalNodeName() {
-    return nodeName;
+    return nodeIdentity.getName();
   }
 
   @Override
@@ -115,7 +126,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
   @Override
   public ODatabaseDocumentInternal copy() {
-    ODatabaseDocumentDistributed database = new ODatabaseDocumentDistributed(getStorage(), getLocalNodeName());
+    ODatabaseDocumentDistributed database = new ODatabaseDocumentDistributed(getStorage(), nodeIdentity);
     database.init(getConfig(), getSharedContext());
     String user;
     if (getUser() != null) {
@@ -151,21 +162,11 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
   @Override
   public void internalCommit(OTransactionInternal iTx) {
-    int protocolVersion = DISTRIBUTED_REPLICATION_PROTOCOL_VERSION.getValueAsInteger();
-    if (OScenarioThreadLocal.INSTANCE.isRunModeDistributed() || (iTx.isSequenceTransaction() && protocolVersion == 2)) {
+    if (OScenarioThreadLocal.INSTANCE.isRunModeDistributed() || iTx.isSequenceTransaction()) {
       //Exclusive for handling schema manipulation, remove after refactor for distributed schema
       super.internalCommit(iTx);
     } else {
-      switch (protocolVersion) {
-      case 1:
-        break;
-      case 2:
-        distributedCommitV2(iTx);
-        break;
-      default:
-        throw new IllegalStateException(
-            "Invalid distributed replicaiton protocol version: " + DISTRIBUTED_REPLICATION_PROTOCOL_VERSION.getValueAsInteger());
-      }
+      distributedCommitV2(iTx);
     }
   }
 
@@ -174,7 +175,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
     OSubmitContext submitContext = ((OSharedContextDistributed) getSharedContext()).getDistributedContext().getSubmitContext();
     OSessionOperationId id = new OSessionOperationId();
     id.init();
-    OSequenceActionCoordinatorSubmit submitAction = new OSequenceActionCoordinatorSubmit(action, getLocalNodeName());
+    OSequenceActionCoordinatorSubmit submitAction = new OSequenceActionCoordinatorSubmit(action);
     Future<OSubmitResponse> future = submitContext.send(id, submitAction);
     try {
       OSequenceActionCoordinatorResponse response = (OSequenceActionCoordinatorResponse) future.get();
@@ -254,18 +255,17 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   public void txFirstPhase(OSessionOperationId operationId, List<ORecordOperationRequest> operations,
       List<OIndexOperationRequest> indexes, boolean useDeltas) {
     OTransactionOptimisticDistributed tx = new OTransactionOptimisticDistributed(this, new ArrayList<>(), useDeltas);
-    OSharedContextDistributed sharedContext = (OSharedContextDistributed) getSharedContext();
-    sharedContext.getDistributedContext().registerTransaction(operationId, tx);
     tx.begin(operations, indexes);
-    firstPhaseDataChecks(false, tx);
+    firstPhaseDataChecks(tx);
   }
 
-  public OTransactionOptimisticDistributed txSecondPhase(OSessionOperationId operationId, boolean success) {
-    OSharedContextDistributed sharedContext = (OSharedContextDistributed) getSharedContext();
-    OTransactionContext context = sharedContext.getDistributedContext().getTransaction(operationId);
+  public OTransactionOptimisticDistributed txSecondPhase(OSessionOperationId operationId, List<ORecordOperationRequest> operations,
+      List<OIndexOperationRequest> indexes, boolean success) {
+    //MAKE delta be used by default
+    OTransactionOptimisticDistributed tx = new OTransactionOptimisticDistributed(this, new ArrayList<>(), false);
+    tx.begin(operations, indexes);
     try {
       if (success) {
-        OTransactionInternal tx = context.getTransaction();
         tx.setDatabase(this);
         ((OAbstractPaginatedStorage) this.getStorage().getUnderlying()).commitPreAllocated(tx);
         return (OTransactionOptimisticDistributed) tx;
@@ -275,27 +275,12 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
     } catch (OLowDiskSpaceException ex) {
       throw ex;
     } finally {
-      sharedContext.getDistributedContext().closeTransaction(operationId);
     }
     return null;
   }
 
-  public void internalCommit2pc(ONewDistributedTxContextImpl txContext) {
-    try {
-      OTransactionInternal tx = txContext.getTransaction();
-      ((OAbstractPaginatedStorage) this.getStorage().getUnderlying()).commitPreAllocated(tx);
-    } catch (OLowDiskSpaceException ex) {
-      throw ex;
-    } finally {
-      txContext.destroy();
-    }
-
-  }
-
-  private void firstPhaseDataChecks(boolean local, OTransactionInternal transaction) {
-    if (!local) {
-      ((OAbstractPaginatedStorage) getStorage().getUnderlying()).preallocateRids(transaction);
-    }
+  private void firstPhaseDataChecks(OTransactionInternal transaction) {
+    ((OAbstractPaginatedStorage) getStorage().getUnderlying()).preallocateRids(transaction);
 
     for (Map.Entry<String, OTransactionIndexChanges> change : transaction.getIndexOperations().entrySet()) {
       OIndex<?> index = getSharedContext().getIndexManager().getRawIndex(change.getKey());

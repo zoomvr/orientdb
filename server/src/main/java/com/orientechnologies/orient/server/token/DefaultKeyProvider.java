@@ -1,11 +1,10 @@
 package com.orientechnologies.orient.server.token;
 
-import java.security.Key;
-
-import javax.crypto.spec.SecretKeySpec;
-
 import com.orientechnologies.orient.core.metadata.security.jwt.OJwtHeader;
 import com.orientechnologies.orient.core.metadata.security.jwt.OKeyProvider;
+
+import javax.crypto.spec.SecretKeySpec;
+import java.security.Key;
 
 /**
  * Created by emrul on 28/09/2014.
@@ -14,22 +13,22 @@ import com.orientechnologies.orient.core.metadata.security.jwt.OKeyProvider;
  */
 public class DefaultKeyProvider implements OKeyProvider {
 
-  private SecretKeySpec secret_key;
+  private SecretKeySpec secretKey;
 
   public DefaultKeyProvider(byte[] secret) {
-    secret_key = new SecretKeySpec(secret, "HmacSHA256");
+    secretKey = new SecretKeySpec(secret, "HmacSHA256");
   }
 
   @Override
   public Key getKey(OJwtHeader header) {
-    return secret_key;
+    return secretKey;
   }
 
   @Override
   public String getDefaultKey() {
     return "default";
   }
-  
+
   @Override
   public String[] getKeys() {
     return new String[] { "default" };

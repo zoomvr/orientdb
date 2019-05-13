@@ -26,14 +26,26 @@ import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.serialization.types.OLongSerializer;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
-import com.orientechnologies.orient.core.db.record.*;
+import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import com.orientechnologies.orient.core.db.record.ORecordElement;
+import com.orientechnologies.orient.core.db.record.ORecordLazyList;
+import com.orientechnologies.orient.core.db.record.ORecordLazyMap;
+import com.orientechnologies.orient.core.db.record.ORecordLazyMultiValue;
+import com.orientechnologies.orient.core.db.record.ORecordLazySet;
+import com.orientechnologies.orient.core.db.record.OTrackedList;
+import com.orientechnologies.orient.core.db.record.OTrackedMap;
+import com.orientechnologies.orient.core.db.record.OTrackedSet;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBag;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.exception.OSerializationException;
 import com.orientechnologies.orient.core.exception.OValidationException;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.metadata.OMetadataInternal;
-import com.orientechnologies.orient.core.metadata.schema.*;
+import com.orientechnologies.orient.core.metadata.schema.OClass;
+import com.orientechnologies.orient.core.metadata.schema.OGlobalProperty;
+import com.orientechnologies.orient.core.metadata.schema.OImmutableSchema;
+import com.orientechnologies.orient.core.metadata.schema.OProperty;
+import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentEntry;
@@ -44,10 +56,40 @@ import com.orientechnologies.orient.core.util.ODateHelper;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeMap;
 
-import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.*;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.MILLISEC_PER_DAY;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.MapRecordInfo;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.NULL_RECORD_ID;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.RecordInfo;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.Tuple;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.convertDayToTimezone;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.getGlobalProperty;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.getTypeFromValueEmbedded;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.readBinary;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.readByte;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.readInteger;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.readLinkCollection;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.readLong;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.readOType;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.readOptimizedLink;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.readString;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.stringFromBytes;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.writeBinary;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.writeLinkCollection;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.writeNullLink;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.writeOType;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.writeOptimizedLink;
+import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.writeString;
 
 public class ORecordSerializerBinaryV0 implements ODocumentSerializer {
 
@@ -362,7 +404,7 @@ public class ORecordSerializerBinaryV0 implements ODocumentSerializer {
 
     int i = 0;
 
-    final Entry<String, ODocumentEntry> values[] = new Entry[fields.size()];
+    final Entry<String, ODocumentEntry>[] values = new Entry[fields.size()];
     for (Entry<String, ODocumentEntry> entry : fields) {
       ODocumentEntry docEntry = entry.getValue();
       if (!docEntry.exist())
@@ -440,7 +482,7 @@ public class ORecordSerializerBinaryV0 implements ODocumentSerializer {
     for (int i = 0; i < numberOfElements; i++) {
       OType keyType = readOType(bytes, false);
       String key = readString(bytes);
-      int valuePos = readInteger(bytes);      
+      int valuePos = readInteger(bytes);
       OType valueType = readOType(bytes, false);
       MapRecordInfo recordInfo = new MapRecordInfo();
       recordInfo.fieldStartOffset = valuePos;
@@ -475,7 +517,7 @@ public class ORecordSerializerBinaryV0 implements ODocumentSerializer {
 
       //read data type      
       OType dataType = readOType(bytes, false);
-      int fieldStart = bytes.offset;      
+      int fieldStart = bytes.offset;
 
       RecordInfo fieldInfo = new RecordInfo();
       fieldInfo.fieldStartOffset = fieldStart;
@@ -535,7 +577,7 @@ public class ORecordSerializerBinaryV0 implements ODocumentSerializer {
 
   protected Object deserializeValue(final BytesContainer bytes, final OType type, final ODocument ownerDocument,
       boolean embeddedAsDocument, int valueLengthInBytes, int serializerVersion, boolean justRunThrough) {
-    if (type == null){
+    if (type == null) {
       throw new ODatabaseException("Invalid type value: null");
     }
     Object value = null;
@@ -979,7 +1021,7 @@ public class ORecordSerializerBinaryV0 implements ODocumentSerializer {
   protected int writeEmbeddedMap(BytesContainer bytes, Map<Object, Object> map) {
     final int[] pos = new int[map.size()];
     int i = 0;
-    Entry<Object, Object> values[] = new Entry[map.size()];
+    Entry<Object, Object>[] values = new Entry[map.size()];
     final int fullPos = OVarIntSerializer.write(bytes, map.size());
     for (Entry<Object, Object> entry : map.entrySet()) {
       // TODO:check skip of complex types

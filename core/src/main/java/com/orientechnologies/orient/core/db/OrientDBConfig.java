@@ -19,11 +19,15 @@
  */
 package com.orientechnologies.orient.core.db;
 
-import java.util.*;
-
 import com.orientechnologies.orient.core.config.OContextConfiguration;
 import com.orientechnologies.orient.core.db.ODatabase.ATTRIBUTES;
 import com.orientechnologies.orient.core.db.config.ONodeConfiguration;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Created by tglman on 27/06/16.
@@ -38,7 +42,7 @@ public class OrientDBConfig {
   private Map<ATTRIBUTES, Object> attributes;
   private Set<ODatabaseListener>  listeners;
   private ClassLoader             classLoader;
-  private ONodeConfiguration      nodeConfiguration = ONodeConfiguration.builder().build();
+  private ONodeConfiguration      nodeConfiguration;
 
   protected OrientDBConfig() {
     configurations = new OContextConfiguration();
@@ -49,7 +53,7 @@ public class OrientDBConfig {
   }
 
   protected OrientDBConfig(OContextConfiguration configurations, Map<ATTRIBUTES, Object> attributes,
-      Set<ODatabaseListener> listeners, ClassLoader classLoader) {
+      Set<ODatabaseListener> listeners, ClassLoader classLoader, ONodeConfiguration nodeConfiguration) {
     this.configurations = configurations;
     this.attributes = attributes;
     parent = null;
@@ -61,6 +65,7 @@ public class OrientDBConfig {
       this.classLoader = classLoader;
     } else
       this.classLoader = this.getClass().getClassLoader();
+    this.nodeConfiguration = nodeConfiguration;
   }
 
   public static OrientDBConfig defaultConfig() {

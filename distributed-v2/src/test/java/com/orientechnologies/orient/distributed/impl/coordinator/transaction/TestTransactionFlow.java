@@ -4,6 +4,7 @@ import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.db.ODatabaseType;
 import com.orientechnologies.orient.core.db.OrientDB;
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.core.db.record.ORecordOperation;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OProperty;
@@ -12,14 +13,21 @@ import com.orientechnologies.orient.core.record.OElement;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionOptimistic;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
-import com.orientechnologies.orient.server.OServer;
 import com.orientechnologies.orient.distributed.impl.OIncrementOperationalLog;
-import com.orientechnologies.orient.distributed.impl.coordinator.*;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedChannel;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedCoordinator;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedMember;
+import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
+import com.orientechnologies.orient.distributed.impl.coordinator.ONodeRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.ONodeResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.coordinator.lock.ODistributedLockManagerImpl;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeRequest;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeResponse;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitResponse;
+import com.orientechnologies.orient.server.OServer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -30,6 +38,7 @@ import javax.management.MalformedObjectNameException;
 import javax.management.NotCompliantMBeanException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +58,8 @@ public class TestTransactionFlow {
       IllegalAccessException, InstanceAlreadyExistsException, NotCompliantMBeanException, ClassNotFoundException,
       MalformedObjectNameException {
     server0 = OServer.startFromClasspathConfig("orientdb-simple-dserver-config-0.xml");
-    ((OrientDBDistributed) server0.getDatabases())
-        .setCoordinator(((OrientDBDistributed) server0.getDatabases()).getNodeConfig().getNodeName());
+    OrientDBDistributed impl = (OrientDBDistributed) server0.getDatabases();
+    impl.setCoordinator(impl.getStructuralConfiguration().getCurrentNodeIdentity(), null);
     orientDB = server0.getContext();
     orientDB.create(TestTransactionFlow.class.getSimpleName(), ODatabaseType.MEMORY);
     try (ODatabaseSession session = orientDB.open(TestTransactionFlow.class.getSimpleName(), "admin", "admin")) {
@@ -90,7 +99,7 @@ public class TestTransactionFlow {
     ODistributedCoordinator coordinator = new ODistributedCoordinator(Executors.newSingleThreadExecutor(),
         new OIncrementOperationalLog(), new ODistributedLockManagerImpl(), new OMockAllocator());
     RecordChannel channel = new RecordChannel();
-    ODistributedMember member = new ODistributedMember("one", "test", channel);
+    ODistributedMember member = new ODistributedMember(new ONodeIdentity("one", "one"), "test", channel);
     coordinator.join(member);
 
     submit.begin(member, new OSessionOperationId(), coordinator);
@@ -100,7 +109,8 @@ public class TestTransactionFlow {
       ONodeResponse res = ops.execute(null, null, null, (ODatabaseDocumentInternal) session);
       assertEquals(((OTransactionFirstPhaseResult) res).getType(), OTransactionFirstPhaseResult.Type.SUCCESS);
     }
-    OTransactionSecondPhaseOperation second = new OTransactionSecondPhaseOperation(ops.getOperationId(), true);
+    OTransactionSecondPhaseOperation second = new OTransactionSecondPhaseOperation(ops.getOperationId(), new ArrayList<>(),
+        new ArrayList<>(), true);
     try (ODatabaseSession session = orientDB.open(TestTransactionFlow.class.getSimpleName(), "admin", "admin")) {
       ONodeResponse res = second.execute(null, null, null, (ODatabaseDocumentInternal) session);
       assertTrue(((OTransactionSecondPhaseResponse) res).isSuccess());

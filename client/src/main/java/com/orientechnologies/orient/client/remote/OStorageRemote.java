@@ -2151,7 +2151,7 @@ public class OStorageRemote extends OStorageAbstract implements OStorageProxy, O
   public void beginTransaction(ODatabaseDocumentRemote database, OTransactionOptimistic transaction) {
     OBeginTransactionRequest request = new OBeginTransactionRequest(transaction.getId(), true, true,
         transaction.getRecordOperations(), transaction.getIndexOperations());
-    OBeginTransactionResponse response = networkOperationNoRetry(request, "Error on remote treansaction begin");
+    OBeginTransactionResponse response = networkOperationNoRetry(request, "Error on remote transaction begin");
     for (Map.Entry<ORID, ORID> entry : response.getUpdatedIds().entrySet()) {
       transaction.updateIdentityAfterCommit(entry.getKey(), entry.getValue());
     }
@@ -2161,7 +2161,7 @@ public class OStorageRemote extends OStorageAbstract implements OStorageProxy, O
   public void reBeginTransaction(ODatabaseDocumentRemote database, OTransactionOptimistic transaction) {
     ORebeginTransactionRequest request = new ORebeginTransactionRequest(transaction.getId(), true,
         transaction.getRecordOperations(), transaction.getIndexOperations());
-    OBeginTransactionResponse response = networkOperationNoRetry(request, "Error on remote treansaction begin");
+    OBeginTransactionResponse response = networkOperationNoRetry(request, "Error on remote transaction begin");
     for (Map.Entry<ORID, ORID> entry : response.getUpdatedIds().entrySet()) {
       transaction.updateIdentityAfterCommit(entry.getKey(), entry.getValue());
     }

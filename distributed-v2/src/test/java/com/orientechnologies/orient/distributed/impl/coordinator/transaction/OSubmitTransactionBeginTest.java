@@ -1,9 +1,18 @@
 package com.orientechnologies.orient.distributed.impl.coordinator.transaction;
 
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.core.db.record.ORecordOperation;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.record.impl.ODocument;
-import com.orientechnologies.orient.distributed.impl.coordinator.*;
+import com.orientechnologies.orient.distributed.impl.coordinator.MockOperationLog;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedChannel;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedCoordinator;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedMember;
+import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
+import com.orientechnologies.orient.distributed.impl.coordinator.ONodeRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.ONodeResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.coordinator.lock.ODistributedLockManagerImpl;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeRequest;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeResponse;
@@ -26,15 +35,15 @@ public class OSubmitTransactionBeginTest {
         new ODistributedLockManagerImpl(), new OMockAllocator());
 
     MockDistributedChannel cOne = new MockDistributedChannel();
-    ODistributedMember mOne = new ODistributedMember("one", null, cOne);
+    ODistributedMember mOne = new ODistributedMember(new ONodeIdentity("one", "one"), null, cOne);
     coordinator.join(mOne);
 
     MockDistributedChannel cTwo = new MockDistributedChannel();
-    ODistributedMember mTwo = new ODistributedMember("two", null, cTwo);
+    ODistributedMember mTwo = new ODistributedMember(new ONodeIdentity("two", "two"), null, cTwo);
     coordinator.join(mTwo);
 
     MockDistributedChannel cThree = new MockDistributedChannel();
-    ODistributedMember mThree = new ODistributedMember("three", null, cThree);
+    ODistributedMember mThree = new ODistributedMember(new ONodeIdentity("three", "three"), null, cThree);
     coordinator.join(mThree);
 
     ArrayList<ORecordOperation> recordOps = new ArrayList<>();

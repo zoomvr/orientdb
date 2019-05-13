@@ -25,7 +25,13 @@ import com.orientechnologies.common.io.OIOUtils;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.command.OCommandOutputListener;
 
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -60,7 +66,8 @@ public class OZIPCompressionUtil {
     final ZipInputStream zin = new ZipInputStream(in);
     try {
       ZipEntry entry;
-      String name, dir;
+      String name;
+      String dir;
       while ((entry = zin.getNextEntry()) != null) {
         name = entry.getName();
 
@@ -72,7 +79,7 @@ public class OZIPCompressionUtil {
           mkdirs(outdir, name);
           continue;
         }
-        
+
         /*
          * this part is necessary because file entry can come before directory entry where is file located i.e.: /foo/foo.txt /foo/
          */
@@ -121,7 +128,7 @@ public class OZIPCompressionUtil {
     File f = new File(path);
     if (f.exists()) {
       if (f.isDirectory()) {
-        File f2[] = f.listFiles();
+        File[] f2 = f.listFiles();
         for (int i = 0; i < f2.length; i++) {
           addFolder(zos, f2[i].getAbsolutePath(), baseFolderName, iSkipFileExtensions, iOutput, iCompressedFiles);
         }

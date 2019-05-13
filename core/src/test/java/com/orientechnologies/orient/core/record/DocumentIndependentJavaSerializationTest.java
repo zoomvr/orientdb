@@ -8,7 +8,11 @@ import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import org.junit.Test;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 import static org.junit.Assert.assertEquals;
 
@@ -61,7 +65,7 @@ public class DocumentIndependentJavaSerializationTest {
       clazz.createProperty("test", OType.STRING);
       ObjectInputStream input = new ObjectInputStream(new ByteArrayInputStream(ser));
       ODocument doc1 = (ODocument) input.readObject();
-      assertEquals(doc1._recordFormat, db.getSerializer());
+      assertEquals(doc1.recordFormat, db.getSerializer());
       assertEquals(doc1.getClassName(), "Test");
       assertEquals(doc1.field("test"), "Some Value");
     } finally {

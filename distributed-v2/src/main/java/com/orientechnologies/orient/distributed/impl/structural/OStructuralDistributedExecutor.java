@@ -1,5 +1,6 @@
 package com.orientechnologies.orient.distributed.impl.structural;
 
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
 import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
 import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLog;
@@ -9,12 +10,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class OStructuralDistributedExecutor implements AutoCloseable {
+public class OStructuralDistributedExecutor implements AutoCloseable, OOperationContext {
 
-  private       OOperationLog                             operationLog;
-  private       ExecutorService                           executor;
-  private       OrientDBDistributed                       orientDB;
-  private final Map<String, OStructuralDistributedMember> members = new ConcurrentHashMap<>();
+  private       OOperationLog                                    operationLog;
+  private       ExecutorService                                  executor;
+  private       OrientDBDistributed                              orientDB;
+  private final Map<ONodeIdentity, OStructuralDistributedMember> members = new ConcurrentHashMap<>();
 
   public OStructuralDistributedExecutor(ExecutorService executor, OOperationLog operationLog, OrientDBDistributed orientDB) {
     this.operationLog = operationLog;
@@ -27,7 +28,7 @@ public class OStructuralDistributedExecutor implements AutoCloseable {
     executor.execute(() -> {
       operationLog.logReceived(opId, request);
       OStructuralNodeResponse response;
-      response = request.execute(member, opId, this, orientDB);
+      response = request.execute(this);
       member.sendResponse(opId, response);
     });
   }
@@ -43,14 +44,26 @@ public class OStructuralDistributedExecutor implements AutoCloseable {
   }
 
   public void join(OStructuralDistributedMember member) {
-    members.put(member.getName(), member);
+    members.put(member.getIdentity(), member);
   }
 
-  public OStructuralDistributedMember getMember(String senderNode) {
+  public OStructuralDistributedMember getMember(ONodeIdentity senderNode) {
     return members.get(senderNode);
   }
 
   public void leave(OStructuralDistributedMember member) {
-    members.remove(member.getName());
+    members.remove(member.getIdentity());
+  }
+
+  @Override
+  public OrientDBDistributed getOrientDB() {
+    return orientDB;
+  }
+
+  public void recover(OLogId logId, OStructuralNodeRequest request) {
+    executor.execute(() -> {
+      request.recover(this);
+    });
+
   }
 }

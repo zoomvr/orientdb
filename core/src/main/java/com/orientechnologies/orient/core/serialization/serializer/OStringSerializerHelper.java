@@ -38,7 +38,15 @@ import com.orientechnologies.orient.core.serialization.serializer.string.OString
 import com.orientechnologies.orient.core.sql.OCommandSQLParsingException;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 public abstract class OStringSerializerHelper {
   public static final char RECORD_SEPARATOR = ',';
@@ -595,7 +603,8 @@ public abstract class OStringSerializerHelper {
 
     boolean escape = false;
     char insideQuote = ' ';
-    int currentPos, deep;
+    int currentPos;
+    int deep;
     int maxPos = iText.length() - 1;
     for (currentPos = openPos + 1, deep = 1; deep > 0; currentPos++) {
       if (currentPos > maxPos)

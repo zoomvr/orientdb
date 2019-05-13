@@ -3,64 +3,32 @@ package com.orientechnologies.orient.distributed.impl;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.db.OSchedulerInternal;
 import com.orientechnologies.orient.core.db.config.ONodeConfiguration;
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimerTask;
 
 public abstract class ONodeManager {
-
-  protected static class Message {
-    static final int TYPE_PING          = 0;
-    static final int TYPE_LEAVE         = 1;
-    static final int TYPE_KNOWN_SERVERS = 2;
-
-    static final int TYPE_START_LEADER_ELECTION = 3;
-    static final int TYPE_VOTE_LEADER_ELECTION  = 4;
-    static final int TYPE_LEADER_ELECTED        = 5;
-
-    static final int ROLE_COORDINATOR = 0;
-    static final int ROLE_REPLICA     = 1;
-    static final int ROLE_UNDEFINED   = 2;
-
-    int    type;
-    String nodeName;
-    String group;
-    int    term;
-    int    role;
-    String connectionUsername;
-    String connectionPassword;
-
-    //for ping
-    int tcpPort;
-
-    // for leader election
-    String voteForNode;
-    String dbName;
-    long   lastLogId;
-
-    //MASTER INFO
-
-    String masterName;
-    int    masterTerm;
-    String masterAddress;
-    int    masterTcpPort;
-    String masterConnectionUsername;
-    String masterConnectionPassword;
-    long   masterPing;
-  }
 
   protected boolean running = true;
 
   protected final ODiscoveryListener discoveryListener;
   private         Thread             messageThread;
 
-  protected Map<String, ODiscoveryListener.NodeData> knownServers;
+  protected Map<ONodeIdentity, ODiscoveryListener.NodeData> knownServers;
 
   protected final ONodeConfiguration         config;
   protected final ONodeInternalConfiguration internalConfiguration;
@@ -77,6 +45,9 @@ public abstract class ONodeManager {
   protected long maxInactiveServerTimeMillis = 5000;
 
   OLeaderElectionStateMachine leaderStatus;
+  private TimerTask discoveryTimer;
+  private TimerTask disconnectTimer;
+  private TimerTask checkerTimer;
 
   public ONodeManager(ONodeConfiguration config, ONodeInternalConfiguration internalConfiguration, int term,
       OSchedulerInternal taskScheduler, ODiscoveryListener discoveryListener) {
@@ -86,14 +57,15 @@ public abstract class ONodeManager {
       throw new IllegalArgumentException("Invalid group name");
     }
 
-    if (config.getNodeName() == null || config.getNodeName().length() == 0) {
+    if (internalConfiguration.getNodeIdentity().getName() == null
+        || internalConfiguration.getNodeIdentity().getName().length() == 0) {
       throw new IllegalArgumentException("Invalid node name");
     }
     this.discoveryListener = discoveryListener;
     knownServers = new HashMap<>();
     this.taskScheduler = taskScheduler;
     leaderStatus = new OLeaderElectionStateMachine();
-    leaderStatus.nodeName = config.getNodeName();
+    leaderStatus.nodeIdentity = internalConfiguration.getNodeIdentity();
     leaderStatus.setQuorum(config.getQuorum());
     leaderStatus.changeTerm(term);
   }
@@ -115,8 +87,8 @@ public abstract class ONodeManager {
   protected abstract void sendMessageToGroup(byte[] msg) throws IOException;
 
   /**
-   * receives messages from the network. It is supposed to invoke {@link #processMessage(Message, String)} for each message
-   * received
+   * receives messages from the network. It is supposed to invoke {@link #processMessage(OBroadcastMessage, String)} for each
+   * message received
    */
   protected abstract void receiveMessages();
 
@@ -140,6 +112,17 @@ public abstract class ONodeManager {
 
   public void stop() {
     running = false;
+    checkerTimer.cancel();
+    disconnectTimer.cancel();
+    discoveryTimer.cancel();
+    try {
+      do {
+        messageThread.interrupt();
+        messageThread.join(1000);
+      } while (messageThread.isAlive());
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
   }
 
 
@@ -155,7 +138,7 @@ public abstract class ONodeManager {
    */
   protected void initReceiveMessages() throws IOException {
     messageThread = new Thread(() -> {
-      while (running) {
+      while (!Thread.interrupted()) {
         receiveMessages();
       }
     });
@@ -164,24 +147,24 @@ public abstract class ONodeManager {
     messageThread.start();
   }
 
-  protected synchronized void processMessage(Message message, String fromAddr) {
+  protected synchronized void processMessage(OBroadcastMessage message, String fromAddr) {
 //    System.out.println(
-//        "MSG toNode: " + this.nodeName + " fromNode: " + message.nodeName + " role: " + message.role + " term: " + message.term
-//            + " type: " + message.type + " master: " + message.masterName + " masterTerm: " + message.masterTerm+" masterPing: "+message.masterPing);
+//        "MSG toNode: " + this.config.getNodeName() + " fromNode: " + message.getNodeIdentity().getName() + " role: " + message.role + " term: " + message.term
+//            + " type: " + message.type + " master: " + message.masterIdentity + " masterTerm: " + message.masterTerm+" masterPing: "+message.masterPing);
     switch (message.type) {
-    case Message.TYPE_PING:
+    case OBroadcastMessage.TYPE_PING:
 //      System.out.println("" + nodeName + " - RECEIVE PING FROM " + message.nodeName);
       processReceivePing(message, fromAddr);
       break;
-    case Message.TYPE_START_LEADER_ELECTION:
+    case OBroadcastMessage.TYPE_START_LEADER_ELECTION:
 //      System.out.println("" + nodeName + " - RECEIVE START ELECTION FROM " + message.nodeName);
       processReceiveStartElection(message, fromAddr);
       break;
-    case Message.TYPE_VOTE_LEADER_ELECTION:
+    case OBroadcastMessage.TYPE_VOTE_LEADER_ELECTION:
 //      System.out.println("" + nodeName + " - RECEIVE VOTE LEADER FROM " + message.nodeName);
       processReceiveVote(message, fromAddr);
       break;
-    case Message.TYPE_LEADER_ELECTED:
+    case OBroadcastMessage.TYPE_LEADER_ELECTED:
 //      System.out.println("" + nodeName + " - RECEIVE LEADER ELECTED FROM " + message.nodeName);
       processReceiveLeaderElected(message, fromAddr);
       break;
@@ -197,7 +180,7 @@ public abstract class ONodeManager {
    * init the procedure that sends pings to other servers, ie. that notifies that you are alive
    */
   protected void initDiscoveryPing() {
-    taskScheduler.scheduleOnce(new TimerTask() {
+    discoveryTimer = new TimerTask() {
       @Override
       public void run() {
         try {
@@ -209,27 +192,29 @@ public abstract class ONodeManager {
           e.printStackTrace();
         }
       }
-    }, discoveryPingIntervalMillis);
+    };
+    taskScheduler.scheduleOnce(discoveryTimer, discoveryPingIntervalMillis);
   }
 
   protected void sendPing() throws Exception {
     if (!running) {
       return;
     }
-    Message ping = generatePingMessage();
+    OBroadcastMessage ping = generatePingMessage();
     byte[] msg = serializeMessage(ping);
     sendMessageToGroup(msg);
   }
 
-  protected synchronized Message generatePingMessage() {
+  protected synchronized OBroadcastMessage generatePingMessage() {
     //nodeData
-    Message message = new Message();
-    message.type = Message.TYPE_PING;
-    message.nodeName = this.config.getNodeName();
+    OBroadcastMessage message = new OBroadcastMessage();
+    message.type = OBroadcastMessage.TYPE_PING;
+    message.nodeIdentity = this.internalConfiguration.getNodeIdentity();
     message.group = this.config.getGroupName();
     message.term = leaderStatus.currentTerm;
-    message.role =
-        leaderStatus.status == OLeaderElectionStateMachine.Status.LEADER ? Message.ROLE_COORDINATOR : Message.ROLE_REPLICA;
+    message.role = leaderStatus.status == OLeaderElectionStateMachine.Status.LEADER ?
+        OBroadcastMessage.ROLE_COORDINATOR :
+        OBroadcastMessage.ROLE_REPLICA;
 
     message.connectionUsername = internalConfiguration.getConnectionUsername();
     message.connectionPassword = internalConfiguration.getConnectionPassword();
@@ -237,7 +222,7 @@ public abstract class ONodeManager {
     //masterData
     ODiscoveryListener.NodeData master = this.knownServers.values().stream().filter(x -> x.master).findFirst().orElse(null);
     if (master != null) {
-      message.masterName = master.name;
+      message.masterIdentity = master.getNodeIdentity();
       message.masterTerm = master.term;
       message.masterAddress = master.address;
       message.masterTcpPort = master.port;
@@ -249,43 +234,39 @@ public abstract class ONodeManager {
     return message;
   }
 
-  protected void processReceivePing(Message message, String fromAddr) {
+  protected void processReceivePing(OBroadcastMessage message, String fromAddr) {
     synchronized (knownServers) {
       if (leaderStatus.currentTerm > message.term) {
         return;
       }
       boolean wasLeader = false;
-      ODiscoveryListener.NodeData data = knownServers.get(message.nodeName);
+      ODiscoveryListener.NodeData data = knownServers.get(message.getNodeIdentity());
       if (data == null) {
-        data = new ODiscoveryListener.NodeData();
-        data.term = message.term;
-        data.name = message.nodeName;
+        data = message.toNodeData();
+        //TODO: this should be removed and should be get from the message
         data.address = fromAddr;
-        data.connectionUsername = message.connectionUsername;
-        data.connectionPassword = message.connectionPassword;
-        data.port = message.tcpPort;
-        knownServers.put(message.nodeName, data);
-        discoveryListener.nodeJoined(data);
+        knownServers.put(message.getNodeIdentity(), data);
+        discoveryListener.nodeConnected(data);
       } else if (data.master) {
         wasLeader = true;
       }
       data.lastPingTimestamp = System.currentTimeMillis();
       if (data.term < message.term) {
         data.term = message.term;
-        if (message.role == Message.ROLE_COORDINATOR) {
+        if (message.role == OBroadcastMessage.ROLE_COORDINATOR) {
           resetLeader();
           data.master = true;
         } else {
           data.master = false;
         }
         leaderStatus.changeTerm(message.term);
-        if (this.config.getNodeName().equals(message.masterName)) {
+        if (this.internalConfiguration.getNodeIdentity().equals(message.getNodeIdentity())) {
           leaderStatus.status = OLeaderElectionStateMachine.Status.LEADER;
         }
-      } else if (data.term == message.term && message.role == Message.ROLE_COORDINATOR) {
+      } else if (data.term == message.term && message.role == OBroadcastMessage.ROLE_COORDINATOR) {
         resetLeader();
         data.master = true;
-        if (!message.nodeName.equals(this.config.getNodeName())) {
+        if (!message.getNodeIdentity().equals(this.internalConfiguration.getNodeIdentity())) {
           leaderStatus.status = OLeaderElectionStateMachine.Status.FOLLOWER;
         }
       }
@@ -294,13 +275,13 @@ public abstract class ONodeManager {
       }
 
       //Master info
-      if (message.masterName != null && message.masterTerm >= this.leaderStatus.currentTerm
+      if (message.masterIdentity != null && message.masterTerm >= this.leaderStatus.currentTerm
           && message.masterPing + maxInactiveServerTimeMillis > System.currentTimeMillis()) {
-        data = knownServers.get(message.masterName);
+        data = knownServers.get(message.masterIdentity);
 
         if (data == null) {
           data = new ODiscoveryListener.NodeData();
-          data.name = message.masterName;
+          data.identity = message.masterIdentity;
           data.term = message.masterTerm;
           data.address = message.masterAddress;
           data.connectionUsername = message.masterConnectionUsername;
@@ -308,8 +289,8 @@ public abstract class ONodeManager {
           data.port = message.masterTcpPort;
           data.lastPingTimestamp = message.masterPing;
           data.master = true;
-          knownServers.put(message.masterName, data);
-          discoveryListener.nodeJoined(data);
+          knownServers.put(message.masterIdentity, data);
+          discoveryListener.nodeConnected(data);
           discoveryListener.leaderElected(data);
         }
 
@@ -328,7 +309,7 @@ public abstract class ONodeManager {
    * inits the procedure that checks if a server is no longer available, ie. if he did not ping for a long time
    */
   protected void initCheckDisconnect() {
-    taskScheduler.scheduleOnce(new TimerTask() {
+    disconnectTimer = new TimerTask() {
       public void run() {
         try {
           checkIfKnownServersAreAlive();
@@ -339,19 +320,20 @@ public abstract class ONodeManager {
           e.printStackTrace();
         }
       }
-    }, discoveryPingIntervalMillis);
+    };
+    taskScheduler.scheduleOnce(disconnectTimer, discoveryPingIntervalMillis);
   }
 
   private synchronized void checkIfKnownServersAreAlive() {
-    Set<String> toRemove = new HashSet<>();
-    for (Map.Entry<String, ODiscoveryListener.NodeData> entry : knownServers.entrySet()) {
+    Set<ONodeIdentity> toRemove = new HashSet<>();
+    for (Map.Entry<ONodeIdentity, ODiscoveryListener.NodeData> entry : knownServers.entrySet()) {
       if (entry.getValue().lastPingTimestamp < System.currentTimeMillis() - maxInactiveServerTimeMillis) {
         toRemove.add(entry.getKey());
       }
     }
     toRemove.forEach(x -> {
       ODiscoveryListener.NodeData val = knownServers.remove(x);
-      discoveryListener.nodeLeft(val);
+      discoveryListener.nodeDisconnected(val);
     });
   }
 
@@ -366,7 +348,7 @@ public abstract class ONodeManager {
    * init the procedure that sends pings to other servers, ie. that notifies that you are alive
    */
   private void initCheckLeader() {
-    taskScheduler.scheduleOnce(new TimerTask() {
+    checkerTimer = new TimerTask() {
       @Override
       public void run() {
         try {
@@ -378,7 +360,8 @@ public abstract class ONodeManager {
           e.printStackTrace();
         }
       }
-    }, checkLeaderIntervalMillis);
+    };
+    taskScheduler.scheduleOnce(checkerTimer, checkLeaderIntervalMillis);
   }
 
   private void checkLeader() {
@@ -418,25 +401,25 @@ public abstract class ONodeManager {
 
   protected void sendStartElection(int currentTerm, String dbName, long lastLogId) {
 //    System.out.println("" + this.nodeName + " * START ELECTION term " + currentTerm + " node " + nodeName);
-    Message message = new Message();
+    OBroadcastMessage message = new OBroadcastMessage();
     message.group = this.config.getGroupName();
-    message.nodeName = this.config.getNodeName();
+    message.nodeIdentity = this.internalConfiguration.getNodeIdentity();
     message.term = currentTerm;
     message.dbName = dbName;
     message.lastLogId = lastLogId;
-    message.type = Message.TYPE_START_LEADER_ELECTION;
+    message.type = OBroadcastMessage.TYPE_START_LEADER_ELECTION;
 
     try {
       byte[] msg = serializeMessage(message);
       sendMessageToGroup(msg);
     } catch (Exception e) {
-
+      e.printStackTrace();
     }
   }
 
-  private void processReceiveLeaderElected(Message message, String fromAddr) {
+  private void processReceiveLeaderElected(OBroadcastMessage message, String fromAddr) {
     if (message.term >= leaderStatus.currentTerm) {
-      if (!this.config.getNodeName().equals(message.nodeName)) {
+      if (!this.internalConfiguration.getNodeIdentity().equals(message.nodeIdentity)) {
         leaderStatus.setStatus(OLeaderElectionStateMachine.Status.FOLLOWER);
       } else {
         leaderStatus.setStatus(OLeaderElectionStateMachine.Status.LEADER);
@@ -444,7 +427,7 @@ public abstract class ONodeManager {
 
       resetLeader();
       ODiscoveryListener.NodeData data = new ODiscoveryListener.NodeData();
-      data.name = message.nodeName;
+      data.identity = message.nodeIdentity;
       data.master = true;
       data.term = message.term;
       data.address = fromAddr;
@@ -453,31 +436,31 @@ public abstract class ONodeManager {
       data.port = message.tcpPort;
       data.lastPingTimestamp = System.currentTimeMillis();
 
-      ODiscoveryListener.NodeData oldEntry = this.knownServers.put(data.name, data);
+      ODiscoveryListener.NodeData oldEntry = this.knownServers.put(data.getNodeIdentity(), data);
       if (oldEntry == null) {
-        discoveryListener.nodeJoined(data);
+        discoveryListener.nodeConnected(data);
       }
 
       discoveryListener.leaderElected(data);
     }
   }
 
-  protected void processReceiveStartElection(Message message, String fromAddr) {
+  protected void processReceiveStartElection(OBroadcastMessage message, String fromAddr) {
     if (message.term > leaderStatus.currentTerm && message.term > leaderStatus.lastTermVoted) {
       //vote, but only once per term!
       leaderStatus.setStatus(OLeaderElectionStateMachine.Status.FOLLOWER);
       leaderStatus.lastTermVoted = message.term;
-      sendVote(message.term, message.nodeName);
+      sendVote(message.term, message.nodeIdentity);
     }
   }
 
-  private void sendVote(int term, String toNode) {
-    Message message = new Message();
+  private void sendVote(int term, ONodeIdentity toNode) {
+    OBroadcastMessage message = new OBroadcastMessage();
     message.group = this.config.getGroupName();
-    message.nodeName = this.config.getNodeName();
+    message.nodeIdentity = this.internalConfiguration.getNodeIdentity();
     message.term = term;
-    message.voteForNode = toNode;
-    message.type = Message.TYPE_VOTE_LEADER_ELECTION;
+    message.voteForIdentity = toNode;
+    message.type = OBroadcastMessage.TYPE_VOTE_LEADER_ELECTION;
 
     try {
       byte[] msg = serializeMessage(message);
@@ -487,21 +470,21 @@ public abstract class ONodeManager {
     }
   }
 
-  protected void processReceiveVote(Message message, String fromAddr) {
+  protected void processReceiveVote(OBroadcastMessage message, String fromAddr) {
 //    System.out.println("RECEIVE VOTE term " + message.term + " from " + message.nodeName + " to " + message.voteForNode);
     if (leaderStatus.status != OLeaderElectionStateMachine.Status.CANDIDATE) {
       return;
     }
-    leaderStatus.receiveVote(message.term, message.nodeName, message.voteForNode);
+    leaderStatus.receiveVote(message.term, message.nodeIdentity, message.voteForIdentity);
     if (leaderStatus.status == OLeaderElectionStateMachine.Status.LEADER) {
       resetLeader();
       ODiscoveryListener.NodeData data = new ODiscoveryListener.NodeData();
       data.term = leaderStatus.currentTerm;
       data.master = true;
-      data.name = this.config.getNodeName();
+      data.identity = this.internalConfiguration.getNodeIdentity();
       data.lastPingTimestamp = System.currentTimeMillis();
       discoveryListener.leaderElected(data);
-      knownServers.put(this.config.getNodeName(), data);
+      knownServers.put(this.internalConfiguration.getNodeIdentity(), data);
       sendLeaderElected();
     }
   }
@@ -512,12 +495,12 @@ public abstract class ONodeManager {
 
   private void sendLeaderElected() {
 //    System.out.println("SEND LEADER ELECTED " + nodeName);
-    Message message = new Message();
+    OBroadcastMessage message = new OBroadcastMessage();
     message.group = this.config.getGroupName();
-    message.nodeName = this.config.getNodeName();
+    message.nodeIdentity = this.internalConfiguration.getNodeIdentity();
     message.term = leaderStatus.currentTerm;
     message.tcpPort = getConfig().getTcpPort();
-    message.type = Message.TYPE_LEADER_ELECTED;
+    message.type = OBroadcastMessage.TYPE_LEADER_ELECTED;
 
     try {
       byte[] msg = serializeMessage(message);
@@ -528,123 +511,23 @@ public abstract class ONodeManager {
   }
 
 
-
-
-
-
-
-
   /* =============== NETWORK UTILITIES ================= */
 
-  protected byte[] serializeMessage(Message message) throws Exception {
+  protected byte[] serializeMessage(OBroadcastMessage message) throws Exception {
     ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-    writeInt(message.type, buffer);
-    writeString(message.group, buffer);
-    writeString(message.nodeName, buffer);
-    writeInt(message.term, buffer);
-    writeInt(message.role, buffer);
-    writeInt(message.tcpPort, buffer);
-    writeString(message.connectionUsername, buffer);
-    writeString(message.connectionPassword, buffer);
-
-    switch (message.type) {
-    case Message.TYPE_PING:
-      writeString(message.masterName, buffer);
-      writeInt(message.masterTerm, buffer);
-      writeString(message.masterAddress, buffer);
-      writeInt(message.masterTcpPort, buffer);
-      writeLong(message.masterPing, buffer);
-      writeString(message.masterConnectionUsername, buffer);
-      writeString(message.masterConnectionPassword, buffer);
-      break;
-    case Message.TYPE_VOTE_LEADER_ELECTION:
-      writeString(message.voteForNode, buffer);
-    }
-
+    message.write(new DataOutputStream(buffer));
     return encrypt(buffer.toByteArray());
   }
 
-  protected Message deserializeMessage(byte[] data) throws Exception {
+  protected OBroadcastMessage deserializeMessage(byte[] data) throws Exception {
     data = decrypt(data);
     if (data == null) {
       return null;
     }
-    Message message = new Message();
-    ByteArrayInputStream stream = new ByteArrayInputStream(data);
-    message.type = readInt(stream);
-    message.group = readString(stream);
-    message.nodeName = readString(stream);
-    message.term = readInt(stream);
-    message.role = readInt(stream);
-    message.tcpPort = readInt(stream);
-    message.connectionUsername = readString(stream);
-    message.connectionPassword = readString(stream);
-
-    switch (message.type) {
-    case Message.TYPE_PING:
-      message.masterName = readString(stream);
-      message.masterTerm = readInt(stream);
-      message.masterAddress = readString(stream);
-      message.masterTcpPort = readInt(stream);
-      message.masterPing = readLong(stream);
-      message.masterConnectionUsername = readString(stream);
-      message.masterConnectionPassword = readString(stream);
-
-    case Message.TYPE_VOTE_LEADER_ELECTION:
-      message.voteForNode = readString(stream);
-    }
+    OBroadcastMessage message = new OBroadcastMessage();
+    message.read(new DataInputStream(new ByteArrayInputStream(data)));
     return message;
   }
-
-  private int readInt(ByteArrayInputStream buffer) throws IOException {
-    byte[] r = new byte[4];
-    buffer.read(r);
-    return ByteBuffer.wrap(r).getInt();
-  }
-
-  private void writeInt(int i, ByteArrayOutputStream buffer) throws IOException {
-    buffer.write(ByteBuffer.allocate(4).putInt(i).array());
-  }
-
-  private long readLong(ByteArrayInputStream buffer) throws IOException {
-    byte[] r = new byte[8];
-    buffer.read(r);
-    return ByteBuffer.wrap(r).getLong();
-  }
-
-  private void writeLong(Long i, ByteArrayOutputStream buffer) throws IOException {
-    buffer.write(ByteBuffer.allocate(8).putLong(i).array());
-  }
-
-  private String readString(ByteArrayInputStream stream) throws IOException {
-    int length = readInt(stream);
-    if (length < 0) {
-      return null;
-    }
-    if (length == 0) {
-      return "";
-    }
-    byte[] nameBuffer = new byte[length];
-    stream.read(nameBuffer);
-    return new String(nameBuffer);
-  }
-
-  private void writeString(String string, ByteArrayOutputStream buffer) throws IOException {
-    if (string == null) {
-      writeInt(-1, buffer);
-      return;
-    }
-    writeInt(string.length(), buffer);
-    if (string.length() == 0) {
-      return;
-    }
-    buffer.write(string.getBytes());
-  }
-
-
-
-
-
 
   /* =============== ENCRYPTION ================= */
 
@@ -659,11 +542,12 @@ public abstract class ONodeManager {
     cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
 
     ByteArrayOutputStream stream = new ByteArrayOutputStream();
-    writeInt(iv.length, stream);
-    stream.write(iv);
+    DataOutput output = new DataOutputStream(stream);
+    output.writeInt(iv.length);
+    output.write(iv);
     byte[] cypher = cipher.doFinal(data);
-    writeInt(cypher.length, stream);
-    stream.write(cypher);
+    output.writeInt(cypher.length);
+    output.write(cypher);
 
     return stream.toByteArray();
   }
@@ -672,19 +556,19 @@ public abstract class ONodeManager {
     if (config.getGroupPassword() == null) {
       return data;
     }
-    ByteArrayInputStream stream = new ByteArrayInputStream(data);
-    int ivLength = readInt(stream);
+    DataInput input = new DataInputStream(new ByteArrayInputStream(data));
+    int ivLength = input.readInt();
     byte[] ivData = new byte[ivLength];
-    stream.read(ivData);
+    input.readFully(ivData);
     IvParameterSpec ivSpec = new IvParameterSpec(ivData);
     SecretKeySpec skeySpec = new SecretKeySpec(paddedPassword(config.getGroupPassword()), "AES");
 
     Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
     cipher.init(Cipher.DECRYPT_MODE, skeySpec, ivSpec);
 
-    int length = readInt(stream);
+    int length = input.readInt();
     byte[] encrypted = new byte[length];
-    stream.read(encrypted);
+    input.readFully(encrypted);
     return cipher.doFinal(encrypted);
   }
 
@@ -713,5 +597,9 @@ public abstract class ONodeManager {
 
   public ONodeConfiguration getConfig() {
     return config;
+  }
+
+  public ONodeInternalConfiguration getInternalConfiguration() {
+    return internalConfiguration;
   }
 }

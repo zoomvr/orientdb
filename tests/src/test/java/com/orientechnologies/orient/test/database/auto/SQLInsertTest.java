@@ -34,7 +34,14 @@ import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * If some of the tests start to fail then check cluster number in queries, e.g #7:1. It can be because the order of clusters could
@@ -62,6 +69,9 @@ public class SQLInsertTest extends DocumentDBBaseTest {
 
     int addressId = database.getMetadata().getSchema().getClass("Address").getDefaultClusterId();
 
+    for (int i = 0; i < 30; i++) {
+      new ODocument("Address").save();
+    }
     List<Long> positions = getValidPositions(addressId);
 
     if (!database.getMetadata().getSchema().existsClass("Profile"))
@@ -266,6 +276,13 @@ public class SQLInsertTest extends DocumentDBBaseTest {
   }
 
   public void updateMultipleFields() {
+
+    if (!database.getMetadata().getSchema().existsClass("Account"))
+      database.getMetadata().getSchema().createClass("Account");
+
+    for (int i = 0; i < 30; i++) {
+      database.command("insert into cluster:3 set name = 'foo"+i+"'");
+    }
     List<Long> positions = getValidPositions(3);
 
     OIdentifiable result = database.command(

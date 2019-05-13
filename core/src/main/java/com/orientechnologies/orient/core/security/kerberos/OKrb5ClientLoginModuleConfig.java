@@ -19,11 +19,10 @@
  */
 package com.orientechnologies.orient.core.security.kerberos;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.auth.login.Configuration;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Custom Kerberos client login configuration.
@@ -33,13 +32,13 @@ import javax.security.auth.login.Configuration;
  */
 public class OKrb5ClientLoginModuleConfig extends Configuration
 {
-	final String LoginModule = "com.sun.security.auth.module.Krb5LoginModule";			
+	private final String loginModule = "com.sun.security.auth.module.Krb5LoginModule";
 
-	private final AppConfigurationEntry[] _appConfigEntries = new AppConfigurationEntry[1];
+	private final AppConfigurationEntry[] appConfigEntries = new AppConfigurationEntry[1];
 
 	public AppConfigurationEntry[] getAppConfigurationEntry(String applicationName)
 	{
-		return _appConfigEntries;
+		return appConfigEntries;
 	}
 /*
 	public OKrb5ClientLoginModuleConfig(String ccPath)
@@ -98,6 +97,6 @@ public class OKrb5ClientLoginModuleConfig extends Configuration
 
 		options.put("doNotPrompt", "true");
 
-		_appConfigEntries[0] = new AppConfigurationEntry(LoginModule, AppConfigurationEntry.LoginModuleControlFlag.REQUIRED, options);
+		appConfigEntries[0] = new AppConfigurationEntry(loginModule, AppConfigurationEntry.LoginModuleControlFlag.REQUIRED, options);
 	}
 }

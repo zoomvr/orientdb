@@ -1,8 +1,14 @@
 package com.orientechnologies.orient.distributed.impl.structural;
 
-import com.orientechnologies.orient.core.db.OrientDBInternal;
-import com.orientechnologies.orient.distributed.OrientDBDistributed;
-import com.orientechnologies.orient.distributed.impl.coordinator.*;
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
+import com.orientechnologies.orient.distributed.impl.coordinator.MockOperationLog;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedChannel;
+import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
+import com.orientechnologies.orient.distributed.impl.coordinator.ONodeRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.ONodeResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLog;
+import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSessionOperationId;
 import org.junit.Test;
 
@@ -26,18 +32,17 @@ public class OStructuralCoordinatorTest {
     OStructuralCoordinator coordinator = new OStructuralCoordinator(Executors.newSingleThreadExecutor(), operationLog, null);
     MockDistributedChannel channel = new MockDistributedChannel();
     channel.coordinator = coordinator;
-    OStructuralDistributedMember one = new OStructuralDistributedMember("one", channel);
+    OStructuralDistributedMember one = new OStructuralDistributedMember(new ONodeIdentity("one", "one"), channel);
     channel.member = one;
-    coordinator.join(one);
+    coordinator.nodeConnected(one);
 
     coordinator.submit(one, new OSessionOperationId(), new OStructuralSubmitRequest() {
       @Override
-      public void begin(OStructuralDistributedMember sender, OSessionOperationId operationId, OStructuralCoordinator coordinator,
-          OrientDBDistributed context) {
+      public void begin(OStructuralSubmitId id, OCoordinationContext coordinator) {
         MockNodeRequest nodeRequest = new MockNodeRequest();
-        coordinator.sendOperation(this, nodeRequest, new OStructuralResponseHandler() {
+        coordinator.sendOperation(nodeRequest, new OStructuralResponseHandler() {
           @Override
-          public boolean receive(OStructuralCoordinator coordinator, OStructuralRequestContext context,
+          public boolean receive(OCoordinationContext coordinator, OStructuralRequestContext context,
               OStructuralDistributedMember member, OStructuralNodeResponse response) {
             if (context.getResponses().size() == 1) {
               responseReceived.countDown();
@@ -46,7 +51,7 @@ public class OStructuralCoordinatorTest {
           }
 
           @Override
-          public boolean timeout(OStructuralCoordinator coordinator, OStructuralRequestContext context) {
+          public boolean timeout(OCoordinationContext coordinator, OStructuralRequestContext context) {
             return true;
           }
         });
@@ -81,24 +86,22 @@ public class OStructuralCoordinatorTest {
     MockDistributedChannel channel = new MockDistributedChannel();
     channel.coordinator = coordinator;
     channel.reply = responseReceived;
-    OStructuralDistributedMember one = new OStructuralDistributedMember("one", channel);
+    OStructuralDistributedMember one = new OStructuralDistributedMember(new ONodeIdentity("one", "one"), channel);
     channel.member = one;
-    coordinator.join(one);
+    coordinator.nodeConnected(one);
 
     coordinator.submit(one, new OSessionOperationId(), new OStructuralSubmitRequest() {
       @Override
-      public void begin(OStructuralDistributedMember sender, OSessionOperationId operationId, OStructuralCoordinator coordinator,
-          OrientDBDistributed context) {
+      public void begin(OStructuralSubmitId id, OCoordinationContext coordinator) {
         MockNodeRequest nodeRequest = new MockNodeRequest();
-        coordinator.sendOperation(this, nodeRequest, new OStructuralResponseHandler() {
+        coordinator.sendOperation(nodeRequest, new OStructuralResponseHandler() {
           @Override
-          public boolean receive(OStructuralCoordinator coordinator, OStructuralRequestContext context,
+          public boolean receive(OCoordinationContext coordinator, OStructuralRequestContext context,
               OStructuralDistributedMember member, OStructuralNodeResponse response) {
             if (context.getResponses().size() == 1) {
-              coordinator.sendOperation(null, new OStructuralNodeRequest() {
+              coordinator.sendOperation(new OStructuralNodeRequest() {
                 @Override
-                public OStructuralNodeResponse execute(OStructuralDistributedMember nodeFrom, OLogId opId,
-                    OStructuralDistributedExecutor executor, OrientDBDistributed context) {
+                public OStructuralNodeResponse execute(OOperationContext context) {
                   return null;
                 }
 
@@ -118,7 +121,7 @@ public class OStructuralCoordinatorTest {
                 }
               }, new OStructuralResponseHandler() {
                 @Override
-                public boolean receive(OStructuralCoordinator coordinator, OStructuralRequestContext context,
+                public boolean receive(OCoordinationContext coordinator, OStructuralRequestContext context,
                     OStructuralDistributedMember member, OStructuralNodeResponse response) {
                   if (context.getResponses().size() == 1) {
                     member.reply(new OSessionOperationId(), new OStructuralSubmitResponse() {
@@ -142,7 +145,7 @@ public class OStructuralCoordinatorTest {
                 }
 
                 @Override
-                public boolean timeout(OStructuralCoordinator coordinator, OStructuralRequestContext context) {
+                public boolean timeout(OCoordinationContext coordinator, OStructuralRequestContext context) {
                   return true;
                 }
               });
@@ -151,7 +154,7 @@ public class OStructuralCoordinatorTest {
           }
 
           @Override
-          public boolean timeout(OStructuralCoordinator coordinator, OStructuralRequestContext context) {
+          public boolean timeout(OCoordinationContext coordinator, OStructuralRequestContext context) {
             return true;
           }
         });
@@ -186,24 +189,23 @@ public class OStructuralCoordinatorTest {
     OStructuralCoordinator coordinator = new OStructuralCoordinator(Executors.newSingleThreadExecutor(), operationLog, null);
     MockDistributedChannel channel = new MockDistributedChannel();
     channel.coordinator = coordinator;
-    OStructuralDistributedMember one = new OStructuralDistributedMember("one", channel);
+    OStructuralDistributedMember one = new OStructuralDistributedMember(new ONodeIdentity("one", "one"), channel);
     channel.member = one;
-    coordinator.join(one);
+    coordinator.nodeConnected(one);
 
     coordinator.submit(one, new OSessionOperationId(), new OStructuralSubmitRequest() {
       @Override
-      public void begin(OStructuralDistributedMember sender, OSessionOperationId operationId, OStructuralCoordinator coordinator,
-          OrientDBDistributed context) {
+      public void begin(OStructuralSubmitId id, OCoordinationContext coordinator) {
         MockNodeRequest nodeRequest = new MockNodeRequest();
-        coordinator.sendOperation(this, nodeRequest, new OStructuralResponseHandler() {
+        coordinator.sendOperation(nodeRequest, new OStructuralResponseHandler() {
           @Override
-          public boolean receive(OStructuralCoordinator coordinator, OStructuralRequestContext context,
+          public boolean receive(OCoordinationContext coordinator, OStructuralRequestContext context,
               OStructuralDistributedMember member, OStructuralNodeResponse response) {
             return false;
           }
 
           @Override
-          public boolean timeout(OStructuralCoordinator coordinator, OStructuralRequestContext context) {
+          public boolean timeout(OCoordinationContext coordinator, OStructuralRequestContext context) {
             timedOut.countDown();
             return true;
           }
@@ -296,8 +298,7 @@ public class OStructuralCoordinatorTest {
   private static class MockNodeRequest implements OStructuralNodeRequest {
 
     @Override
-    public OStructuralNodeResponse execute(OStructuralDistributedMember nodeFrom, OLogId opId,
-        OStructuralDistributedExecutor executor, OrientDBDistributed context) {
+    public OStructuralNodeResponse execute(OOperationContext context) {
       return null;
     }
 

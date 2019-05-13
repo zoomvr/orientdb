@@ -10,7 +10,11 @@ import com.orientechnologies.orient.distributed.impl.coordinator.transaction.res
 import com.orientechnologies.orient.distributed.impl.coordinator.transaction.results.OUniqueKeyViolationResult;
 import org.junit.Test;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -75,7 +79,8 @@ public class TransactionMessagesReadWriteTests {
 
   @Test
   public void testSecondPhase() {
-    OTransactionSecondPhaseOperation operation = new OTransactionSecondPhaseOperation(new OSessionOperationId(), true);
+    OTransactionSecondPhaseOperation operation = new OTransactionSecondPhaseOperation(new OSessionOperationId(), new ArrayList<>(),
+        new ArrayList<>(), true);
     OTransactionSecondPhaseOperation readOperation = new OTransactionSecondPhaseOperation();
     writeRead(operation, readOperation);
 

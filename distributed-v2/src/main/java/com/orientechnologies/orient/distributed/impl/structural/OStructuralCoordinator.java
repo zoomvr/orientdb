@@ -1,7 +1,9 @@
 package com.orientechnologies.orient.distributed.impl.structural;
 
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
-import com.orientechnologies.orient.distributed.impl.coordinator.*;
+import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
+import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLog;
 import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSessionOperationId;
 
 import java.util.ArrayList;
@@ -13,11 +15,11 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class OStructuralCoordinator implements AutoCloseable {
+public class OStructuralCoordinator implements AutoCloseable, OCoordinationContext {
   private final ExecutorService                                  requestExecutor;
   private final OOperationLog                                    operationLog;
   private final ConcurrentMap<OLogId, OStructuralRequestContext> contexts = new ConcurrentHashMap<>();
-  private final Map<String, OStructuralDistributedMember>        members  = new ConcurrentHashMap<>();
+  private final Map<ONodeIdentity, OStructuralDistributedMember> members  = new ConcurrentHashMap<>();
   private final Timer                                            timer;
   private final OrientDBDistributed                              context;
 
@@ -30,12 +32,12 @@ public class OStructuralCoordinator implements AutoCloseable {
 
   public void submit(OStructuralDistributedMember member, OSessionOperationId operationId, OStructuralSubmitRequest request) {
     requestExecutor.execute(() -> {
-      request.begin(member, operationId, this, context);
+      request.begin(new OStructuralSubmitId(member, operationId), this);
     });
   }
 
-  public void reply(OStructuralDistributedMember member, OSessionOperationId operationId, OStructuralSubmitResponse response) {
-    member.reply(operationId, response);
+  public void reply(OStructuralSubmitId id, OStructuralSubmitResponse response) {
+    id.getMember().reply(id.getOperationId(), response);
   }
 
   public void receive(OStructuralDistributedMember member, OLogId relativeRequest, OStructuralNodeResponse response) {
@@ -48,11 +50,10 @@ public class OStructuralCoordinator implements AutoCloseable {
     return operationLog.log(request);
   }
 
-  public OStructuralRequestContext sendOperation(OStructuralSubmitRequest submitRequest, OStructuralNodeRequest nodeRequest,
-      OStructuralResponseHandler handler) {
+  public OStructuralRequestContext sendOperation(OStructuralNodeRequest nodeRequest, OStructuralResponseHandler handler) {
     List<OStructuralDistributedMember> members = new ArrayList<>(this.members.values());
     OLogId id = log(nodeRequest);
-    OStructuralRequestContext context = new OStructuralRequestContext(this, submitRequest, nodeRequest, members, handler, id);
+    OStructuralRequestContext context = new OStructuralRequestContext(this, nodeRequest, members, handler, id);
     contexts.put(id, context);
     for (OStructuralDistributedMember member : members) {
       member.sendRequest(id, nodeRequest);
@@ -62,8 +63,8 @@ public class OStructuralCoordinator implements AutoCloseable {
     return context;
   }
 
-  public void join(OStructuralDistributedMember member) {
-    members.put(member.getName(), member);
+  public void nodeConnected(OStructuralDistributedMember member) {
+    members.put(member.getIdentity(), member);
   }
 
   @Override
@@ -90,12 +91,17 @@ public class OStructuralCoordinator implements AutoCloseable {
     return contexts;
   }
 
-  public OStructuralDistributedMember getMember(String member) {
+  public OStructuralDistributedMember getMember(ONodeIdentity member) {
     return members.get(member);
   }
 
-  public void leave(OStructuralDistributedMember member) {
-    members.remove(member.getName());
+  public void nodeDisconnected(ONodeIdentity identity) {
+    // TODO: Instead of remove mark it as disconnected
+    members.remove(identity);
   }
 
+  @Override
+  public OrientDBDistributed getOrientDB() {
+    return context;
+  }
 }

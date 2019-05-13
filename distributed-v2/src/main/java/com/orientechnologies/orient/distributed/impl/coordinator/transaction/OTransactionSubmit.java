@@ -21,7 +21,12 @@ import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitRequest;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import static com.orientechnologies.orient.distributed.impl.coordinator.OCoordinateMessagesFactory.TRANSACTION_SUBMIT_REQUEST;
 
@@ -155,7 +160,7 @@ public class OTransactionSubmit implements OSubmitRequest {
     }
     lockManager.lock(rids, keys, (guards) -> {
       OTransactionFirstPhaseResponseHandler responseHandler = new OTransactionFirstPhaseResponseHandler(operationId, this,
-          requester, guards);
+          requester, operations, indexes, guards);
       OTransactionFirstPhaseOperation request = new OTransactionFirstPhaseOperation(operationId, this.operations, indexes);
       coordinator.sendOperation(this, request, responseHandler);
     });
@@ -192,6 +197,14 @@ public class OTransactionSubmit implements OSubmitRequest {
     for (OIndexOperationRequest change : indexes) {
       change.serialize(output);
     }
+  }
+
+  public List<OIndexOperationRequest> getIndexes() {
+    return indexes;
+  }
+
+  public List<ORecordOperationRequest> getOperations() {
+    return operations;
   }
 
   @Override

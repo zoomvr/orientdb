@@ -2,7 +2,11 @@ package com.orientechnologies.orient.server.distributed.impl.metadata;
 
 import com.orientechnologies.orient.core.cache.OCommandCacheSoftRefs;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.db.*;
+import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
+import com.orientechnologies.orient.core.db.ODatabaseLifecycleListener;
+import com.orientechnologies.orient.core.db.OScenarioThreadLocal;
+import com.orientechnologies.orient.core.db.OSharedContext;
+import com.orientechnologies.orient.core.db.OrientDBDistributed;
 import com.orientechnologies.orient.core.db.viewmanager.ViewManager;
 import com.orientechnologies.orient.core.index.OIndexException;
 import com.orientechnologies.orient.core.index.OIndexFactory;
@@ -26,7 +30,6 @@ import com.orientechnologies.orient.server.distributed.impl.ViewManagerDistribut
 public class OSharedContextDistributed extends OSharedContext {
 
   private ViewManager         viewManager;
-  private ODistributedContext distributedContext;
 
   public OSharedContextDistributed(OStorage storage, OrientDBDistributed orientDB) {
     this.orientDB = orientDB;
@@ -49,7 +52,6 @@ public class OSharedContextDistributed extends OSharedContext {
 
     queryStats = new OQueryStats();
 
-    distributedContext = new ODistributedContext(storage, orientDB);
     this.viewManager = new ViewManagerDistributed(orientDB, storage.getName());
 
   }
@@ -94,7 +96,6 @@ public class OSharedContextDistributed extends OSharedContext {
     executionPlanCache.invalidate();
     liveQueryOps.close();
     liveQueryOpsV2.close();
-    distributedContext.close();
   }
 
   public synchronized void reload(ODatabaseDocumentInternal database) {
@@ -108,7 +109,6 @@ public class OSharedContextDistributed extends OSharedContext {
       sequenceLibrary.load(database);
       commandCache.clear();
       scheduler.load(database);
-      distributedContext.reload();
       return null;
     });
   }
@@ -147,7 +147,4 @@ public class OSharedContextDistributed extends OSharedContext {
     return viewManager;
   }
 
-  public ODistributedContext getDistributedContext() {
-    return distributedContext;
-  }
 }

@@ -65,6 +65,7 @@ import com.orientechnologies.orient.core.iterator.ORecordIteratorCluster;
 import com.orientechnologies.orient.core.metadata.OMetadata;
 import com.orientechnologies.orient.core.metadata.OMetadataDefault;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
+import com.orientechnologies.orient.core.metadata.schema.OProperty;
 import com.orientechnologies.orient.core.metadata.schema.OSchema;
 import com.orientechnologies.orient.core.metadata.schema.OSchemaProxy;
 import com.orientechnologies.orient.core.metadata.schema.OView;
@@ -122,6 +123,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -1619,7 +1621,10 @@ public abstract class ODatabaseDocumentAbstract extends OListenerManger<ODatabas
 
         // CREATE THE EDGE DOCUMENT TO STORE FIELDS TOO
 
-        if (isUseLightweightEdges() && (fields == null || fields.length == 0) && !forceRegular) {
+        boolean regularEdgeBasedOnSchema =
+            hasLinkedClass(from, outFieldName, edgeType) || hasLinkedClass(to, inFieldName, edgeType);
+
+        if (isUseLightweightEdges() && !regularEdgeBasedOnSchema && (fields == null || fields.length == 0) && !forceRegular) {
           edge = newLightweightEdge(iClassName, from, to);
           OVertexDelegate.createLink(from.getRecord(), to.getRecord(), outFieldName);
           OVertexDelegate.createLink(to.getRecord(), from.getRecord(), inFieldName);
@@ -1679,6 +1684,21 @@ public abstract class ODatabaseDocumentAbstract extends OListenerManger<ODatabas
       }
     }
     return edge;
+  }
+
+  private boolean hasLinkedClass(OVertex vertex, String edgeFieldName, OClass linkedClass) {
+    Optional<OClass> clazz = vertex.getSchemaType();
+    if (!clazz.isPresent()) {
+      return false;
+    }
+    OProperty prop = clazz.get().getProperty(edgeFieldName);
+    if (prop == null) {
+      return false;
+    }
+    if(prop.getLinkedClass() == null ){
+      return false;
+    }
+    return linkedClass.isSubClassOf(prop.getLinkedClass());
   }
 
   private boolean checkDeletedInTx(OVertex currentVertex) {

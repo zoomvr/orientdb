@@ -4,8 +4,30 @@ import com.orientechnologies.orient.distributed.impl.coordinator.ddl.ODDLQueryOp
 import com.orientechnologies.orient.distributed.impl.coordinator.ddl.ODDLQueryOperationResponse;
 import com.orientechnologies.orient.distributed.impl.coordinator.ddl.ODDLQuerySubmitRequest;
 import com.orientechnologies.orient.distributed.impl.coordinator.ddl.ODDLQuerySubmitResponse;
-import com.orientechnologies.orient.distributed.impl.coordinator.transaction.*;
-import com.orientechnologies.orient.distributed.impl.structural.*;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSequenceActionCoordinatorResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSequenceActionCoordinatorSubmit;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSequenceActionNodeRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSequenceActionNodeResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OTransactionFirstPhaseOperation;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OTransactionFirstPhaseResult;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OTransactionResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OTransactionSecondPhaseOperation;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OTransactionSecondPhaseResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OTransactionSubmit;
+import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeRequest;
+import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeResponse;
+import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseFinalizeRequest;
+import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseFinalizeResponse;
+import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseOperationRequest;
+import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseOperationResponse;
+import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseOperationRequest;
+import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseOperationResponse;
+import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseSubmitResponse;
 
 public class OCoordinateMessagesFactory {
   public static final int TRANSACTION_SUBMIT_REQUEST        = 1;
@@ -37,6 +59,9 @@ public class OCoordinateMessagesFactory {
   public static final int DROP_DATABASE_SUBMIT_RESPONSE = 2;
   public static final int DROP_DATABASE_REQUEST         = 2;
   public static final int DROP_DATABASE_RESPONSE        = 2;
+
+  public static final int CONFIGURATION_FETCH_SUBMIT_REQUEST  = 4;
+  public static final int CONFIGURATION_FETCH_SUBMIT_RESPONSE = 4;
 
   public ONodeResponse createOperationResponse(int responseType) {
     switch (responseType) {

@@ -24,7 +24,11 @@ import com.orientechnologies.orient.server.binary.impl.OBinaryToken;
 import com.orientechnologies.orient.server.network.protocol.ONetworkProtocolData;
 
 import javax.crypto.Mac;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -102,7 +106,8 @@ public class OTokenHandlerImpl implements OTokenHandler {
     JsonWebToken token = null;
 
     // / <header>.<payload>.<signature>
-    int firstDot = -1, secondDot = -1;
+    int firstDot = -1;
+    int secondDot = -1;
     for (int x = 0; x < tokenBytes.length; x++) {
       if (tokenBytes[x] == JWT_DELIMITER) {
         if (firstDot == -1)

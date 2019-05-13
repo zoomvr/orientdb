@@ -15,14 +15,6 @@ import com.orientechnologies.orient.core.sql.OCommandExecutorSQLCreateIndex;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.storage.OAutoshardedStorage;
 import com.orientechnologies.orient.core.storage.OStorage;
-import com.orientechnologies.orient.server.distributed.impl.coordinator.OSubmitResponse;
-import com.orientechnologies.orient.server.distributed.impl.coordinator.ddl.ODDLQuerySubmitRequest;
-import com.orientechnologies.orient.server.distributed.impl.coordinator.transaction.OSessionOperationId;
-
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-
-import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DISTRIBUTED_REPLICATION_PROTOCOL_VERSION;
 
 /**
  * Created by tglman on 23/06/17.
@@ -117,21 +109,7 @@ public class OIndexManagerDistributed extends OIndexManagerShared {
   }
 
   public void sendCommand(ODatabaseDocumentInternal database, String query) {
-    if (database.getConfiguration().getValueAsInteger(DISTRIBUTED_REPLICATION_PROTOCOL_VERSION) == 2) {
-
-      ODistributedContext distributed = ((OSharedContextDistributed) database.getSharedContext()).getDistributedContext();
-      Future<OSubmitResponse> response = distributed.getSubmitContext()
-          .send(new OSessionOperationId(), new ODDLQuerySubmitRequest(query));
-      try {
-        response.get();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      } catch (ExecutionException e) {
-        e.printStackTrace();
-      }
-    } else {
-      database.command(new OCommandSQL(query)).execute();
-    }
+    database.command(new OCommandSQL(query)).execute();
   }
 
 }

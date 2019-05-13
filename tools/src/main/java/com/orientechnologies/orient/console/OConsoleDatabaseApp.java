@@ -102,12 +102,10 @@ import com.orientechnologies.orient.server.config.OServerConfigurationManager;
 import com.orientechnologies.orient.server.config.OServerUserConfiguration;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -152,22 +150,20 @@ public class OConsoleDatabaseApp extends OrientConsole implements OCommandOutput
   public static void main(final String[] args) {
     int result = 0;
 
+    final boolean interactiveMode = isInteractiveMode(args);
     try {
       final OConsoleDatabaseApp console = new OConsoleDatabaseApp(args);
-
       boolean tty = false;
       try {
-        if (console.isInteractiveMode(args) && setTerminalToCBreak())
+        if (setTerminalToCBreak(interactiveMode))
           tty = true;
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> restoreTerminal()));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> restoreTerminal(interactiveMode)));
 
       } catch (Exception ignored) {
       }
 
-      new OSignalHandler().installDefaultSignals(signal -> restoreTerminal());
-
-
+      new OSignalHandler().installDefaultSignals(signal -> restoreTerminal(interactiveMode));
 
       if (tty)
         console.setReader(new TTYConsoleReader(console.historyEnabled()));
@@ -175,61 +171,43 @@ public class OConsoleDatabaseApp extends OrientConsole implements OCommandOutput
       result = console.run();
 
     } finally {
-      restoreTerminal();
+      restoreTerminal(interactiveMode);
     }
 
     Orient.instance().shutdown();
     System.exit(result);
   }
 
-  protected static void restoreTerminal() {
+  protected static void restoreTerminal(final boolean interactiveMode) {
     try {
-      stty("echo");
+      stty("echo", interactiveMode);
     } catch (Exception ignored) {
     }
   }
 
-  protected static boolean setTerminalToCBreak() throws IOException, InterruptedException {
+  protected static boolean setTerminalToCBreak(final boolean interactiveMode) throws IOException, InterruptedException {
     // set the console to be character-buffered instead of line-buffered
-    int result = stty("-icanon min 1");
+    int result = stty("-icanon min 1", interactiveMode);
     if (result != 0) {
       return false;
     }
 
     // disable character echoing
-    stty("-echo");
+    stty("-echo", interactiveMode);
     return true;
   }
 
   /**
    * Execute the stty command with the specified arguments against the current active terminal.
    */
-  protected static int stty(final String args) throws IOException, InterruptedException {
-    String cmd = "stty " + args + " < /dev/tty";
-
-    return exec(new String[] { "sh", "-c", cmd });
-  }
-
-  /**
-   * Execute the specified command and return the output (both stdout and stderr).
-   */
-  protected static int exec(final String[] cmd) throws IOException, InterruptedException {
-    ByteArrayOutputStream bout = new ByteArrayOutputStream();
-
-    Process p = Runtime.getRuntime().exec(cmd);
-    int c;
-    InputStream in = p.getInputStream();
-
-    while ((c = in.read()) != -1) {
-      bout.write(c);
+  protected static int stty(final String args, final boolean interactiveMode) throws IOException, InterruptedException {
+    if (!interactiveMode) {
+      return -1;
     }
 
-    in = p.getErrorStream();
+    final String cmd = "stty " + args + " < /dev/tty";
 
-    while ((c = in.read()) != -1) {
-      bout.write(c);
-    }
-
+    final Process p = Runtime.getRuntime().exec(new String[] { "sh", "-c", cmd });
     p.waitFor(10, TimeUnit.SECONDS);
 
     return p.exitValue();

@@ -4,8 +4,16 @@ import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.sql.OCommandSQLParsingException;
 import com.orientechnologies.orient.core.sql.OSQLEngine;
-import com.orientechnologies.orient.core.sql.executor.*;
-import com.orientechnologies.orient.core.sql.parser.*;
+import com.orientechnologies.orient.core.sql.executor.OInternalExecutionPlan;
+import com.orientechnologies.orient.core.sql.executor.OResultSet;
+import com.orientechnologies.orient.core.sql.executor.ORetryExecutionPlan;
+import com.orientechnologies.orient.core.sql.executor.OScriptExecutionPlan;
+import com.orientechnologies.orient.core.sql.executor.RetryStep;
+import com.orientechnologies.orient.core.sql.parser.OBeginStatement;
+import com.orientechnologies.orient.core.sql.parser.OCommitStatement;
+import com.orientechnologies.orient.core.sql.parser.OLetStatement;
+import com.orientechnologies.orient.core.sql.parser.OLocalResultSet;
+import com.orientechnologies.orient.core.sql.parser.OStatement;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -84,7 +92,7 @@ public class OSqlScriptExecutor implements OScriptExecutor {
               throw new OCommandExecutionException("Invalid retry number: " + nRetries);
             }
 
-            RetryStep step = new RetryStep(lastRetryBlock, nRetries, scriptContext, false);
+            RetryStep step = new RetryStep(lastRetryBlock, nRetries, ((OCommitStatement) stm).getElseStatements(), ((OCommitStatement) stm).getElseFail(), scriptContext, false);
             ORetryExecutionPlan retryPlan = new ORetryExecutionPlan(scriptContext);
             retryPlan.chain(step);
             plan.chain(retryPlan, false);

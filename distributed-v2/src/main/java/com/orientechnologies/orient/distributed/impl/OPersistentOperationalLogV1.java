@@ -12,7 +12,18 @@ import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLog;
 import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLogEntry;
 import com.orientechnologies.orient.server.distributed.ODistributedException;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -163,6 +174,11 @@ public class OPersistentOperationalLogV1 implements OOperationLog {
       throw new ODistributedException("Cannot init oplog info:" + e.getMessage());
     }
 
+  }
+
+  @Override
+  public OLogId lastPersistentLog() {
+    return new OLogId(inc.get());
   }
 
   protected AtomicLong readLastLogId() {
@@ -339,5 +355,11 @@ public class OPersistentOperationalLogV1 implements OOperationLog {
         e.printStackTrace();
       }
     }
+  }
+
+  @Override
+  public void removeAfter(OLogId lastValid) {
+    //TODO:
+    throw new UnsupportedOperationException("not yed done");
   }
 }

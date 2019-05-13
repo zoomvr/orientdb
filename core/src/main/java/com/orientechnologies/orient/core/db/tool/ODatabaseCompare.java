@@ -43,7 +43,14 @@ import com.orientechnologies.orient.core.storage.ORawBuffer;
 import com.orientechnologies.orient.core.storage.OStorage;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.orientechnologies.orient.core.record.impl.ODocumentHelper.makeDbCall;
 
@@ -807,6 +814,7 @@ public class ODatabaseCompare extends ODatabaseImpExpAbstract {
               }
 
               if (buffer1.buffer == null && buffer2.buffer == null) {
+                // Both null so both equals
               } else if (buffer1.buffer == null && buffer2.buffer != null) {
                 listener.onMessage(
                     "\n- ERR: RID=" + clusterId1 + ":" + position + " content is different: null <-> " + buffer2.buffer.length);

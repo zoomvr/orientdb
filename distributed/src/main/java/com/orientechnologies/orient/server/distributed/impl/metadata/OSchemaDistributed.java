@@ -3,20 +3,18 @@ package com.orientechnologies.orient.server.distributed.impl.metadata;
 import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.OSharedContext;
-import com.orientechnologies.orient.core.metadata.schema.*;
+import com.orientechnologies.orient.core.metadata.schema.OClass;
+import com.orientechnologies.orient.core.metadata.schema.OClassImpl;
+import com.orientechnologies.orient.core.metadata.schema.OSchemaEmbedded;
+import com.orientechnologies.orient.core.metadata.schema.OType;
+import com.orientechnologies.orient.core.metadata.schema.OViewConfig;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.storage.OAutoshardedStorage;
-import com.orientechnologies.orient.server.distributed.impl.ODatabaseDocumentDistributed;
-import com.orientechnologies.orient.server.distributed.impl.coordinator.OSubmitResponse;
-import com.orientechnologies.orient.server.distributed.impl.coordinator.ddl.ODDLQuerySubmitRequest;
-import com.orientechnologies.orient.server.distributed.impl.coordinator.transaction.OSessionOperationId;
 
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-import static com.orientechnologies.orient.core.config.OGlobalConfiguration.*;
+import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DISTRIBUTED_REPLICATION_PROTOCOL_VERSION;
 
 /**
  * Created by tglman on 22/06/17.
@@ -207,15 +205,6 @@ public class OSchemaDistributed extends OSchemaEmbedded {
 
     } else {
       createClassInternal(database, className, clusterIds, superClassesList);
-    }
-  }
-
-  @Override
-  public void sendCommand(ODatabaseDocumentInternal database, String command) {
-    if (isDistributeVersionTwo(database)) {
-      ((ODatabaseDocumentDistributed)database).sendDDLCommand(command);
-    } else {
-      super.sendCommand(database, command);
     }
   }
 

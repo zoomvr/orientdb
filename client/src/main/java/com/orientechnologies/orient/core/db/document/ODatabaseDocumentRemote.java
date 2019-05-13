@@ -62,7 +62,11 @@ import com.orientechnologies.orient.core.metadata.security.ORule;
 import com.orientechnologies.orient.core.metadata.security.OToken;
 import com.orientechnologies.orient.core.metadata.security.OUser;
 import com.orientechnologies.orient.core.metadata.sequence.OSequenceAction;
-import com.orientechnologies.orient.core.record.*;
+import com.orientechnologies.orient.core.record.OEdge;
+import com.orientechnologies.orient.core.record.ORecord;
+import com.orientechnologies.orient.core.record.ORecordInternal;
+import com.orientechnologies.orient.core.record.ORecordVersionHelper;
+import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
 import com.orientechnologies.orient.core.record.impl.OEdgeDelegate;
@@ -600,7 +604,7 @@ public class ODatabaseDocumentRemote extends ODatabaseDocumentAbstract {
       OImmutableClass clazz = ODocumentInternal.getImmutableSchemaClass(this, doc);
       if (clazz != null && getTransaction().isActive()) {
         List<OClassIndexManager.IndexChange> indexChanges = new ArrayList<>();
-        OClassIndexManager.processIndexOnDelete(this, doc, indexChanges);
+        OClassIndexManager.processIndexOnUpdate(this, doc, indexChanges);
         OTransactionOptimisticClient tx = (OTransactionOptimisticClient) getTransaction();
         for (OClassIndexManager.IndexChange indexChange : indexChanges) {
           tx.addIndexChanged(indexChange.index.getName());

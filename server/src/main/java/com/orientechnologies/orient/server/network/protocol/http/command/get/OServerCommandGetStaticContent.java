@@ -29,7 +29,15 @@ import com.orientechnologies.orient.server.network.protocol.http.OHttpRequest;
 import com.orientechnologies.orient.server.network.protocol.http.OHttpResponse;
 import com.orientechnologies.orient.server.network.protocol.http.OHttpUtils;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,9 +57,9 @@ public class OServerCommandGetStaticContent extends OServerCommandConfigurableAb
   private ConcurrentHashMap<String, OStaticContentCachedEntry> cacheContents    = new ConcurrentHashMap<String, OStaticContentCachedEntry>();
   private Map<String, String>                                  cacheHttp        = new HashMap<String, String>();
   private String                                               cacheHttpDefault = "Cache-Control: max-age=3000";
-  private String rootPath;
-  private String filePath;
-  private ConcurrentHashMap<String, OCallable<Object, String>> virtualFolders = new ConcurrentHashMap<String, OCallable<Object, String>>();
+  private String                                               rootPath;
+  private String                                               filePath;
+  private ConcurrentHashMap<String, OCallable<Object, String>> virtualFolders   = new ConcurrentHashMap<String, OCallable<Object, String>>();
 
   public static class OStaticContent {
     public InputStream is          = null;
@@ -135,7 +143,8 @@ public class OServerCommandGetStaticContent extends OServerCommandConfigurableAb
           iResponse.sendStream(OHttpUtils.STATUS_OK_CODE, OHttpUtils.STATUS_OK_DESCRIPTION, staticContent.type,
               new ByteArrayInputStream(compressedBytes), compressedBytes.length, null, new HashMap<String, String>() {{
                 put("Content-Encoding", "gzip");
-              }});
+              }
+          });
         } finally {
           stream.close();
           bytesOutput.close();

@@ -5,7 +5,12 @@ import com.orientechnologies.orient.core.db.OSchedulerInternal;
 import com.orientechnologies.orient.core.db.config.ONodeConfiguration;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.MulticastSocket;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.Enumeration;
 
 public class OUDPMulticastNodeManager extends ONodeManager {
@@ -38,8 +43,10 @@ public class OUDPMulticastNodeManager extends ONodeManager {
   }
 
   public void stop() {
-    super.stop();
-    socket.close();
+    if(running) {
+      socket.close();
+      super.stop();
+    }
   }
 
   protected void initNetwork() throws IOException {
@@ -86,13 +93,15 @@ public class OUDPMulticastNodeManager extends ONodeManager {
       }
       socket.receive(packet);
       packet.getAddress();
-      Message message = deserializeMessage(packet.getData());
+      OBroadcastMessage message = deserializeMessage(packet.getData());
       if (!message.group.equals(this.config.getGroupName())) {
         return;
       }
       String fromAddr = packet.getAddress().getHostAddress();
       processMessage(message, fromAddr);
     } catch (SocketException ex) {
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
       e.printStackTrace();
     }

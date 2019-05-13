@@ -2,32 +2,33 @@ package com.orientechnologies.orient.distributed.impl.metadata;
 
 import com.orientechnologies.orient.core.db.OSharedContext;
 import com.orientechnologies.orient.core.db.OrientDBInternal;
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.core.storage.OStorage;
-import com.orientechnologies.orient.core.tx.OTransactionInternal;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
 import com.orientechnologies.orient.distributed.impl.OClusterPositionAllocatorDatabase;
 import com.orientechnologies.orient.distributed.impl.OPersistentOperationalLogV1;
-import com.orientechnologies.orient.distributed.impl.coordinator.*;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedCoordinator;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedExecutor;
+import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedMember;
+import com.orientechnologies.orient.distributed.impl.coordinator.OLoopBackDistributeMember;
+import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLog;
+import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitContext;
+import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitContextImpl;
 import com.orientechnologies.orient.distributed.impl.coordinator.lock.ODistributedLockManagerImpl;
-import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSessionOperationId;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 
 public class ODistributedContext {
 
-  private Map<OSessionOperationId, OTransactionContext> transactions;
-  private ODistributedExecutor                          executor;
-  private OSubmitContext                                submitContext;
-  private ODistributedCoordinator                       coordinator;
-  private OClusterPositionAllocatorDatabase             allocator;
-  private OrientDBInternal                              context;
-  private String                                        databaseName;
-  private OOperationLog                                 opLog;
+  private ODistributedExecutor              executor;
+  private OSubmitContext                    submitContext;
+  private ODistributedCoordinator           coordinator;
+  private OClusterPositionAllocatorDatabase allocator;
+  private OrientDBInternal                  context;
+  private String                            databaseName;
+  private OOperationLog                     opLog;
 
   public ODistributedContext(OStorage storage, OrientDBDistributed context) {
-    transactions = new ConcurrentHashMap<>();
     this.context = context;
     this.databaseName = storage.getName();
     initOpLog();
@@ -43,19 +44,6 @@ public class ODistributedContext {
 //    this.opLog = new OIncrementOperationalLog();
   }
 
-  public void registerTransaction(OSessionOperationId requestId, OTransactionInternal tx) {
-    transactions.put(requestId, new OTransactionContext(tx));
-
-  }
-
-  public OTransactionContext getTransaction(OSessionOperationId operationId) {
-    return transactions.get(operationId);
-  }
-
-  public void closeTransaction(OSessionOperationId operationId) {
-    transactions.remove(operationId);
-  }
-
   public ODistributedExecutor getExecutor() {
     return executor;
   }
@@ -68,7 +56,7 @@ public class ODistributedContext {
     return coordinator;
   }
 
-  public synchronized void makeCoordinator(String nodeName, OSharedContext context) {
+  public synchronized void makeCoordinator(ONodeIdentity nodeName, OSharedContext context) {
     if (coordinator == null) {
       allocator = new OClusterPositionAllocatorDatabase(context);
       coordinator = new ODistributedCoordinator(Executors.newSingleThreadExecutor(), opLog, new ODistributedLockManagerImpl(),
