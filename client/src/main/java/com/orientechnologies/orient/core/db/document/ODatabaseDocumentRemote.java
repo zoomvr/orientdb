@@ -363,6 +363,7 @@ public class ODatabaseDocumentRemote extends ODatabaseDocumentAbstract {
       else
         storage.beginTransaction(this, (OTransactionOptimistic) this.currentTx);
       ((OTransactionOptimistic) this.currentTx).resetChangesTracking();
+      ((OTransactionOptimistic) this.currentTx).setSentToServer(true);
     }
   }
 
