@@ -18,16 +18,17 @@ import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeR
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeResponse;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitResponse;
-import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseFinalizeRequest;
 import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseFinalizeResponse;
-import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseOperationRequest;
 import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseOperationResponse;
 import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitResponse;
-import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseOperationRequest;
 import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseOperationResponse;
 import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.structural.raft.OCreateDatabase;
+import com.orientechnologies.orient.distributed.impl.structural.raft.ODropDatabase;
+import com.orientechnologies.orient.distributed.impl.structural.raft.ONodeJoin;
+import com.orientechnologies.orient.distributed.impl.structural.raft.ORaftOperation;
 
 public class OCoordinateMessagesFactory {
   public static final int TRANSACTION_SUBMIT_REQUEST        = 1;
@@ -51,13 +52,14 @@ public class OCoordinateMessagesFactory {
   public static final int CREATE_DATABASE_SUBMIT_REQUEST    = 1;
   public static final int CREATE_DATABASE_SUBMIT_RESPONSE   = 1;
   public static final int CREATE_DATABASE_REQUEST           = 1;
+  public static final int DROP_DATABASE_REQUEST             = 3;
   public static final int CREATE_DATABASE_RESPONSE          = 1;
+  public static final int NODE_JOIN_REQUEST                 = 2;
   public static final int CREATE_DATABASE_FINALIZE_REQUEST  = 3;
   public static final int CREATE_DATABASE_FINALIZE_RESPONSE = 3;
 
   public static final int DROP_DATABASE_SUBMIT_REQUEST  = 2;
   public static final int DROP_DATABASE_SUBMIT_RESPONSE = 2;
-  public static final int DROP_DATABASE_REQUEST         = 2;
   public static final int DROP_DATABASE_RESPONSE        = 2;
 
   public static final int CONFIGURATION_FETCH_SUBMIT_REQUEST  = 4;
@@ -132,14 +134,6 @@ public class OCoordinateMessagesFactory {
   }
 
   public OStructuralNodeRequest createStructuralOperationRequest(int requestType) {
-    switch (requestType) {
-    case CREATE_DATABASE_REQUEST:
-      return new OCreateDatabaseOperationRequest();
-    case CREATE_DATABASE_FINALIZE_REQUEST:
-      return new OCreateDatabaseFinalizeRequest();
-    case DROP_DATABASE_REQUEST:
-      return new ODropDatabaseOperationRequest();
-    }
     return null;
   }
 
@@ -161,5 +155,19 @@ public class OCoordinateMessagesFactory {
       return new ODropDatabaseSubmitResponse();
     }
     return null;
+  }
+
+  public ORaftOperation createRaftOperation(int requestType) {
+    switch (requestType) {
+    case CREATE_DATABASE_REQUEST:
+      return new OCreateDatabase();
+    case NODE_JOIN_REQUEST:
+      return new ONodeJoin();
+    case DROP_DATABASE_REQUEST:
+      return new ODropDatabase();
+    }
+
+    return null;
+
   }
 }

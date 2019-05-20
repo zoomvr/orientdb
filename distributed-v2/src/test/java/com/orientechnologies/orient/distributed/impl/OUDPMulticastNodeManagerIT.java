@@ -87,7 +87,7 @@ public class OUDPMulticastNodeManagerIT {
     for (OUDPMulticastNodeManager node : nodes.values()) {
       int numOfMasters = 0;
       for (ODiscoveryListener.NodeData value : node.knownServers.values()) {
-        if (value.master) {
+        if (value.leader) {
           numOfMasters++;
           if (lastMaster == null) {
             lastMaster = value.getNodeIdentity();
@@ -112,7 +112,7 @@ public class OUDPMulticastNodeManagerIT {
       for (OUDPMulticastNodeManager node : nodes.values()) {
         int numOfMasters = 0;
         for (ODiscoveryListener.NodeData value : node.knownServers.values()) {
-          if (value.master) {
+          if (value.leader) {
             numOfMasters++;
             if (lastMaster == null) {
               lastMaster = value.getNodeIdentity();
@@ -185,7 +185,7 @@ public class OUDPMulticastNodeManagerIT {
     for (OUDPMulticastNodeManager node : nodes.values()) {
       int numOfMasters = 0;
       for (ODiscoveryListener.NodeData value : node.knownServers.values()) {
-        if (value.master) {
+        if (value.leader) {
           numOfMasters++;
           if (lastMaster == null) {
             lastMaster = value.getNodeIdentity();
@@ -221,7 +221,7 @@ public class OUDPMulticastNodeManagerIT {
       for (OUDPMulticastNodeManager node_ : nodes.values()) {
         int numOfMasters = 0;
         for (ODiscoveryListener.NodeData value : node_.knownServers.values()) {
-          if (value.master) {
+          if (value.leader) {
             numOfMasters++;
             if (lastMaster == null) {
               lastMaster = value.getNodeIdentity();

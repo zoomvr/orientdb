@@ -17,4 +17,10 @@ public interface OCoordinatedExecutor {
   void executeStructuralSubmitRequest(ONetworkStructuralSubmitRequest request);
 
   void executeStructuralSubmitResponse(ONetworkStructuralSubmitResponse response);
+
+  void executePropagate(ONetworkPropagate propagate);
+
+  void executeConfirm(ONetworkConfirm confirm);
+
+  void executeAck(ONetworkAck ack);
 }

@@ -5,15 +5,26 @@ import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class OStructuralSharedConfiguration {
 
+  private List<String>                                     databases;
   private Map<ONodeIdentity, OStructuralNodeConfiguration> knownNodes;
+  private int                                              quorum;
+
+  public void init(int quorum) {
+    databases = new ArrayList<>();
+    knownNodes = new HashMap<>();
+    this.quorum = quorum;
+  }
 
   public void deserialize(DataInput input) throws IOException {
+    this.quorum = input.readInt();
     int nKnowNodes = input.readInt();
     knownNodes = new HashMap<>();
     while (nKnowNodes-- > 0) {
@@ -21,16 +32,22 @@ public class OStructuralSharedConfiguration {
       node.deserialize(input);
       knownNodes.put(node.getIdentity(), node);
     }
-  }
-
-  public void init() {
-    knownNodes = new HashMap<>();
+    int nDatabases = input.readInt();
+    databases = new ArrayList<>();
+    while (nDatabases-- > 0) {
+      databases.add(input.readUTF());
+    }
   }
 
   public void serialize(DataOutput output) throws IOException {
+    output.writeInt(quorum);
     output.writeInt(knownNodes.size());
     for (OStructuralNodeConfiguration node : knownNodes.values()) {
       node.serialize(output);
+    }
+    output.writeInt(databases.size());
+    for (String database : databases) {
+      output.writeUTF(database);
     }
   }
 
@@ -54,5 +71,25 @@ public class OStructuralSharedConfiguration {
 
   public OStructuralNodeConfiguration getNode(ONodeIdentity nodeIdentity) {
     return knownNodes.get(nodeIdentity);
+  }
+
+  public boolean existsNode(ONodeIdentity identity) {
+    return knownNodes.containsKey(identity);
+  }
+
+  public boolean canAddNode(ONodeIdentity identity) {
+    return knownNodes.size() < (quorum - 1) * 2;
+  }
+
+  public boolean existsDatabase(String database) {
+    return databases.contains(database);
+  }
+
+  public void addDatabase(String database) {
+    databases.add(database);
+  }
+
+  public int getQuorum() {
+    return quorum;
   }
 }

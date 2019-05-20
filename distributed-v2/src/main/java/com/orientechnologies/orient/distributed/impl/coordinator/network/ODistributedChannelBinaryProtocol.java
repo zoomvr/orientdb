@@ -12,6 +12,7 @@ import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeR
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeResponse;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.structural.raft.ORaftOperation;
 import com.orientechnologies.orient.server.distributed.ORemoteServerController;
 
 public class ODistributedChannelBinaryProtocol implements ODistributedChannel {
@@ -62,6 +63,21 @@ public class ODistributedChannelBinaryProtocol implements ODistributedChannel {
   @Override
   public void reply(String database, OSessionOperationId operationId, OSubmitResponse response) {
     controller.sendBinaryRequest(new ONetworkSubmitResponse(nodeIdentity, database, operationId, response));
+  }
+
+  @Override
+  public void propagate(OLogId id, ORaftOperation operation) {
+    controller.sendBinaryRequest(new ONetworkPropagate(nodeIdentity, id, operation));
+  }
+
+  @Override
+  public void ack(OLogId logId) {
+    controller.sendBinaryRequest(new ONetworkAck(nodeIdentity, logId));
+  }
+
+  @Override
+  public void confirm(OLogId id) {
+    controller.sendBinaryRequest(new ONetworkConfirm(nodeIdentity, id));
   }
 
   public void close() {

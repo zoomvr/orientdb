@@ -4,70 +4,75 @@ import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
 import com.orientechnologies.orient.distributed.impl.OPersistentOperationalLogV1;
 import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLog;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSessionOperationId;
+import com.orientechnologies.orient.distributed.impl.structural.raft.OStructuralFollower;
+import com.orientechnologies.orient.distributed.impl.structural.raft.OStructuralLeader;
 
 import java.util.concurrent.Executors;
 
 public class OStructuralDistributedContext {
-  private OStructuralDistributedExecutor executor;
-  private OStructuralSubmitContext       submitContext;
-  private OStructuralCoordinator         coordinator;
-  private OOperationLog                  opLog;
-  private OrientDBDistributed            context;
+  private OStructuralSubmitContext submitContext;
+  private OOperationLog            opLog;
+  private OrientDBDistributed      context;
+  private OStructuralLeader        leader;
+  private OStructuralFollower      follower;
 
   public OStructuralDistributedContext(OrientDBDistributed context) {
     this.context = context;
     initOpLog();
-    executor = new OStructuralDistributedExecutor(Executors.newSingleThreadExecutor(), opLog, context);
     submitContext = new OStructuralSubmitContextImpl();
-    coordinator = null;
+    follower = new OStructuralFollower(Executors.newSingleThreadExecutor(), opLog, context);
+    leader = null;
   }
 
   private void initOpLog() {
     this.opLog = OPersistentOperationalLogV1
         .newInstance("OSystem", context, (x) -> context.getCoordinateMessagesFactory().createStructuralOperationRequest(x));
-//    this.opLog = new OIncrementOperationalLog();
-  }
-
-  public OStructuralDistributedExecutor getExecutor() {
-    return executor;
   }
 
   public OStructuralSubmitContext getSubmitContext() {
     return submitContext;
   }
 
-  public synchronized OStructuralCoordinator getCoordinator() {
-    return coordinator;
-  }
-
   public OOperationLog getOpLog() {
     return opLog;
   }
 
-  public synchronized void makeCoordinator(ONodeIdentity identity) {
-    if (coordinator == null) {
-      coordinator = new OStructuralCoordinator(Executors.newSingleThreadExecutor(), opLog, context);
-      OStructuralLoopBackDistributeDistributedMember loopBack = new OStructuralLoopBackDistributeDistributedMember(identity,
-          submitContext, coordinator, executor);
-      coordinator.nodeConnected(loopBack);
-      submitContext.setCoordinator(loopBack);
-      executor.join(loopBack);
-    }
+  public OStructuralLeader getLeader() {
+    return leader;
   }
 
-  public synchronized void setExternalCoordinator(OStructuralDistributedMember coordinator) {
-    if (this.coordinator != null) {
-      this.coordinator.close();
-      this.coordinator = null;
+  public OStructuralFollower getFollower() {
+    return follower;
+  }
+
+  public synchronized void makeLeader(ONodeIdentity identity, OStructuralSharedConfiguration sharedConfiguration) {
+    if (leader == null) {
+      leader = new OStructuralLeader(Executors.newSingleThreadExecutor(), opLog, context);
     }
-    submitContext.setCoordinator(coordinator);
-    executor.join(coordinator);
+    OStructuralLoopBackDistributeDistributedMember loopbackLeader = new OStructuralLoopBackDistributeDistributedMember(identity,
+        submitContext, leader, follower);
+    leader.connected(loopbackLeader);
+    this.getSubmitContext().setLeader(loopbackLeader);
+  }
+
+  public synchronized void setExternalLeader(OStructuralDistributedMember coordinator) {
+    if (this.leader != null) {
+      this.leader.close();
+      this.leader = null;
+    }
+    this.getSubmitContext().setLeader(coordinator);
   }
 
   public synchronized void close() {
-    if (coordinator != null)
-      coordinator.close();
-    executor.close();
+    if (leader != null)
+      leader.close();
+    follower.close();
   }
 
+  public void execute(ONodeIdentity senderNode, OSessionOperationId operationId, OStructuralSubmitRequest request) {
+    if (leader != null) {
+      leader.receiveSubmit(senderNode, operationId, request);
+    }
+  }
 }

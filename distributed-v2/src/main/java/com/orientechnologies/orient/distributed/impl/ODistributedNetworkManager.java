@@ -6,12 +6,14 @@ import com.orientechnologies.orient.client.remote.OBinaryResponse;
 import com.orientechnologies.orient.core.db.config.ONodeConfiguration;
 import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
-import com.orientechnologies.orient.distributed.hazelcast.OCoordinatedExecutorMessageHandler;
 import com.orientechnologies.orient.distributed.impl.coordinator.OCoordinateMessagesFactory;
 import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedChannel;
 import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
 import com.orientechnologies.orient.distributed.impl.coordinator.network.ODistributedChannelBinaryProtocol;
 import com.orientechnologies.orient.distributed.impl.coordinator.network.ODistributedExecutable;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkAck;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkConfirm;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkPropagate;
 import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkStructuralSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkStructuralSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkSubmitRequest;
@@ -30,8 +32,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import static com.orientechnologies.orient.enterprise.channel.binary.OChannelBinaryProtocol.DISTRIBUTED_ACK_RESPONSE;
+import static com.orientechnologies.orient.enterprise.channel.binary.OChannelBinaryProtocol.DISTRIBUTED_CONFIRM_REQUEST;
 import static com.orientechnologies.orient.enterprise.channel.binary.OChannelBinaryProtocol.DISTRIBUTED_OPERATION_REQUEST;
 import static com.orientechnologies.orient.enterprise.channel.binary.OChannelBinaryProtocol.DISTRIBUTED_OPERATION_RESPONSE;
+import static com.orientechnologies.orient.enterprise.channel.binary.OChannelBinaryProtocol.DISTRIBUTED_PROPAGATE_REQUEST;
 import static com.orientechnologies.orient.enterprise.channel.binary.OChannelBinaryProtocol.DISTRIBUTED_STRUCTURAL_OPERATION_REQUEST;
 import static com.orientechnologies.orient.enterprise.channel.binary.OChannelBinaryProtocol.DISTRIBUTED_STRUCTURAL_OPERATION_RESPONSE;
 import static com.orientechnologies.orient.enterprise.channel.binary.OChannelBinaryProtocol.DISTRIBUTED_STRUCTURAL_SUBMIT_REQUEST;
@@ -142,7 +147,7 @@ public class ODistributedNetworkManager implements ODiscoveryListener {
   public void leaderElected(NodeData data) {
     //TODO: Come from a term
     OLogId lastValid = null;
-    orientDB.setCoordinator(data.getNodeIdentity(), lastValid);
+    orientDB.setLeader(data.getNodeIdentity(), lastValid);
   }
 
   public ODistributedChannel getChannel(ONodeIdentity identity) {
@@ -184,6 +189,12 @@ public class ODistributedNetworkManager implements ODiscoveryListener {
       return new OStructuralOperationRequest(coordinateMessagesFactory);
     case DISTRIBUTED_STRUCTURAL_OPERATION_RESPONSE:
       return new OStructuralOperationResponse(coordinateMessagesFactory);
+    case DISTRIBUTED_PROPAGATE_REQUEST:
+      return new ONetworkPropagate(coordinateMessagesFactory);
+    case DISTRIBUTED_ACK_RESPONSE:
+      return new ONetworkAck();
+    case DISTRIBUTED_CONFIRM_REQUEST:
+      return new ONetworkConfirm();
     }
     return null;
   }

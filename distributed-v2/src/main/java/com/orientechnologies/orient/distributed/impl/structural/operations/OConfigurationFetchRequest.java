@@ -1,16 +1,18 @@
 package com.orientechnologies.orient.distributed.impl.structural.operations;
 
+import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
-import com.orientechnologies.orient.distributed.impl.structural.OCoordinationContext;
+import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSessionOperationId;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeDatabase;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitId;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.raft.OLeaderContext;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static com.orientechnologies.orient.distributed.impl.coordinator.OCoordinateMessagesFactory.CONFIGURATION_FETCH_SUBMIT_REQUEST;
 
@@ -25,9 +27,8 @@ public class OConfigurationFetchRequest implements OStructuralSubmitRequest {
   }
 
   @Override
-  public void begin(OStructuralSubmitId id, OCoordinationContext coordinator) {
-    coordinator.reply(id, new OConfigurationFetchResponse(coordinator.getOrientDB().getStructuralConfiguration().getSharedConfiguration()));
-
+  public void begin(Optional<ONodeIdentity> requester, OSessionOperationId id, OLeaderContext context) {
+    //coordinator.reply(id, new OConfigurationFetchResponse(coordinator.getOrientDB().getStructuralConfiguration().getSharedConfiguration()));
   }
 
   @Override

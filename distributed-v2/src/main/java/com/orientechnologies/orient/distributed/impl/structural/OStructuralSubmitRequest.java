@@ -1,11 +1,12 @@
 package com.orientechnologies.orient.distributed.impl.structural;
 
+import com.orientechnologies.orient.distributed.impl.structural.raft.OStructuralSubmit;
+
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-public interface OStructuralSubmitRequest {
-  void begin(OStructuralSubmitId id, OCoordinationContext coordinator);
+public interface OStructuralSubmitRequest extends OStructuralSubmit {
 
   void serialize(DataOutput output) throws IOException;
 

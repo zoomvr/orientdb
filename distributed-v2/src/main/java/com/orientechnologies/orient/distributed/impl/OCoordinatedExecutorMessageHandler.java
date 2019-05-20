@@ -1,18 +1,29 @@
-package com.orientechnologies.orient.distributed.hazelcast;
+package com.orientechnologies.orient.distributed.impl;
 
 import com.orientechnologies.common.log.OLogManager;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralCoordinator;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
 import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedCoordinator;
 import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedExecutor;
 import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedMember;
 import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitContext;
-import com.orientechnologies.orient.distributed.impl.coordinator.network.*;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.OCoordinatedExecutor;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkAck;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkConfirm;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkPropagate;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkStructuralSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkStructuralSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.ONetworkSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.OOperationRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.OOperationResponse;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.OStructuralOperationRequest;
+import com.orientechnologies.orient.distributed.impl.coordinator.network.OStructuralOperationResponse;
 import com.orientechnologies.orient.distributed.impl.metadata.ODistributedContext;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralDistributedContext;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralDistributedExecutor;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralDistributedMember;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitContext;
+import com.orientechnologies.orient.distributed.impl.structural.raft.OStructuralFollower;
+import com.orientechnologies.orient.distributed.impl.structural.raft.OStructuralLeader;
 
 public class OCoordinatedExecutorMessageHandler implements OCoordinatedExecutor {
   private OrientDBDistributed distributed;
@@ -70,34 +81,18 @@ public class OCoordinatedExecutorMessageHandler implements OCoordinatedExecutor 
 
   @Override
   public void executeStructuralOperationRequest(OStructuralOperationRequest request) {
-    OStructuralDistributedContext distributedContext = distributed.getStructuralDistributedContext();
-    OStructuralDistributedExecutor executor = distributedContext.getExecutor();
-    OStructuralDistributedMember member = executor.getMember(request.getSenderNode());
-    executor.receive(member, request.getId(), request.getRequest());
+    //TODO: To remove
   }
 
   @Override
   public void executeStructuralOperationResponse(OStructuralOperationResponse response) {
-    OStructuralDistributedContext distributedContext = distributed.getStructuralDistributedContext();
-    OStructuralCoordinator coordinator = distributedContext.getCoordinator();
-    if (coordinator == null) {
-      OLogManager.instance().error(this, "Received coordinator response on a node that is not a coordinator ignoring it", null);
-    } else {
-      OStructuralDistributedMember member = coordinator.getMember(response.getSenderNode());
-      coordinator.receive(member, response.getId(), response.getResponse());
-    }
+    //TODO: To remove
   }
 
   @Override
   public void executeStructuralSubmitRequest(ONetworkStructuralSubmitRequest request) {
     OStructuralDistributedContext distributedContext = distributed.getStructuralDistributedContext();
-    OStructuralCoordinator coordinator = distributedContext.getCoordinator();
-    if (coordinator == null) {
-      OLogManager.instance().error(this, "Received submit request on a node that is not a coordinator ignoring it", null);
-    } else {
-      OStructuralDistributedMember member = coordinator.getMember(request.getSenderNode());
-      coordinator.submit(member, request.getOperationId(), request.getRequest());
-    }
+    distributedContext.execute(request.getSenderNode(), request.getOperationId(), request.getRequest());
   }
 
   @Override
@@ -105,5 +100,31 @@ public class OCoordinatedExecutorMessageHandler implements OCoordinatedExecutor 
     OStructuralDistributedContext distributedContext = distributed.getStructuralDistributedContext();
     OStructuralSubmitContext context = distributedContext.getSubmitContext();
     context.receive(response.getOperationId(), response.getResponse());
+  }
+
+  @Override
+  public void executePropagate(ONetworkPropagate propagate) {
+    OStructuralDistributedContext distributedContext = distributed.getStructuralDistributedContext();
+    OStructuralFollower slave = distributedContext.getFollower();
+    OStructuralDistributedMember member = slave.getMember(propagate.getSenderNode());
+    slave.log(member, propagate.getId(), propagate.getOperation());
+  }
+
+  @Override
+  public void executeConfirm(ONetworkConfirm confirm) {
+    OStructuralDistributedContext distributedContext = distributed.getStructuralDistributedContext();
+    OStructuralFollower slave = distributedContext.getFollower();
+    slave.confirm(confirm.getId());
+  }
+
+  @Override
+  public void executeAck(ONetworkAck ack) {
+    OStructuralDistributedContext distributedContext = distributed.getStructuralDistributedContext();
+    OStructuralLeader master = distributedContext.getLeader();
+    if (master == null) {
+      OLogManager.instance().error(this, "Received coordinator response on a node that is not a coordinator ignoring it", null);
+    } else {
+      master.receiveAck(ack.getSenderNode(), ack.getLogId());
+    }
   }
 }

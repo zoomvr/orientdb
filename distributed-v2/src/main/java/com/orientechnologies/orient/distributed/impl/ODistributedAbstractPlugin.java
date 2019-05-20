@@ -20,29 +20,29 @@
 package com.orientechnologies.orient.distributed.impl;
 
 import com.orientechnologies.common.concur.lock.OInterruptedException;
-import com.orientechnologies.common.console.OConsoleReader;
-import com.orientechnologies.common.console.ODefaultConsoleReader;
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.io.OFileUtils;
 import com.orientechnologies.common.io.OIOException;
 import com.orientechnologies.common.io.OIOUtils;
-import com.orientechnologies.common.log.OAnsiCode;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.parser.OSystemVariableResolver;
-import com.orientechnologies.common.util.OArrays;
 import com.orientechnologies.common.util.OCallable;
 import com.orientechnologies.common.util.OUncaughtExceptionHandler;
 import com.orientechnologies.orient.core.OConstants;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.db.*;
+import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
+import com.orientechnologies.orient.core.db.ODatabaseInternal;
+import com.orientechnologies.orient.core.db.ODatabaseLifecycleListener;
+import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
+import com.orientechnologies.orient.core.db.OScenarioThreadLocal;
+import com.orientechnologies.orient.core.db.OrientDBConfig;
 import com.orientechnologies.orient.core.db.config.ONodeConfiguration;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.exception.OConfigurationException;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
-import com.orientechnologies.orient.core.metadata.schema.OSchema;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.metadata.schema.OView;
 import com.orientechnologies.orient.core.record.impl.ODocument;
@@ -52,15 +52,28 @@ import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
 import com.orientechnologies.orient.core.storage.disk.OLocalPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
-import com.orientechnologies.orient.distributed.impl.task.*;
+import com.orientechnologies.orient.distributed.impl.task.OSyncDatabaseDeltaTask;
+import com.orientechnologies.orient.distributed.impl.task.OSyncDatabaseTask;
+import com.orientechnologies.orient.distributed.impl.task.OUpdateDatabaseStatusTask;
 import com.orientechnologies.orient.server.OServer;
 import com.orientechnologies.orient.server.OSystemDatabase;
-import com.orientechnologies.orient.server.config.OServerConfiguration;
-import com.orientechnologies.orient.server.config.OServerHandlerConfiguration;
 import com.orientechnologies.orient.server.config.OServerParameterConfiguration;
 import com.orientechnologies.orient.server.config.OServerUserConfiguration;
-import com.orientechnologies.orient.server.distributed.*;
+import com.orientechnologies.orient.server.distributed.ODistributedConfiguration;
+import com.orientechnologies.orient.server.distributed.ODistributedDatabase;
+import com.orientechnologies.orient.server.distributed.ODistributedException;
+import com.orientechnologies.orient.server.distributed.ODistributedLifecycleListener;
+import com.orientechnologies.orient.server.distributed.ODistributedMomentum;
+import com.orientechnologies.orient.server.distributed.ODistributedRequest;
+import com.orientechnologies.orient.server.distributed.ODistributedRequestId;
+import com.orientechnologies.orient.server.distributed.ODistributedResponse;
+import com.orientechnologies.orient.server.distributed.ODistributedResponseManager;
+import com.orientechnologies.orient.server.distributed.ODistributedServerLog;
 import com.orientechnologies.orient.server.distributed.ODistributedServerLog.DIRECTION;
+import com.orientechnologies.orient.server.distributed.ODistributedServerManager;
+import com.orientechnologies.orient.server.distributed.ODistributedStrategy;
+import com.orientechnologies.orient.server.distributed.OModifiableDistributedConfiguration;
+import com.orientechnologies.orient.server.distributed.ORemoteTaskFactoryManager;
 import com.orientechnologies.orient.server.distributed.conflict.ODistributedConflictResolverFactory;
 import com.orientechnologies.orient.server.distributed.task.OAbstractReplicatedTask;
 import com.orientechnologies.orient.server.distributed.task.ODatabaseIsOldException;
@@ -69,13 +82,31 @@ import com.orientechnologies.orient.server.distributed.task.ORemoteTask;
 import com.orientechnologies.orient.server.network.OServerNetworkListener;
 import com.orientechnologies.orient.server.plugin.OServerPluginAbstract;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimerTask;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -94,21 +125,19 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
   protected static final String PAR_DEF_DISTRIB_DB_CONFIG = "configuration.db.default";
   protected static final String NODE_NAME_ENV             = "ORIENTDB_NODE_NAME";
 
-  protected          OServer                                    serverInstance;
-  protected          String                                     nodeUuid;
-  protected          String                                     nodeName                          = null;
-  protected          int                                        nodeId                            = -1;
-  protected          File                                       defaultDatabaseConfigFile;
-  protected final    ConcurrentMap<String, ODistributedStorage> storages                          = new ConcurrentHashMap<String, ODistributedStorage>();
-  protected volatile NODE_STATUS                                status                            = NODE_STATUS.OFFLINE;
-  protected          long                                       lastClusterChangeOn;
-  protected          List<ODistributedLifecycleListener>        listeners                         = new ArrayList<ODistributedLifecycleListener>();
-  protected          TimerTask                                  publishLocalNodeConfigurationTask = null;
-  protected          TimerTask                                  haStatsTask                       = null;
+  protected          OServer                             serverInstance;
+  protected          String                              nodeUuid;
+  protected          String                              nodeName                          = null;
+  protected          int                                 nodeId                            = -1;
+  protected          File                                defaultDatabaseConfigFile;
+  protected volatile NODE_STATUS                         status                            = NODE_STATUS.OFFLINE;
+  protected          long                                lastClusterChangeOn;
+  protected          List<ODistributedLifecycleListener> listeners                         = new ArrayList<ODistributedLifecycleListener>();
+  protected          TimerTask                           publishLocalNodeConfigurationTask = null;
+  protected          TimerTask                           haStatsTask                       = null;
 
   // LOCAL MSG COUNTER
-  protected AtomicLong                          localMessageIdCounter     = new AtomicLong();
-  protected OClusterOwnershipAssignmentStrategy clusterAssignmentStrategy = new ODefaultClusterOwnershipAssignmentStrategy(this);
+  protected AtomicLong localMessageIdCounter = new AtomicLong();
 
   protected static final int                            DEPLOY_DB_MAX_RETRIES  = 10;
   protected              ConcurrentMap<String, String>  activeNodesNamesByUuid = new ConcurrentHashMap<String, String>();
@@ -119,14 +148,11 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
       .newSetFromMap(new ConcurrentHashMap<String, Boolean>());
   protected volatile     ODistributedMessageServiceImpl messageService;
   protected              Date                           startedOn              = new Date();
-  protected              ODistributedStrategy           responseManagerFactory = new ODefaultDistributedStrategy();
-  protected              ORemoteTaskFactoryManager      taskFactoryManager     = new ORemoteTaskFactoryManagerImpl(this);
 
   private volatile String                              lastServerDump          = "";
   protected        CountDownLatch                      serverStarted           = new CountDownLatch(1);
   private          ODistributedConflictResolverFactory conflictResolverFactory = new ODistributedConflictResolverFactory();
   private final    ODistributedLockManagerRequester    lockManagerRequester    = new ODistributedLockManagerRequester(this);
-  private          ODistributedLockManagerExecutor     lockManagerExecutor;
 
   protected ODistributedAbstractPlugin() {
   }
@@ -226,12 +252,12 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
 
   @Override
   public ODistributedLockManagerRequester getLockManagerRequester() {
-    return lockManagerRequester;
+    return null;
   }
 
   @Override
   public ODistributedLockManagerExecutor getLockManagerExecutor() {
-    return lockManagerExecutor;
+    return null;
   }
 
   /**
@@ -276,7 +302,6 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
   public void sendShutdown() {
     shutdown();
   }
-
 
   public ODistributedConfiguration getDatabaseConfiguration(final String iDatabaseName) {
     return getDatabaseConfiguration(iDatabaseName, true);
@@ -1350,7 +1375,7 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
 
   @Override
   public ORemoteTaskFactoryManager getTaskFactoryManager() {
-    return taskFactoryManager;
+    return null;
   }
 
   private void createClusters(final ODatabaseInternal iDatabase, final Map<OClass, List<String>> cluster2Create,
@@ -1402,11 +1427,11 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
   }
 
   public ODistributedStrategy getDistributedStrategy() {
-    return responseManagerFactory;
+    return null;
   }
 
   public void setDistributedStrategy(final ODistributedStrategy streatgy) {
-    this.responseManagerFactory = streatgy;
+
   }
 
   /**
@@ -1466,120 +1491,8 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
 
   public abstract void notifyClients(String databaseName);
 
-  protected void onDatabaseEvent(final String nodeName, final String databaseName, final DB_STATUS status) {
-    updateLastClusterChange();
-    dumpServersStatus();
-  }
-
   protected void rebalanceClusterOwnership(final String iNode, ODatabaseInternal iDatabase,
       final OModifiableDistributedConfiguration cfg, final boolean canCreateNewClusters) {
-    final ODistributedConfiguration.ROLES role = cfg.getServerRole(iNode);
-    if (role != ODistributedConfiguration.ROLES.MASTER)
-      // NO MASTER, DON'T CREATE LOCAL CLUSTERS
-      return;
-
-    if (iDatabase.isClosed())
-      iDatabase = getServerInstance().openDatabase(iDatabase.getName());
-
-    ODistributedServerLog
-        .info(this, nodeName, null, DIRECTION.NONE, "Reassigning ownership of clusters for database %s...", iDatabase.getName());
-
-    final Set<String> availableNodes = getAvailableNodeNames(iDatabase.getName());
-
-    iDatabase.activateOnCurrentThread();
-    final OSchema schema = ((ODatabaseInternal<?>) iDatabase).getDatabaseOwner().getMetadata().getSchema();
-
-    final Map<OClass, List<String>> cluster2CreateMap = new HashMap<OClass, List<String>>(1);
-    for (final OClass clazz : schema.getClasses()) {
-      final List<String> cluster2Create = clusterAssignmentStrategy
-          .assignClusterOwnershipOfClass(iDatabase, cfg, clazz, availableNodes, canCreateNewClusters);
-
-      cluster2CreateMap.put(clazz, cluster2Create);
-    }
-
-    if (canCreateNewClusters)
-      createClusters(iDatabase, cluster2CreateMap, cfg);
-
-    ODistributedServerLog
-        .info(this, nodeName, null, DIRECTION.NONE, "Reassignment of clusters for database '%s' completed (classes=%d)",
-            iDatabase.getName(), cluster2CreateMap.size());
-  }
-
-  protected void assignNodeName() {
-    // ORIENTDB_NODE_NAME ENV VARIABLE OR JVM SETTING
-    nodeName = OSystemVariableResolver.resolveVariable(NODE_NAME_ENV);
-
-    if (nodeName != null) {
-      nodeName = nodeName.trim();
-      if (nodeName.isEmpty())
-        nodeName = null;
-    }
-
-    if (nodeName == null) {
-      try {
-        // WAIT ANY LOG IS PRINTED
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-      }
-
-      System.out.println();
-      System.out.println();
-      System.out.println(OAnsiCode.format("$ANSI{yellow +---------------------------------------------------------------+}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow |         WARNING: FIRST DISTRIBUTED RUN CONFIGURATION          |}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow +---------------------------------------------------------------+}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow | This is the first time that the server is running as          |}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow | distributed. Please type the name you want to assign to the   |}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow | current server node.                                          |}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow |                                                               |}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow | To avoid this message set the environment variable or JVM     |}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow | setting ORIENTDB_NODE_NAME to the server node name to use.    |}"));
-      System.out.println(OAnsiCode.format("$ANSI{yellow +---------------------------------------------------------------+}"));
-      System.out.print(OAnsiCode.format("\n$ANSI{yellow Node name [BLANK=auto generate it]: }"));
-
-      OConsoleReader reader = new ODefaultConsoleReader();
-      try {
-        nodeName = reader.readLine();
-      } catch (IOException e) {
-      }
-      if (nodeName != null) {
-        nodeName = nodeName.trim();
-        if (nodeName.isEmpty())
-          nodeName = null;
-      }
-    }
-
-    if (nodeName == null)
-      // GENERATE NODE NAME
-      this.nodeName = "node" + System.currentTimeMillis();
-
-    OLogManager.instance().warn(this, "Assigning distributed node name: %s", this.nodeName);
-
-    // SALVE THE NODE NAME IN CONFIGURATION
-    boolean found = false;
-    final OServerConfiguration cfg = serverInstance.getConfiguration();
-    for (OServerHandlerConfiguration h : cfg.handlers) {
-      if (h.clazz.equals(getClass().getName())) {
-        for (OServerParameterConfiguration p : h.parameters) {
-          if (p.name.equals("nodeName")) {
-            found = true;
-            p.value = this.nodeName;
-            break;
-          }
-        }
-
-        if (!found) {
-          h.parameters = OArrays.copyOf(h.parameters, h.parameters.length + 1);
-          h.parameters[h.parameters.length - 1] = new OServerParameterConfiguration("nodeName", this.nodeName);
-        }
-
-        try {
-          serverInstance.saveConfiguration();
-        } catch (IOException e) {
-          throw OException.wrapException(new OConfigurationException("Cannot save server configuration"), e);
-        }
-        break;
-      }
-    }
   }
 
   protected long writeDatabaseChunk(final int iChunkId, final ODistributedDatabaseChunk chunk, final OutputStream out)
@@ -1623,8 +1536,7 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
               dir.mkdir();
               File file = new File(iDatabaseCompressedFile);
               file.renameTo(new File(dir, databaseName + "_full.ibu"));
-              OStorage storage = serverInstance.getDatabases()
-                  .fullSync(databaseName, null, OrientDBConfig.defaultConfig());
+              OStorage storage = serverInstance.getDatabases().fullSync(databaseName, null, OrientDBConfig.defaultConfig());
               file.delete();
               dir.delete();
               if (uniqueClustersBackupDirectory != null && uniqueClustersBackupDirectory.exists()) {
@@ -1734,21 +1646,6 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
   }
 
   public void stopNode(final String iNode) throws IOException {
-    ODistributedServerLog.warn(this, nodeName, null, DIRECTION.NONE, "Sending request of stopping node '%s'...", iNode);
-
-    final ODistributedRequest request = new ODistributedRequest(this, nodeId, getNextMessageIdCounter(), null,
-        getTaskFactoryManager().getFactoryByServerName(iNode).createTask(OStopServerTask.FACTORYID));
-
-    getRemoteServer(iNode).sendRequest(request);
-  }
-
-  public void restartNode(final String iNode) throws IOException {
-    ODistributedServerLog.warn(this, nodeName, null, DIRECTION.NONE, "Sending request of restarting node '%s'...", iNode);
-
-    final ODistributedRequest request = new ODistributedRequest(this, nodeId, getNextMessageIdCounter(), null,
-        getTaskFactoryManager().getFactoryByServerName(iNode).createTask(ORestartServerTask.FACTORYID));
-
-    getRemoteServer(iNode).sendRequest(request);
   }
 
   public Set<String> getAvailableNodeNames(final String iDatabaseName) {
@@ -1758,36 +1655,6 @@ public abstract class ODistributedAbstractPlugin extends OServerPluginAbstract
 
   public long getNextMessageIdCounter() {
     return localMessageIdCounter.getAndIncrement();
-  }
-
-  protected boolean isRelatedToLocalServer(final ODatabaseInternal iDatabase) {
-    final String dbUrl = OSystemVariableResolver.resolveSystemVariables(iDatabase.getURL());
-
-    // Check for the system database.
-    if (iDatabase.getName().equalsIgnoreCase(OSystemDatabase.SYSTEM_DB_NAME))
-      return false;
-
-    if (dbUrl.startsWith("plocal:")) {
-      final OLocalPaginatedStorage paginatedStorage = (OLocalPaginatedStorage) iDatabase.getStorage().getUnderlying();
-
-      // CHECK SPECIAL CASE WITH MULTIPLE SERVER INSTANCES ON THE SAME JVM
-      final Path storagePath = paginatedStorage.getStoragePath();
-      final Path dbDirectoryPath = Paths.get(serverInstance.getDatabaseDirectory());
-
-      if (!storagePath.startsWith(dbDirectoryPath))
-        // SKIP IT: THIS HAPPENS ONLY ON MULTIPLE SERVER INSTANCES ON THE SAME JVM
-        return false;
-    } else if (dbUrl.startsWith("remote:"))
-      return false;
-
-    return true;
-  }
-
-  /**
-   * Avoids to dump the same configuration twice if it's unchanged since the last time.
-   */
-  protected void dumpServersStatus() {
-
   }
 
   @Override

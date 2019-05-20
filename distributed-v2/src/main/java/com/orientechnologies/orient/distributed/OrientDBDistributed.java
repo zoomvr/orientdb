@@ -34,18 +34,16 @@ import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSe
 import com.orientechnologies.orient.distributed.impl.metadata.ODistributedContext;
 import com.orientechnologies.orient.distributed.impl.metadata.OSharedContextDistributed;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralConfiguration;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralCoordinator;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralDistributedContext;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralDistributedMember;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeConfiguration;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeDatabase;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeRequest;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSharedConfiguration;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitResponse;
-import com.orientechnologies.orient.distributed.impl.structural.operations.OConfigurationFetchRequest;
-import com.orientechnologies.orient.distributed.impl.structural.operations.OConfigurationFetchResponse;
 import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.raft.ORaftOperation;
 import com.orientechnologies.orient.enterprise.channel.binary.OChannelBinary;
 import com.orientechnologies.orient.server.OClientConnection;
 import com.orientechnologies.orient.server.OServer;
@@ -59,12 +57,11 @@ import com.orientechnologies.orient.server.network.protocol.binary.ONetworkProto
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.SecureRandom;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -116,8 +113,7 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
 
   @Override
   public void onAfterActivate() {
-    structuralConfiguration = new OStructuralConfiguration(this.getServer().getSystemDatabase(), this,
-        this.nodeConfiguration.getNodeName());
+    structuralConfiguration = new OStructuralConfiguration(this.getServer().getSystemDatabase(), this);
     checkPort();
     structuralDistributedContext = new OStructuralDistributedContext(this);
     networkManager = new ODistributedNetworkManager(this, getNodeConfig(), generateInternalConfiguration());
@@ -136,16 +132,15 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
   }
 
   private ONodeInternalConfiguration generateInternalConfiguration() {
-
-    OServerUserConfiguration user = server.getUser(DISTRIBUTED_USER);
+    String userName = getNodeIdentity().getName() + DISTRIBUTED_USER;
+    OServerUserConfiguration user = server.getUser(userName);
     if (user == null) {
-      server.addTemporaryUser(DISTRIBUTED_USER, "" + new SecureRandom().nextLong(), "*");
-      user = server.getUser(DISTRIBUTED_USER);
+      server.addTemporaryUser(userName, "" + new SecureRandom().nextLong(), "*");
+      user = server.getUser(userName);
     }
     OLogId lastLogId = structuralDistributedContext.getOpLog().lastPersistentLog();
 
-    return new ONodeInternalConfiguration(lastLogId, structuralConfiguration.getCurrentNodeIdentity(), DISTRIBUTED_USER,
-        user.password);
+    return new ONodeInternalConfiguration(lastLogId, getNodeIdentity(), userName, user.password);
   }
 
   @Override
@@ -243,7 +238,10 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
     Future<OStructuralSubmitResponse> created = structuralDistributedContext.getSubmitContext()
         .send(new OSessionOperationId(), new OCreateDatabaseSubmitRequest(name, type.name(), new HashMap<>()));
     try {
-      created.get();
+      OCreateDatabaseSubmitResponse response = (OCreateDatabaseSubmitResponse) created.get();
+      if (!response.isSuccess()) {
+        throw new ODatabaseException(response.getError());
+      }
     } catch (InterruptedException e) {
       e.printStackTrace();
       return;
@@ -332,9 +330,10 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
         c.join(member);
       }
     }
-    if (coordinator && structuralDistributedContext.getCoordinator() != null) {
-      OStructuralDistributedMember member = new OStructuralDistributedMember(nodeIdentity, channel);
-      structuralDistributedContext.getCoordinator().nodeConnected(member);
+    if (coordinator && structuralDistributedContext.getLeader() != null) {
+      OStructuralDistributedMember member = new OStructuralDistributedMember(nodeIdentity, networkManager.getChannel(nodeIdentity));
+      structuralDistributedContext.getLeader().connected(member);
+      structuralDistributedContext.getLeader().join(nodeIdentity);
     }
   }
 
@@ -351,10 +350,10 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
         if (c == null) {
           c.leave(c.getMember(nodeIdentity));
         }
-        OStructuralCoordinator s = structuralDistributedContext.getCoordinator();
-        if (s != null) {
-          s.nodeDisconnected(nodeIdentity);
-        }
+//        OStructuralCoordinator s = structuralDistributedContext.getCoordinator();
+//        if (s != null) {
+//          s.nodeDisconnected(nodeIdentity);
+//        }
       }
     }
   }
@@ -363,7 +362,7 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
     return context.getStorage().getName().equals(OSystemDatabase.SYSTEM_DB_NAME) || context.getStorage().isClosed();
   }
 
-  public synchronized void setCoordinator(ONodeIdentity coordinatorIdentity, OLogId lastValid) {
+  public synchronized void setLeader(ONodeIdentity coordinatorIdentity, OLogId lastValid) {
     this.coordinatorIdentity = coordinatorIdentity;
     if (getNodeIdentity().equals(coordinatorIdentity)) {
       if (!this.coordinator) {
@@ -378,19 +377,22 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
             distributed.getCoordinator().join(member);
           }
         }
-        structuralDistributedContext.makeCoordinator(coordinatorIdentity);
-        OStructuralCoordinator structuralCoordinator = structuralDistributedContext.getCoordinator();
+        structuralDistributedContext.makeLeader(coordinatorIdentity, getStructuralConfiguration().getSharedConfiguration());
+
         for (ONodeIdentity node : networkManager.getRemoteServers()) {
           OStructuralDistributedMember member = new OStructuralDistributedMember(node, networkManager.getChannel(node));
-          structuralCoordinator.nodeConnected(member);
+          structuralDistributedContext.getLeader().connected(member);
+        }
+        structuralDistributedContext.getLeader().join(getNodeIdentity());
+        for (ONodeIdentity node : networkManager.getRemoteServers()) {
+          structuralDistributedContext.getLeader().join(node);
         }
         this.coordinator = true;
       }
     } else {
+      structuralDistributedContext
+          .setExternalLeader(new OStructuralDistributedMember(coordinatorIdentity, networkManager.getChannel(coordinatorIdentity)));
       realignToLog(lastValid);
-      structuralDistributedContext.setExternalCoordinator(
-          new OStructuralDistributedMember(coordinatorIdentity, networkManager.getChannel(coordinatorIdentity)));
-      firstJoinCoordinator();
       for (OSharedContext context : sharedContexts.values()) {
         if (isContextToIgnore(context))
           continue;
@@ -406,50 +408,39 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
   }
 
   private void realignToLog(OLogId lastValid) {
-    OLogId id = this.structuralConfiguration.getLastUpdateId();
+    OLogId lastStateId = this.structuralConfiguration.getLastUpdateId();
     OOperationLog opLog = this.structuralDistributedContext.getOpLog();
-    if (opLog.lastPersistentLog() != null && lastValid != null) {
-      Iterator<OOperationLogEntry> list = opLog.iterate(id, lastValid);
+    OLogId lastPersistent = opLog.lastPersistentLog();
+    if (lastPersistent != null && lastValid != null) {
+      Iterator<OOperationLogEntry> list = opLog.iterate(lastStateId, lastValid);
       while (list.hasNext()) {
         OOperationLogEntry change = list.next();
-        this.structuralDistributedContext.getExecutor().recover(change.getLogId(), (OStructuralNodeRequest) change.getRequest());
+        this.getStructuralDistributedContext().getFollower().recover((ORaftOperation) change.getRequest());
       }
-      int isCoordinatorLastMoreRecent = lastValid.compareTo(opLog.lastPersistentLog());
+      int isCoordinatorLastMoreRecent = lastValid.compareTo(lastPersistent);
       if (isCoordinatorLastMoreRecent > 0) {
-        // Fetch the missing from network
+        nodeSyncRequest(lastPersistent);
       } else if (isCoordinatorLastMoreRecent < 0) {
+        //Remove from the log the staff i've after the master id, this should not have been applied to the state yet.
+        //TODO: double check if state has an id more recent, this should not happen just add an assert.
         opLog.removeAfter(lastValid);
       }
+    } else if (lastValid != null) {
+      nodeFirstJoin();
+    } else if (lastPersistent != null) {
+      //TODO:  I've something that the master has not, rely on what the master tell me.
     } else {
-      firstJoinCoordinator();
+      //TODO: First join for everyone, do nothing for a while ? and then sync the databases existing on the disc on nodes.
     }
 
   }
 
-  private void firstJoinCoordinator() {
-    super.loadAllDatabases();
-    Collection<OStorage> storages = super.getStorages();
-    List<OStructuralNodeDatabase> databases = new ArrayList<>();
+  private void nodeFirstJoin() {
+    this.getStructuralDistributedContext().getSubmitContext().send(new OSessionOperationId(), new SyncRequest(Optional.empty()));
+  }
 
-    for (OStorage database : storages) {
-      databases.add(new OStructuralNodeDatabase(((OAbstractPaginatedStorage) database).getUuid(), database.getName(),
-          OStructuralNodeDatabase.NodeMode.ACTIVE));
-    }
-    OLogId logId = structuralDistributedContext.getOpLog().lastPersistentLog();
-    Future<OStructuralSubmitResponse> result = getStructuralDistributedContext().getSubmitContext()
-        .send(new OSessionOperationId(), new OConfigurationFetchRequest(logId, databases));
-
-    try {
-      OConfigurationFetchResponse res = (OConfigurationFetchResponse) result.get();
-
-      syncToConfiguration(res.getSharedConfiguration());
-
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    } catch (ExecutionException e) {
-      e.printStackTrace();
-    }
-
+  private void nodeSyncRequest(OLogId logId) {
+    this.getStructuralDistributedContext().getSubmitContext().send(new OSessionOperationId(), new SyncRequest(Optional.of(logId)));
   }
 
   private synchronized void syncDatabase(OStructuralNodeDatabase configuration) {
@@ -477,8 +468,8 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
     });
   }
 
-  private synchronized void syncToConfiguration(OStructuralSharedConfiguration sharedConfiguration) {
-    getStructuralConfiguration().receiveSharedConfiguration(sharedConfiguration);
+  public synchronized void syncToConfiguration(OLogId lastId, OStructuralSharedConfiguration sharedConfiguration) {
+    getStructuralConfiguration().receiveSharedConfiguration(lastId, sharedConfiguration);
     OStructuralNodeConfiguration nodeConfig = getStructuralConfiguration().getSharedConfiguration().getNode(getNodeIdentity());
     assert nodeConfig != null : "if arrived here the configuration should have this node configured";
     super.loadAllDatabases();
@@ -538,9 +529,16 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
     networkManager.coordinatedRequest(connection, requestType, clientTxId, channel);
   }
 
-  public void internalCreateDatabase(String database, String type, Map<String, String> configurations) {
+  public synchronized void internalCreateDatabase(OSessionOperationId operationId, String database, String type,
+      Map<String, String> configurations) {
     //TODO:INIT CONFIG
     super.create(database, null, null, ODatabaseType.valueOf(type), null);
+    getStructuralConfiguration().getSharedConfiguration().addDatabase(database);
+    getStructuralDistributedContext().getSubmitContext().receive(operationId);
+    this.databasesStatus.put(database, ODistributedStatus.ONLINE);
+    checkCoordinator(database);
+    //TODO: double check this notify, it may unblock as well checkReadyForHandleRequests that is not what is expected
+    this.notifyAll();
   }
 
   public void internalDropDatabase(String database) {
@@ -579,20 +577,15 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
     }
   }
 
-  public synchronized void finalizeCreateDatabase(String database) {
-    this.databasesStatus.put(database, ODistributedStatus.ONLINE);
-    checkCoordinator(database);
-    //TODO: double check this notify, it may unblock as well checkReadyForHandleRequests that is not what is expected
-    this.notifyAll();
-  }
-
   public OCoordinateMessagesFactory getCoordinateMessagesFactory() {
     return networkManager.getCoordinateMessagesFactory();
   }
 
   @Override
   public void close() {
-    this.networkManager.shutdown();
+    if (networkManager != null) {
+      this.networkManager.shutdown();
+    }
     super.close();
   }
 
@@ -602,5 +595,9 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
 
   public OStructuralConfiguration getStructuralConfiguration() {
     return structuralConfiguration;
+  }
+
+  public ODistributedNetworkManager getNetworkManager() {
+    return networkManager;
   }
 }
