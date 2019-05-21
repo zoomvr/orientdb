@@ -274,7 +274,6 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       }
     } catch (OLowDiskSpaceException ex) {
       throw ex;
-    } finally {
     }
     return null;
   }

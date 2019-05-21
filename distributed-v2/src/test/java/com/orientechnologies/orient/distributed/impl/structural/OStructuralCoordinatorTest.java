@@ -10,6 +10,7 @@ import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLog;
 import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSessionOperationId;
+import com.orientechnologies.orient.distributed.impl.structural.raft.OFullConfiguration;
 import com.orientechnologies.orient.distributed.impl.structural.raft.OLeaderContext;
 import com.orientechnologies.orient.distributed.impl.structural.raft.ORaftOperation;
 import org.junit.Ignore;
@@ -311,6 +312,11 @@ public class OStructuralCoordinatorTest {
 
     @Override
     public void confirm(OLogId id) {
+
+    }
+
+    @Override
+    public void send(OFullConfiguration fullConfiguration) {
 
     }
   }

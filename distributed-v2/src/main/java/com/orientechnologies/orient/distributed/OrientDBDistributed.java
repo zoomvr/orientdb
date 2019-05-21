@@ -35,7 +35,6 @@ import com.orientechnologies.orient.distributed.impl.metadata.ODistributedContex
 import com.orientechnologies.orient.distributed.impl.metadata.OSharedContextDistributed;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralConfiguration;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralDistributedContext;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralDistributedMember;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeConfiguration;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeDatabase;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSharedConfiguration;
@@ -331,8 +330,7 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
       }
     }
     if (coordinator && structuralDistributedContext.getLeader() != null) {
-      OStructuralDistributedMember member = new OStructuralDistributedMember(nodeIdentity, networkManager.getChannel(nodeIdentity));
-      structuralDistributedContext.getLeader().connected(member);
+      structuralDistributedContext.getLeader().connected(nodeIdentity, channel);
       structuralDistributedContext.getLeader().join(nodeIdentity);
     }
   }
@@ -340,6 +338,9 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
   public synchronized void nodeDisconnected(ONodeIdentity nodeIdentity) {
     if (this.getNodeIdentity().equals(nodeIdentity))
       return;
+    if (coordinator) {
+      structuralDistributedContext.getLeader().disconnected(nodeIdentity);
+    }
     for (OSharedContext context : sharedContexts.values()) {
       if (isContextToIgnore(context))
         continue;
@@ -350,10 +351,7 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
         if (c == null) {
           c.leave(c.getMember(nodeIdentity));
         }
-//        OStructuralCoordinator s = structuralDistributedContext.getCoordinator();
-//        if (s != null) {
-//          s.nodeDisconnected(nodeIdentity);
-//        }
+
       }
     }
   }
@@ -380,8 +378,7 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
         structuralDistributedContext.makeLeader(coordinatorIdentity, getStructuralConfiguration().getSharedConfiguration());
 
         for (ONodeIdentity node : networkManager.getRemoteServers()) {
-          OStructuralDistributedMember member = new OStructuralDistributedMember(node, networkManager.getChannel(node));
-          structuralDistributedContext.getLeader().connected(member);
+          structuralDistributedContext.getLeader().connected(node, networkManager.getChannel(node));
         }
         structuralDistributedContext.getLeader().join(getNodeIdentity());
         for (ONodeIdentity node : networkManager.getRemoteServers()) {
@@ -390,8 +387,7 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
         this.coordinator = true;
       }
     } else {
-      structuralDistributedContext
-          .setExternalLeader(new OStructuralDistributedMember(coordinatorIdentity, networkManager.getChannel(coordinatorIdentity)));
+      structuralDistributedContext.setExternalLeader(networkManager.getChannel(coordinatorIdentity));
       realignToLog(lastValid);
       for (OSharedContext context : sharedContexts.values()) {
         if (isContextToIgnore(context))

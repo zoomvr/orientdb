@@ -20,11 +20,11 @@
 package com.orientechnologies.orient.server.config;
 
 import javax.xml.bind.annotation.XmlAttribute;
- import javax.xml.bind.annotation.XmlRootElement;
- import javax.xml.bind.annotation.XmlType;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
 
 @XmlRootElement(name = "user")
- @XmlType(propOrder = { "resources", "password", "name" })
+@XmlType(propOrder = { "resources", "password", "name" })
  public class OServerUserConfiguration {
    @XmlAttribute
    public String name;

@@ -20,11 +20,11 @@
 package com.orientechnologies.orient.server.config;
 
 import javax.xml.bind.annotation.XmlAttribute;
- import javax.xml.bind.annotation.XmlRootElement;
- import javax.xml.bind.annotation.XmlType;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
 
 @XmlRootElement(name = "protocol")
- @XmlType(propOrder = { "implementation", "name" })
+@XmlType(propOrder = { "implementation", "name" })
  public class OServerNetworkProtocolConfiguration {
 
    public OServerNetworkProtocolConfiguration() {

@@ -27,6 +27,7 @@ import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeR
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeResponse;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.structural.raft.OFullConfiguration;
 import com.orientechnologies.orient.distributed.impl.structural.raft.ORaftOperation;
 import com.orientechnologies.orient.server.OServer;
 import org.junit.After;
@@ -170,6 +171,11 @@ public class TestTransactionFlow {
 
     @Override
     public void ack(OLogId logId) {
+
+    }
+
+    @Override
+    public void send(OFullConfiguration fullConfiguration) {
 
     }
 
