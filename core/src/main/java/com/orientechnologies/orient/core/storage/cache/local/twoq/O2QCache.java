@@ -1225,7 +1225,7 @@ public final class O2QCache implements OReadCache {
     }
   }
 
-  private final static class UpdateCacheResult {
+  private static final class UpdateCacheResult {
     private final boolean     removeColdPages;
     private final OCacheEntry cacheEntry;
 

@@ -21,7 +21,6 @@ package com.orientechnologies.common.concur.lock;
 
 import com.orientechnologies.common.exception.OException;
 
-import java.util.Collection;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,7 +36,7 @@ public class OComparableLockManager<T extends  Comparable> {
   private         long                                    acquireTimeout;
   protected final ConcurrentSkipListMap<T, CountableLock> map;
   private final   boolean                                 enabled;
-  private final static Object NULL_KEY = new Object();
+  private static final Object NULL_KEY = new Object();
 
   @SuppressWarnings("serial")
   private static class CountableLock {

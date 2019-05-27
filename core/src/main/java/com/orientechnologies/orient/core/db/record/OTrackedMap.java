@@ -19,13 +19,18 @@
  */
 package com.orientechnologies.orient.core.db.record;
 
-import java.io.Serializable;
-import java.util.*;
-
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
+
+import java.io.Serializable;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
 
 /**
  * Implementation of LinkedHashMap bound to a source ORecord object to keep track of changes. This avoid to call the makeDirty() by
@@ -36,7 +41,7 @@ import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
  */
 @SuppressWarnings("serial")
 public class OTrackedMap<T> extends LinkedHashMap<Object, T> implements ORecordElement, OTrackedMultiValue<Object, T>, Serializable {
-  final protected ORecord                            sourceRecord;
+  protected final ORecord                            sourceRecord;
   private STATUS                                     status          = STATUS.NOT_LOADED;
   private List<OMultiValueChangeListener<Object, T>> changeListeners = null;
   protected Class<?>                                 genericClass;

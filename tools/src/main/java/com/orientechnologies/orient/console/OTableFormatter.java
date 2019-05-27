@@ -33,16 +33,29 @@ import com.orientechnologies.orient.core.record.impl.OBlob;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 public class OTableFormatter {
   public enum ALIGNMENT {
     LEFT, CENTER, RIGHT
   }
 
-  protected final static String           MORE           = "...";
-  protected final static SimpleDateFormat DEF_DATEFORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+  protected static final String           MORE           = "...";
+  protected static final SimpleDateFormat DEF_DATEFORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
   protected       OPair<String, Boolean>           columnSorting   = null;
   protected final Map<String, ALIGNMENT>           columnAlignment = new HashMap<String, ALIGNMENT>();

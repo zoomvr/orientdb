@@ -19,8 +19,6 @@
  */
 package com.orientechnologies.orient.core.db.record;
 
-import java.util.Iterator;
-
 import com.orientechnologies.common.collection.OLazyIterator;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.util.OResettable;
@@ -28,6 +26,8 @@ import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.ORecordInternal;
+
+import java.util.Iterator;
 
 /**
  * Lazy implementation of Iterator that load the records only when accessed. It keep also track of changes to the source record
@@ -37,10 +37,10 @@ import com.orientechnologies.orient.core.record.ORecordInternal;
  * 
  */
 public class OLazyRecordIterator implements OLazyIterator<OIdentifiable>, OResettable {
-  final private ORecord                           sourceRecord;
-  final private Iterable<? extends OIdentifiable> source;
+  private final ORecord                           sourceRecord;
+  private final Iterable<? extends OIdentifiable> source;
   private Iterator<? extends OIdentifiable>       underlying;
-  final private boolean                           autoConvert2Record;
+  private final boolean                           autoConvert2Record;
 
   public OLazyRecordIterator(final Iterator<? extends OIdentifiable> iIterator, final boolean iConvertToRecord) {
     this.sourceRecord = null;

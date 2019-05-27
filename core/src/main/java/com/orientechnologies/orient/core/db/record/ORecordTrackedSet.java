@@ -19,12 +19,21 @@
  */
 package com.orientechnologies.orient.core.db.record;
 
-import java.util.*;
-
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
+
+import java.util.AbstractCollection;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Implementation of Set bound to a source ORecord object to keep track of changes. This avoid to call the makeDirty() by hand when
@@ -38,7 +47,7 @@ public class ORecordTrackedSet extends AbstractCollection<OIdentifiable> impleme
   protected final ORecord                                               sourceRecord;
   protected Map<OIdentifiable, Object>                                  map             = new HashMap<OIdentifiable, Object>();
   private STATUS                                                        status          = STATUS.NOT_LOADED;
-  protected final static Object                                         ENTRY_REMOVAL   = new Object();
+  protected static final Object                                         ENTRY_REMOVAL   = new Object();
   private List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> changeListeners;
 
   public ORecordTrackedSet(final ORecord iSourceRecord) {

@@ -24,7 +24,11 @@ import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.metadata.OMetadataDefault;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Abstract class for import/export of database and data in general.
@@ -33,7 +37,7 @@ import java.util.*;
  * 
  */
 public abstract class ODatabaseImpExpAbstract extends ODatabaseTool {
-  protected final static String       DEFAULT_EXT               = ".json";
+  protected static final String       DEFAULT_EXT               = ".json";
   protected ODatabaseDocumentInternal database;
   protected String                    fileName;
   protected Set<String>               includeClusters;

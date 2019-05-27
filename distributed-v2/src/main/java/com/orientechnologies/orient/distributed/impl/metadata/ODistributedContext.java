@@ -7,6 +7,7 @@ import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
 import com.orientechnologies.orient.distributed.impl.OClusterPositionAllocatorDatabase;
 import com.orientechnologies.orient.distributed.impl.OPersistentOperationalLogV1;
+import com.orientechnologies.orient.distributed.impl.coordinator.OCoordinateMessagesFactory;
 import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedCoordinator;
 import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedExecutor;
 import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedMember;
@@ -39,9 +40,8 @@ public class ODistributedContext {
   }
 
   private void initOpLog() {
-    this.opLog = OPersistentOperationalLogV1.newInstance(databaseName, context,
-        (x) -> ((OrientDBDistributed) context).getCoordinateMessagesFactory().createOperationRequest(x));
-//    this.opLog = new OIncrementOperationalLog();
+    this.opLog = OPersistentOperationalLogV1
+        .newInstance(databaseName, context, (x) -> OCoordinateMessagesFactory.createOperationRequest(x));
   }
 
   public ODistributedExecutor getExecutor() {

@@ -26,12 +26,21 @@ import com.orientechnologies.orient.core.metadata.schema.OClass.INDEX_TYPE;
 import com.orientechnologies.orient.core.metadata.schema.OProperty;
 import com.orientechnologies.orient.core.metadata.schema.OSchema;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.executor.OInternalResultSet;
 import com.orientechnologies.orient.core.sql.executor.OResultInternal;
 
-import java.sql.*;
-import java.util.*;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.RowIdLifetime;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * @author Roberto Franchini (CELI srl - franchini--at--celi.it)
@@ -39,7 +48,7 @@ import java.util.*;
  * @author Luca Garulli (l.garulli--(at)--orientdb.com) (OrientDB - l.garulli--at--orientdb.com)
  */
 public class OrientJdbcDatabaseMetaData implements DatabaseMetaData {
-  protected final static List<String> TABLE_TYPES = Arrays.asList("TABLE", "SYSTEM TABLE");
+  protected static final List<String> TABLE_TYPES = Arrays.asList("TABLE", "SYSTEM TABLE");
   private final OrientJdbcConnection connection;
   private final ODatabaseDocument    database;
   private final OMetadata            metadata;

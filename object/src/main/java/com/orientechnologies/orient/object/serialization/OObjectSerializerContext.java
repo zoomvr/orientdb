@@ -19,22 +19,21 @@
   */
 package com.orientechnologies.orient.object.serialization;
 
+import com.orientechnologies.common.reflection.OReflectionHelper;
+import com.orientechnologies.orient.core.db.ODatabase;
+import com.orientechnologies.orient.core.serialization.serializer.object.OObjectSerializer;
+import com.orientechnologies.orient.object.entity.OObjectEntityClassHandler;
+
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import com.orientechnologies.common.reflection.OReflectionHelper;
-import com.orientechnologies.orient.core.db.ODatabase;
-import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
-import com.orientechnologies.orient.core.serialization.serializer.object.OObjectSerializer;
-import com.orientechnologies.orient.object.entity.OObjectEntityClassHandler;
-
 // We need to suppress the raw types warnings of OObjectSerializer, because otherwise the compiler won't compile
 // the parameter iFieldValue (which is of type Object) to the defined type LOCAL_TYPE.
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class OObjectSerializerContext implements OObjectSerializer<Object, Object> {
-  final private Map<Class<?>, OObjectSerializer> customSerializers = new LinkedHashMap<Class<?>, OObjectSerializer>();
+  private final Map<Class<?>, OObjectSerializer> customSerializers = new LinkedHashMap<Class<?>, OObjectSerializer>();
 
   public void bind(final OObjectSerializer serializer, ODatabase database) {
     final Type[] actualTypes = OReflectionHelper.getGenericTypes(serializer.getClass());

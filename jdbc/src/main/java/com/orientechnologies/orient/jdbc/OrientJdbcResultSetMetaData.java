@@ -25,7 +25,11 @@ import java.math.BigDecimal;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
 
 /**
  * @author Roberto Franchini (CELI Srl - franchini@celi.it)
@@ -34,7 +38,7 @@ import java.util.*;
 
 public class OrientJdbcResultSetMetaData implements ResultSetMetaData {
 
-  private final static Map<OType, Integer> typesSqlTypes = new HashMap<>();
+  private static final Map<OType, Integer> typesSqlTypes = new HashMap<>();
 
   static {
     typesSqlTypes.put(OType.STRING, Types.VARCHAR);

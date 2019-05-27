@@ -19,7 +19,6 @@
  */
 package com.orientechnologies.orient.core.db.record;
 
-import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.record.ORecordMultiValueHelper.MULTIVALUE_CONTENT_TYPE;
 import com.orientechnologies.orient.core.exception.ORecordNotFoundException;
 import com.orientechnologies.orient.core.id.ORID;
@@ -40,7 +39,7 @@ import java.util.Map;
  */
 @SuppressWarnings({ "serial" })
 public class ORecordLazyMap extends OTrackedMap<OIdentifiable> implements ORecordLazyMultiValue {
-  final private byte                                      recordType;
+  private final byte                                      recordType;
   private ORecordMultiValueHelper.MULTIVALUE_CONTENT_TYPE status              = MULTIVALUE_CONTENT_TYPE.EMPTY;
   protected boolean                                       marshalling         = false;
   private boolean                                         autoConvertToRecord = true;

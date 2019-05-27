@@ -23,7 +23,11 @@ import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
@@ -50,7 +54,7 @@ public class OOneEntryPerKeyLockManager<T> implements OLockManager<T> {
   private final   boolean                                   enabled;
   private final   int                                       amountOfCachedInstances;
 
-  private final static Object NULL_KEY = new Object();
+  private static final Object NULL_KEY = new Object();
 
   @SuppressWarnings("serial")
   private static class CountableLock {
