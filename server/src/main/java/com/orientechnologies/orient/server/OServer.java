@@ -43,17 +43,11 @@ import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.exception.OStorageException;
 import com.orientechnologies.orient.core.metadata.security.OToken;
 import com.orientechnologies.orient.core.security.OSecurityManager;
-import com.orientechnologies.orient.server.config.OServerConfiguration;
-import com.orientechnologies.orient.server.config.OServerConfigurationManager;
-import com.orientechnologies.orient.server.config.OServerEntryConfiguration;
-import com.orientechnologies.orient.server.config.OServerHandlerConfiguration;
-import com.orientechnologies.orient.server.config.OServerNetworkListenerConfiguration;
-import com.orientechnologies.orient.server.config.OServerNetworkProtocolConfiguration;
-import com.orientechnologies.orient.server.config.OServerParameterConfiguration;
-import com.orientechnologies.orient.server.config.OServerSocketFactoryConfiguration;
-import com.orientechnologies.orient.server.config.OServerStorageConfiguration;
-import com.orientechnologies.orient.server.config.OServerUserConfiguration;
+import com.orientechnologies.orient.server.config.*;
+import com.orientechnologies.orient.server.config.distributed.OServerDistributedConfiguration;
+import com.orientechnologies.orient.server.distributed.ODistributedConfiguration;
 import com.orientechnologies.orient.server.distributed.ODistributedServerManager;
+import com.orientechnologies.orient.server.distributed.config.ODistributedConfig;
 import com.orientechnologies.orient.server.handler.OConfigurableHooksManager;
 import com.orientechnologies.orient.server.network.OServerNetworkListener;
 import com.orientechnologies.orient.server.network.OServerSocketFactory;
@@ -394,12 +388,24 @@ public class OServer {
       databaseDirectory += "/";
 
     OrientDBConfig config = OrientDBConfig.builder().fromContext(contextConfiguration).build();
+
     if (contextConfiguration.getValueAsBoolean(OGlobalConfiguration.SERVER_BACKWARD_COMPATIBILITY)) {
+
       databases = ODatabaseDocumentTxInternal.getOrCreateEmbeddedFactory(this.databaseDirectory, config);
     } else {
-      try {
-        databases = OrientDBInternal.distributed(this.databaseDirectory, config);
-      } catch (ODatabaseException ex) {
+      OServerConfiguration configuration = getConfiguration();
+
+      configuration.distributed = ODistributedConfig.fromEnv(configuration.distributed);
+
+      if (configuration.distributed != null && configuration.distributed.enabled) {
+        try {
+
+          databases = OrientDBInternal
+              .distributed(this.databaseDirectory, ODistributedConfig.buildConfig(contextConfiguration, configuration.distributed));
+        } catch (ODatabaseException ex) {
+          databases = OrientDBInternal.embedded(this.databaseDirectory, config);
+        }
+      } else {
         databases = OrientDBInternal.embedded(this.databaseDirectory, config);
       }
     }
