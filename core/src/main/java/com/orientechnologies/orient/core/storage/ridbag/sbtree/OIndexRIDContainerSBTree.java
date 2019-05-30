@@ -32,10 +32,7 @@ import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OBonsa
 import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OSBTreeBonsaiLocal;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Persistent Set<OIdentifiable> implementation that uses the SBTree to handle entries in persistent way.
@@ -194,13 +191,30 @@ public class OIndexRIDContainerSBTree implements Set<OIdentifiable> {
   public void clear() {
     try {
       tree.clear();
-    } catch (java.io.IOException e) {
-      e.printStackTrace();
+    } catch (IOException e) {
+      throw OException.wrapException(new ODatabaseException("Error during clearing of index container"), e);
     }
   }
 
   public void delete() {
     try {
+      final OIdentifiable first = tree.firstKey();
+      if (first != null) {
+        final OIdentifiable last = tree.lastKey();
+        final List<OIdentifiable> entriesToDelete = new ArrayList<>(64);
+
+        tree.loadEntriesBetween(first, true, last, true, (entry) -> {
+          final OIdentifiable rid = entry.getKey();
+          entriesToDelete.add(rid);
+
+          return true;
+        });
+
+        for (final OIdentifiable identifiable : entriesToDelete) {
+          tree.remove(identifiable);
+        }
+      }
+
       tree.delete();
     } catch (IOException e) {
       throw OException.wrapException(new ODatabaseException("Error during deletion index container"), e);

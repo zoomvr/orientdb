@@ -54,8 +54,8 @@ public class OSBTreeCollectionManagerShared extends OSBTreeCollectionManagerAbst
   private volatile ThreadLocal<Map<UUID, OBonsaiCollectionPointer>> collectionPointerChanges = new CollectionPointerChangesThreadLocal();
 
   /**
-   * If this flag is set to {@code true} then all access to the manager will be prohibited and exception
-   * {@link OAccessToSBtreeCollectionManagerIsProhibitedException} will be thrown.
+   * If this flag is set to {@code true} then all access to the manager will be prohibited and exception {@link
+   * OAccessToSBtreeCollectionManagerIsProhibitedException} will be thrown.
    */
   private volatile boolean prohibitAccess = false;
 
@@ -130,6 +130,16 @@ public class OSBTreeCollectionManagerShared extends OSBTreeCollectionManagerAbst
     }
 
     return pointer;
+  }
+
+  public void deleteComponent(final int clusterId) throws IOException {
+    checkAccess();
+
+    clearClusterCache(clusterId);
+
+    final OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(FILE_NAME_PREFIX + clusterId,
+        DEFAULT_EXTENSION, storage);
+    tree.deleteComponent();
   }
 
   @Override

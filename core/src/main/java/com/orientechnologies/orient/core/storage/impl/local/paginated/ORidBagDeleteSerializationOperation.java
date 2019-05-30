@@ -31,6 +31,8 @@ import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollection
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeRidBag;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ORidBagDeleteSerializationOperation implements ORecordSerializationOperation {
   private final OBonsaiCollectionPointer collectionPointer;
@@ -48,6 +50,27 @@ public class ORidBagDeleteSerializationOperation implements ORecordSerialization
   public void execute(OAbstractPaginatedStorage paginatedStorage) {
     OSBTreeBonsai<OIdentifiable, Integer> treeBonsai = loadTree();
     try {
+      final OIdentifiable first = treeBonsai.firstKey();
+      if (first != null) {
+        final OIdentifiable last = treeBonsai.lastKey();
+        final List<OIdentifiable> entriesToDelete = new ArrayList<>(64);
+
+        treeBonsai.loadEntriesBetween(first, true, last, true, (entry) -> {
+          final int count = entry.getValue();
+          final OIdentifiable rid = entry.getKey();
+
+          for (int i = 0; i < count; i++) {
+            entriesToDelete.add(rid);
+          }
+
+          return true;
+        });
+
+        for (final OIdentifiable identifiable : entriesToDelete) {
+          treeBonsai.remove(identifiable);
+        }
+      }
+
       treeBonsai.delete();
     } catch (IOException e) {
       throw OException.wrapException(new ODatabaseException("Error during ridbag deletion"), e);
