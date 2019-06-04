@@ -6,12 +6,9 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.Assert;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 /**
  * Created by tglman on 01/10/15.
@@ -33,28 +30,6 @@ public class DirtyManagerReferenceCleanTest {
     db.drop();
   }
 
-  @Test
-  public void testNoTxRefClean() {
-    ODocument doc = new ODocument("test");
-    ODocument doc1 = new ODocument("test");
-    doc.field("ref", doc1);
-    assertEquals(1, ORecordInternal.getDirtyManager(doc).getReferences().size());
-    db.save(doc);
-    assertNull(ORecordInternal.getDirtyManager(doc).getReferences());
-  }
-
-  @Test
-  public void testTxRefClean() {
-    db.begin();
-    ODocument doc = new ODocument("test");
-    ODocument doc1 = new ODocument("test");
-    doc.field("ref", doc1);
-    assertEquals(1, ORecordInternal.getDirtyManager(doc).getReferences().size());
-    db.save(doc);
-    assertNull(ORecordInternal.getDirtyManager(doc).getReferences());
-    db.commit();
-    assertNull(ORecordInternal.getDirtyManager(doc).getReferences());
-  }
 
   @Test
   public void testReferDeletedDocument() {
