@@ -26,16 +26,10 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOpera
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.cas.OWriteableWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.OComponentOperationRecord;
+import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OBonsaiBucketPointer;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Note: all atomic operations methods are designed in context that all operations on single files will be wrapped in shared lock.
@@ -61,6 +55,13 @@ public final class OAtomicOperation {
 
   private final List<OComponentOperationRecord> pendingComponentOperations    = new ArrayList<>();
   private final List<OLogSequenceNumber>        pendingComponentOperationLSNs = new ArrayList<>();
+
+  /**
+   * Pointers to ridbags deleted during current transaction. We can not reuse pointers if we delete ridbag and then  create new one
+   * inside of the same transaction.
+   */
+  private final Set<OBonsaiBucketPointer> deletedBonsaiPointers = new HashSet<>();
+
 
   private boolean diskBasedStorage;
   private int     inMemoryOperationSize;
@@ -129,6 +130,14 @@ public final class OAtomicOperation {
    */
   private Map<String, OAtomicOperationMetadata<?>> getMetadata() {
     return Collections.unmodifiableMap(metadata);
+  }
+
+  public void addDeletedRidBag(OBonsaiBucketPointer rootPointer) {
+    deletedBonsaiPointers.add(rootPointer);
+  }
+
+  public Set<OBonsaiBucketPointer> getDeletedBonsaiPointers() {
+    return deletedBonsaiPointers;
   }
 
   OLogSequenceNumber commitTx(final OWriteAheadLog writeAheadLog) throws IOException {

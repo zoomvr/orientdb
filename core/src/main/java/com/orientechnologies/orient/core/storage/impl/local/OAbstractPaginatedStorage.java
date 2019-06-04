@@ -50,6 +50,7 @@ import com.orientechnologies.orient.core.db.ODatabaseListener;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.OrientDBConfig;
 import com.orientechnologies.orient.core.db.record.OCurrentStorageComponentsFactory;
+import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.ORecordOperation;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBagDeleter;
 import com.orientechnologies.orient.core.encryption.OEncryption;
@@ -100,10 +101,9 @@ import com.orientechnologies.orient.core.storage.impl.local.statistic.OSessionSt
 import com.orientechnologies.orient.core.storage.impl.local.txapprover.OTxApprover;
 import com.orientechnologies.orient.core.storage.index.engine.OHashTableIndexEngine;
 import com.orientechnologies.orient.core.storage.index.engine.OSBTreeIndexEngine;
-import com.orientechnologies.orient.core.storage.ridbag.sbtree.OIndexRIDContainerSBTree;
-import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManager;
-import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManagerAbstract;
-import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManagerShared;
+import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OBonsaiBucketPointer;
+import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OSBTreeBonsai;
+import com.orientechnologies.orient.core.storage.ridbag.sbtree.*;
 import com.orientechnologies.orient.core.tx.OTransactionAbstract;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionInternal;
@@ -5189,7 +5189,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
       ((OClusterBasedStorageConfiguration) configuration).updateCluster(cluster.generateClusterConfig());
 
-      sbTreeCollectionManager.createSBTree(createdClusterId, null);
+      sbTreeCollectionManager.createComponent(createdClusterId);
     }
 
 
@@ -5206,6 +5206,38 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     cluster.create();
 
     registerCluster(cluster);
+  }
+
+  public void addRidBagComponentInternal(final String fileName, final long requiredFileId) throws IOException {
+    final long fileId = sbTreeCollectionManager.createComponent(fileName);
+    if(requiredFileId != fileId) {
+      throw new OStorageException("Can not create rid bag component with fileName = " + fileName +
+          " file IDs are different (" + fileId + " vs " + requiredFileId +")");
+    }
+  }
+
+  public void addRidBagInternal(final String fileName, final long requiredFileId, final int requiredPageIndex, final int requiredPageOffset) throws IOException {
+    final OBonsaiCollectionPointer pointer = sbTreeCollectionManager.createTree(fileName, requiredPageIndex, requiredPageOffset);
+
+    if (!writeCache.fileIdsAreEqual(pointer.getFileId(), requiredFileId) || pointer.getRootPointer().getPageIndex() != requiredPageIndex || pointer.getRootPointer().getPageOffset() != requiredPageOffset) {
+      throw new OStorageException("Can create rid bag with fileId = " + requiredFileId +
+          " , pageIndex = " + requiredPageIndex + " , pageOffset = " +
+          requiredPageOffset + " created component has fileId = " + pointer.getFileId() + " , pageIndex = " +
+          pointer.getRootPointer().getPageIndex() + " , pageOffset = " + pointer.getRootPointer().getPageOffset());
+    }
+  }
+
+  public void deleteRidBagInternal(final long fileId, final int pageIndex, final int pageOffset) throws IOException {
+    final OBonsaiCollectionPointer bonsaiPointer = new OBonsaiCollectionPointer(fileId, new OBonsaiBucketPointer(pageIndex, pageOffset));
+
+    final OSBTreeBonsai<OIdentifiable, Integer> tree = sbTreeCollectionManager.loadSBTree(bonsaiPointer);
+    tree.delete();
+
+    sbTreeCollectionManager.delete(bonsaiPointer);
+  }
+
+  public void deleteRidBagComponentInternal(final long fileId) throws IOException {
+    sbTreeCollectionManager.deleteComponent(fileId);
   }
 
   private void doClose(final boolean force, final boolean onDelete) {

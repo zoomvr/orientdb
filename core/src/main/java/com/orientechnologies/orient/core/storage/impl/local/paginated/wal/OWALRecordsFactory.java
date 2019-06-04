@@ -32,12 +32,11 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.ind
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.indexengine.OIndexEngineDeleteCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.localhashtable.OLocalHashTablePutCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.localhashtable.OLocalHashTableRemoveCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterAllocatePositionCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterCreateRecordCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterDeleteRecordCO;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.OPaginatedClusterUpdateRecordCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.paginatedcluster.*;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbteebonsai.OSBTreeBonsaiCreateCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbteebonsai.OSBTreeBonsaiCreateComponentCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbteebonsai.OSBTreeBonsaiDeleteCO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbteebonsai.OSBTreeBonsaiDeleteComponentCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreePutCO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreeRemoveCO;
 import net.jpountz.lz4.LZ4Compressor;
@@ -49,32 +48,7 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.ATOMIC_UNIT_END_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.ATOMIC_UNIT_START_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_MULTI_VALUE_PUT_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_MULTI_VALUE_REMOVE_ENTRY_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_SINGLE_VALUE_PUT_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CELL_BTREE_SINGLE_VALUE_REMOVE_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CHECKPOINT_END_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_ALLOCATE_RECORD_POSITION_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_CREATE_RECORD_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_DELETE_RECORD_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CLUSTER_UPDATE_RECORD_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.CREATE_CLUSTER_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.DELETE_CLUSTER_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.EMPTY_WAL_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FILE_CREATED_WAL_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FILE_DELETED_WAL_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FULL_CHECKPOINT_START_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_END_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.FUZZY_CHECKPOINT_START_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_CREATE_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.INDEX_ENGINE_DELETE_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.LOCAL_HASHTABLE_PUT_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.LOCAL_HASHTABLE_REMOVE_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.NON_TX_OPERATION_PERFORMED_WAL_RECORD;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_PUT_CO;
-import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.SBTREE_REMOVE_CO;
+import static com.orientechnologies.orient.core.storage.impl.local.paginated.wal.WALRecordTypes.*;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -211,6 +185,18 @@ public final class OWALRecordsFactory {
       break;
     case LOCAL_HASHTABLE_REMOVE_CO:
       walRecord = new OLocalHashTableRemoveCO();
+      break;
+    case SBTREE_BONSAI_CREATE_COMPONENT_CO:
+      walRecord = new OSBTreeBonsaiCreateComponentCO();
+      break;
+    case SBTREE_BONSAI_CREATE_CO:
+      walRecord =  new OSBTreeBonsaiCreateCO();
+      break;
+    case SBTREE_BONSAI_DELETE_COMPONENT_CO:
+      walRecord = new OSBTreeBonsaiDeleteComponentCO();
+      break;
+    case SBTREE_BONSAI_DELETE_CO:
+      walRecord = new OSBTreeBonsaiDeleteCO();
       break;
     default:
       if (idToTypeMap.containsKey(content[0]))

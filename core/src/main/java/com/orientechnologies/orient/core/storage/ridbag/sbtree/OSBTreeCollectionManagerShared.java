@@ -132,18 +132,48 @@ public class OSBTreeCollectionManagerShared extends OSBTreeCollectionManagerAbst
     return pointer;
   }
 
-  public void deleteComponent(final int clusterId) throws IOException {
+  public void createComponent(final int clusterId) throws IOException {
     checkAccess();
 
-    clearClusterCache(clusterId);
+    final OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(FILE_NAME_PREFIX + clusterId, DEFAULT_EXTENSION,
+        storage);
+    tree.createComponent();
+  }
 
-    final OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(FILE_NAME_PREFIX + clusterId,
+  public long createComponent(final String fileName) throws IOException {
+    checkAccess();
+
+    final OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(fileName, DEFAULT_EXTENSION,
+        storage);
+    return tree.createComponent();
+  }
+
+  public OBonsaiCollectionPointer createTree(String fileName, final int pageIndex, final int pageOffset) throws IOException {
+    checkAccess();
+
+    final OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(fileName, DEFAULT_EXTENSION,
+        storage);
+    tree.create(OLinkSerializer.INSTANCE, OIntegerSerializer.INSTANCE, pageIndex, pageOffset);
+
+    return tree.getCollectionPointer();
+  }
+
+  public void deleteComponent(final long fileId) throws IOException {
+    checkAccess();
+
+    final String fullFileName = storage.getWriteCache().fileNameById(fileId);
+    final String fileName = fullFileName.substring(0, fullFileName.length() - DEFAULT_EXTENSION.length());
+
+    clearClusterCache(fileId, fileName);
+
+
+    final OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(fileName,
         DEFAULT_EXTENSION, storage);
     tree.deleteComponent();
   }
 
   @Override
-  protected OSBTreeBonsaiLocal<OIdentifiable, Integer> createTree(int clusterId) throws IOException {
+  protected OSBTreeBonsaiLocal<OIdentifiable, Integer> createEdgeTree(int clusterId) throws IOException {
 
     OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(FILE_NAME_PREFIX + clusterId, DEFAULT_EXTENSION,
         storage);

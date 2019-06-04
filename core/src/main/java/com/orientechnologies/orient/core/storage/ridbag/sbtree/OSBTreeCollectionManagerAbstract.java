@@ -28,8 +28,6 @@ import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.storage.OStorage;
-import com.orientechnologies.orient.core.storage.cache.OWriteCache;
-import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OSBTreeBonsai;
 
 import java.io.IOException;
@@ -157,7 +155,7 @@ public abstract class OSBTreeCollectionManagerAbstract
 
   @Override
   public OBonsaiCollectionPointer createSBTree(int clusterId, UUID ownerUUID) throws IOException {
-    OSBTreeBonsai<OIdentifiable, Integer> tree = createTree(clusterId);
+    OSBTreeBonsai<OIdentifiable, Integer> tree = createEdgeTree(clusterId);
     return tree.getCollectionPointer();
   }
 
@@ -251,17 +249,14 @@ public abstract class OSBTreeCollectionManagerAbstract
     treeCache.keySet().removeIf(cacheKey -> cacheKey.storage == storage);
   }
 
-  void clearClusterCache(final int clusterId) {
-    final OWriteCache writeCache = ((OAbstractPaginatedStorage)storage).getWriteCache();
-    final long fileId = writeCache.fileIdByName(FILE_NAME_PREFIX + clusterId);
-
+  void clearClusterCache(final long fileId, String fileName) {
     treeCache.entrySet().removeIf(entry -> {
       final CacheKey key = entry.getKey();
 
       if (key.storage == storage && key.pointer.getFileId() == fileId) {
         final SBTreeBonsaiContainer container = entry.getValue();
         if (container.usagesCounter > 0) {
-          throw new IllegalStateException("Ridbags of cluster " + clusterId + " can not be cleared because some of them are in use");
+          throw new IllegalStateException("Ridbags of file " + fileName + " can not be cleared because some of them are in use");
         }
 
         return true;
@@ -271,7 +266,7 @@ public abstract class OSBTreeCollectionManagerAbstract
     });
   }
 
-  protected abstract OSBTreeBonsai<OIdentifiable, Integer> createTree(int clusterId) throws IOException;
+  protected abstract OSBTreeBonsai<OIdentifiable, Integer> createEdgeTree(int clusterId) throws IOException;
 
   protected abstract OSBTreeBonsai<OIdentifiable, Integer> loadTree(OBonsaiCollectionPointer collectionPointer);
 
