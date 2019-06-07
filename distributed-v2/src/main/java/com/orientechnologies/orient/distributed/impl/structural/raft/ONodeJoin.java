@@ -3,6 +3,7 @@ package com.orientechnologies.orient.distributed.impl.structural.raft;
 import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
 import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeConfiguration;
+import com.orientechnologies.orient.distributed.impl.structural.OStructuralSharedConfiguration;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -23,7 +24,9 @@ public class ONodeJoin implements ORaftOperation {
 
   @Override
   public void apply(OrientDBDistributed context) {
-    context.getStructuralConfiguration().getSharedConfiguration().addNode(new OStructuralNodeConfiguration(nodeIdentity));
+    OStructuralSharedConfiguration config = context.getStructuralConfiguration().modifySharedConfiguration();
+    config.addNode(new OStructuralNodeConfiguration(nodeIdentity));
+    context.getStructuralConfiguration().update(config);
   }
 
   @Override

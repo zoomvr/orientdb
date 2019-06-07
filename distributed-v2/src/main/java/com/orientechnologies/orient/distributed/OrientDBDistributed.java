@@ -5,14 +5,7 @@ import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.cache.OCommandCacheSoftRefs;
 import com.orientechnologies.orient.core.command.OCommandOutputListener;
-import com.orientechnologies.orient.core.db.ODatabaseDocumentEmbeddedPooled;
-import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import com.orientechnologies.orient.core.db.ODatabasePoolInternal;
-import com.orientechnologies.orient.core.db.ODatabaseType;
-import com.orientechnologies.orient.core.db.OSharedContext;
-import com.orientechnologies.orient.core.db.OSharedContextEmbedded;
-import com.orientechnologies.orient.core.db.OrientDBConfig;
-import com.orientechnologies.orient.core.db.OrientDBEmbedded;
+import com.orientechnologies.orient.core.db.*;
 import com.orientechnologies.orient.core.db.config.ONodeConfiguration;
 import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentEmbedded;
@@ -23,31 +16,17 @@ import com.orientechnologies.orient.distributed.impl.ODatabaseDocumentDistribute
 import com.orientechnologies.orient.distributed.impl.ODatabaseDocumentDistributedPooled;
 import com.orientechnologies.orient.distributed.impl.ODistributedNetworkManager;
 import com.orientechnologies.orient.distributed.impl.ONodeInternalConfiguration;
-import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedChannel;
-import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedCoordinator;
-import com.orientechnologies.orient.distributed.impl.coordinator.ODistributedMember;
-import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
-import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLog;
-import com.orientechnologies.orient.distributed.impl.coordinator.OOperationLogEntry;
+import com.orientechnologies.orient.distributed.impl.coordinator.*;
 import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSessionOperationId;
 import com.orientechnologies.orient.distributed.impl.metadata.ODistributedContext;
 import com.orientechnologies.orient.distributed.impl.metadata.OSharedContextDistributed;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralConfiguration;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralDistributedContext;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeConfiguration;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralNodeDatabase;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralSharedConfiguration;
-import com.orientechnologies.orient.distributed.impl.structural.OStructuralSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.structural.*;
 import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseSubmitRequest;
 import com.orientechnologies.orient.distributed.impl.structural.raft.ORaftOperation;
 import com.orientechnologies.orient.enterprise.channel.binary.OChannelBinary;
-import com.orientechnologies.orient.server.OClientConnection;
-import com.orientechnologies.orient.server.OServer;
-import com.orientechnologies.orient.server.OServerAware;
-import com.orientechnologies.orient.server.OServerLifecycleListener;
-import com.orientechnologies.orient.server.OSystemDatabase;
+import com.orientechnologies.orient.server.*;
 import com.orientechnologies.orient.server.config.OServerUserConfiguration;
 import com.orientechnologies.orient.server.network.OServerNetworkListener;
 import com.orientechnologies.orient.server.network.protocol.binary.ONetworkProtocolBinary;
@@ -55,18 +34,8 @@ import com.orientechnologies.orient.server.network.protocol.binary.ONetworkProto
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.SecureRandom;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -372,7 +341,7 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
             distributed.getCoordinator().join(member);
           }
         }
-        structuralDistributedContext.makeLeader(coordinatorIdentity, getStructuralConfiguration().getSharedConfiguration());
+        structuralDistributedContext.makeLeader(coordinatorIdentity);
 
         for (ONodeIdentity node : networkManager.getRemoteServers()) {
           structuralDistributedContext.getLeader().connected(node, networkManager.getChannel(node));
@@ -461,9 +430,9 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
     });
   }
 
-  public synchronized void syncToConfiguration(OLogId lastId, OStructuralSharedConfiguration sharedConfiguration) {
+  public synchronized void syncToConfiguration(OLogId lastId, OReadStructuralSharedConfiguration sharedConfiguration) {
     getStructuralConfiguration().receiveSharedConfiguration(lastId, sharedConfiguration);
-    OStructuralNodeConfiguration nodeConfig = getStructuralConfiguration().getSharedConfiguration().getNode(getNodeIdentity());
+    OStructuralNodeConfiguration nodeConfig = getStructuralConfiguration().readSharedConfiguration().getNode(getNodeIdentity());
     assert nodeConfig != null : "if arrived here the configuration should have this node configured";
     super.loadAllDatabases();
     Collection<OStorage> storages = super.getStorages();
@@ -526,7 +495,9 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
       Map<String, String> configurations) {
     //TODO:INIT CONFIG
     super.create(database, null, null, ODatabaseType.valueOf(type), null);
-    getStructuralConfiguration().getSharedConfiguration().addDatabase(database);
+    OStructuralSharedConfiguration config = getStructuralConfiguration().modifySharedConfiguration();
+    config.addDatabase(database);
+    getStructuralConfiguration().update(config);
     this.databasesStatus.put(database, ODistributedStatus.ONLINE);
     checkCoordinator(database);
     //TODO: double check this notify, it may unblock as well checkReadyForHandleRequests that is not what is expected
@@ -535,6 +506,9 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
 
   public void internalDropDatabase(String database) {
     super.drop(database, null, null);
+    OStructuralSharedConfiguration config = getStructuralConfiguration().modifySharedConfiguration();
+    config.removeDatabase(database);
+    getStructuralConfiguration().update(config);
   }
 
   public synchronized void checkReadyForHandleRequests() {

@@ -1,5 +1,6 @@
 package com.orientechnologies.orient.distributed.impl.structural;
 
+import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.iterator.ORecordIteratorCluster;
@@ -9,13 +10,7 @@ import com.orientechnologies.orient.distributed.OrientDBDistributed;
 import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
 import com.orientechnologies.orient.server.OSystemDatabase;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.DataOutput;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 
 public class OStructuralConfiguration {
 
@@ -118,17 +113,30 @@ public class OStructuralConfiguration {
     return currentNodeIdentity;
   }
 
-  public OStructuralSharedConfiguration getSharedConfiguration() {
+  public OReadStructuralSharedConfiguration readSharedConfiguration() {
     return sharedConfiguration;
   }
 
-  public synchronized void receiveSharedConfiguration(OLogId lastId, OStructuralSharedConfiguration sharedConfiguration) {
+  public OStructuralSharedConfiguration modifySharedConfiguration() {
+    try {
+      return sharedConfiguration.clone();
+    } catch (CloneNotSupportedException e) {
+      throw OException.wrapException(new ODatabaseException("Cloning error"), e);
+    }
+  }
+
+  public synchronized void receiveSharedConfiguration(OLogId lastId, OReadStructuralSharedConfiguration sharedConfiguration) {
     this.lastUpdateId = lastId;
-    this.sharedConfiguration = sharedConfiguration;
+    this.sharedConfiguration = (OStructuralSharedConfiguration) sharedConfiguration;
     this.save();
   }
 
   public OLogId getLastUpdateId() {
     return lastUpdateId;
+  }
+
+  public synchronized void update(OStructuralSharedConfiguration config) {
+    this.sharedConfiguration = config;
+    save();
   }
 }

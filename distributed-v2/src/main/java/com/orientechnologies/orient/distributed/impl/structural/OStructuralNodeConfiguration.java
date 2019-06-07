@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-public class OStructuralNodeConfiguration {
+public class OStructuralNodeConfiguration implements Cloneable {
 
   private ONodeIdentity                      identity;
   private Map<UUID, OStructuralNodeDatabase> databases;
