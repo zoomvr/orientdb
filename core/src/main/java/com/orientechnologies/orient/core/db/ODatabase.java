@@ -45,7 +45,6 @@ import com.orientechnologies.orient.core.sql.OCommandSQLParsingException;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import com.orientechnologies.orient.core.storage.ORecordCallback;
 import com.orientechnologies.orient.core.storage.ORecordMetadata;
-import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.tx.OTransaction;
 import com.orientechnologies.orient.core.util.OBackupable;
 
@@ -548,7 +547,7 @@ public interface ODatabase<T> extends OBackupable, Closeable {
         String superclass = superclasses[i];
         OClass superclazz = schema.getClass(superclass);
         if (superclazz == null) {
-          throw new OSchemaException("Class " + superclazz + " does not exist");
+          throw new OSchemaException("Class " + superclass + " does not exist");
         }
         superclassInstances[i] = superclazz;
       }

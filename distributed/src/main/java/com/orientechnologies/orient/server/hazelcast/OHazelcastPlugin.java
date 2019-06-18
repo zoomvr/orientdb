@@ -21,21 +21,7 @@ package com.orientechnologies.orient.server.hazelcast;
 
 import com.hazelcast.config.Config;
 import com.hazelcast.config.FileSystemXmlConfig;
-import com.hazelcast.core.EntryEvent;
-import com.hazelcast.core.EntryListener;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastException;
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.HazelcastInstanceNotActiveException;
-import com.hazelcast.core.ILock;
-import com.hazelcast.core.LifecycleEvent;
-import com.hazelcast.core.LifecycleListener;
-import com.hazelcast.core.LifecycleService;
-import com.hazelcast.core.MapEvent;
-import com.hazelcast.core.Member;
-import com.hazelcast.core.MemberAttributeEvent;
-import com.hazelcast.core.MembershipEvent;
-import com.hazelcast.core.MembershipListener;
+import com.hazelcast.core.*;
 import com.hazelcast.spi.exception.RetryableHazelcastException;
 import com.orientechnologies.common.concur.OOfflineNodeException;
 import com.orientechnologies.common.concur.lock.OInterruptedException;
@@ -51,11 +37,7 @@ import com.orientechnologies.common.util.OUncaughtExceptionHandler;
 import com.orientechnologies.orient.core.OSignalHandler;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import com.orientechnologies.orient.core.db.ODatabaseInternal;
-import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
-import com.orientechnologies.orient.core.db.OScenarioThreadLocal;
-import com.orientechnologies.orient.core.db.OrientDBDistributed;
+import com.orientechnologies.orient.core.db.*;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentAbstract;
 import com.orientechnologies.orient.core.exception.OConfigurationException;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
@@ -67,23 +49,9 @@ import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedSt
 import com.orientechnologies.orient.server.OServer;
 import com.orientechnologies.orient.server.OSystemDatabase;
 import com.orientechnologies.orient.server.config.OServerParameterConfiguration;
-import com.orientechnologies.orient.server.distributed.ODistributedConfiguration;
-import com.orientechnologies.orient.server.distributed.ODistributedException;
-import com.orientechnologies.orient.server.distributed.ODistributedLifecycleListener;
-import com.orientechnologies.orient.server.distributed.ODistributedRequest;
-import com.orientechnologies.orient.server.distributed.ODistributedResponse;
-import com.orientechnologies.orient.server.distributed.ODistributedServerLog;
+import com.orientechnologies.orient.server.distributed.*;
 import com.orientechnologies.orient.server.distributed.ODistributedServerLog.DIRECTION;
-import com.orientechnologies.orient.server.distributed.ODistributedServerManager;
-import com.orientechnologies.orient.server.distributed.ODistributedStartupException;
-import com.orientechnologies.orient.server.distributed.OModifiableDistributedConfiguration;
-import com.orientechnologies.orient.server.distributed.ORemoteServerController;
-import com.orientechnologies.orient.server.distributed.impl.OClusterHealthChecker;
-import com.orientechnologies.orient.server.distributed.impl.ODistributedAbstractPlugin;
-import com.orientechnologies.orient.server.distributed.impl.ODistributedDatabaseImpl;
-import com.orientechnologies.orient.server.distributed.impl.ODistributedMessageServiceImpl;
-import com.orientechnologies.orient.server.distributed.impl.ODistributedOutput;
-import com.orientechnologies.orient.server.distributed.impl.ODistributedStorage;
+import com.orientechnologies.orient.server.distributed.impl.*;
 import com.orientechnologies.orient.server.distributed.impl.task.OAbstractSyncDatabaseTask;
 import com.orientechnologies.orient.server.distributed.impl.task.ODropDatabaseTask;
 import com.orientechnologies.orient.server.distributed.impl.task.OUpdateDatabaseConfigurationTask;
@@ -94,15 +62,7 @@ import sun.misc.Signal;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Hazelcast implementation for clustering.
@@ -868,17 +828,19 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
     List<String> hosts = new ArrayList<>();
     for (Member member : activeNodes.values()) {
       ODocument memberConfig = getNodeConfigurationByUuid(member.getUuid(), true);
-      final String nodeStatus = memberConfig.field("status");
+      if (memberConfig != null) {
+        final String nodeStatus = memberConfig.field("status");
 
-      if (memberConfig != null && !"OFFLINE".equals(nodeStatus)) {
-        final Collection<Map<String, Object>> listeners = memberConfig.field("listeners");
-        if (listeners != null)
-          for (Map<String, Object> listener : listeners) {
-            if (listener.get("protocol").equals("ONetworkProtocolBinary")) {
-              String url = (String) listener.get("listen");
-              hosts.add(url);
+        if (memberConfig != null && !"OFFLINE".equals(nodeStatus)) {
+          final Collection<Map<String, Object>> listeners = memberConfig.field("listeners");
+          if (listeners != null)
+            for (Map<String, Object> listener : listeners) {
+              if (listener.get("protocol").equals("ONetworkProtocolBinary")) {
+                String url = (String) listener.get("listen");
+                hosts.add(url);
+              }
             }
-          }
+        }
       }
     }
     serverInstance.getPushManager().pushDistributedConfig(databaseName, hosts);
@@ -1423,8 +1385,8 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
           setDatabaseStatus(nodeName, databaseName, DB_STATUS.NOT_AVAILABLE);
 
         try {
-          if(!installDatabase(true, databaseName, false,
-              OGlobalConfiguration.DISTRIBUTED_BACKUP_TRY_INCREMENTAL_FIRST.getValueAsBoolean())){
+          if (!installDatabase(true, databaseName, false,
+              OGlobalConfiguration.DISTRIBUTED_BACKUP_TRY_INCREMENTAL_FIRST.getValueAsBoolean())) {
             setDatabaseStatus(getLocalNodeName(), databaseName, DB_STATUS.NOT_AVAILABLE);
           }
         } catch (Exception e) {

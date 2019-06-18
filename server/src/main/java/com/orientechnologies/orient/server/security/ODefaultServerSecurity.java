@@ -28,16 +28,12 @@ import com.orientechnologies.orient.core.db.ODatabase;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.metadata.security.OSecurity;
 import com.orientechnologies.orient.core.metadata.security.OSecurityExternal;
+import com.orientechnologies.orient.core.metadata.security.OSecurityInternal;
 import com.orientechnologies.orient.core.metadata.security.OSystemUser;
 import com.orientechnologies.orient.core.metadata.security.OUser;
 import com.orientechnologies.orient.core.record.impl.ODocument;
-import com.orientechnologies.orient.core.security.OAuditingOperation;
-import com.orientechnologies.orient.core.security.OInvalidPasswordException;
-import com.orientechnologies.orient.core.security.OSecurityFactory;
-import com.orientechnologies.orient.core.security.OSecurityManager;
-import com.orientechnologies.orient.core.security.OSecuritySystemException;
+import com.orientechnologies.orient.core.security.*;
 import com.orientechnologies.orient.server.OClientConnection;
 import com.orientechnologies.orient.server.OClientConnectionManager;
 import com.orientechnologies.orient.server.OServer;
@@ -1025,7 +1021,7 @@ public class ODefaultServerSecurity implements OSecurityFactory, OServerLifecycl
   /***
    * OSecurityFactory Interface
    ***/
-  public OSecurity newSecurity() {
+  public OSecurityInternal newSecurity() {
     return new OSecurityExternal();
   }
 

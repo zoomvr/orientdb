@@ -8,7 +8,7 @@ import com.orientechnologies.orient.core.db.viewmanager.ViewManager;
 import com.orientechnologies.orient.core.index.OIndexManagerAbstract;
 import com.orientechnologies.orient.core.metadata.function.OFunctionLibraryImpl;
 import com.orientechnologies.orient.core.metadata.schema.OSchemaShared;
-import com.orientechnologies.orient.core.metadata.security.OSecurity;
+import com.orientechnologies.orient.core.metadata.security.OSecurityInternal;
 import com.orientechnologies.orient.core.metadata.sequence.OSequenceLibraryImpl;
 import com.orientechnologies.orient.core.query.live.OLiveQueryHook;
 import com.orientechnologies.orient.core.query.live.OLiveQueryHookV2;
@@ -27,7 +27,7 @@ public abstract class OSharedContext extends OListenerManger<OMetadataUpdateList
   protected OrientDBInternal               orientDB;
   protected OStorage                       storage;
   protected OSchemaShared                  schema;
-  protected OSecurity                      security;
+  protected OSecurityInternal              security;
   protected OIndexManagerAbstract          indexManager;
   protected OFunctionLibraryImpl           functionLibrary;
   protected OSchedulerImpl                 scheduler;
@@ -48,7 +48,7 @@ public abstract class OSharedContext extends OListenerManger<OMetadataUpdateList
     return schema;
   }
 
-  public OSecurity getSecurity() {
+  public OSecurityInternal getSecurity() {
     return security;
   }
 

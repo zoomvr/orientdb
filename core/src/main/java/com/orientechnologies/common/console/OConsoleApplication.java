@@ -25,28 +25,14 @@ import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.parser.OStringParser;
 import com.orientechnologies.common.util.OArrays;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.ServiceLoader;
-import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -374,13 +360,14 @@ public class OConsoleApplication {
     Method lastMethodInvoked = null;
     final StringBuilder lastCommandInvoked = new StringBuilder(1024);
 
-    String commandLowerCase = "";
+    StringBuilder commandLowerCaseBuilder = new StringBuilder();
     for (int i = 0; i < commandWords.length; i++) {
       if (i > 0) {
-        commandLowerCase += " ";
+        commandLowerCaseBuilder.append(" ");
       }
-      commandLowerCase += commandWords[i].toLowerCase(Locale.ENGLISH);
+      commandLowerCaseBuilder.append(commandWords[i].toLowerCase(Locale.ENGLISH));
     }
+    String commandLowerCase = commandLowerCaseBuilder.toString();
 
     for (Entry<Method, Object> entry : getConsoleMethods().entrySet()) {
       final Method m = entry.getKey();
@@ -487,7 +474,6 @@ public class OConsoleApplication {
       // COMMENT: JUMP IT
       return null;
 
-    Method lastMethodInvoked = null;
     final StringBuilder lastCommandInvoked = new StringBuilder(1024);
 
     final String commandLowerCase = iCommand.toLowerCase(Locale.ENGLISH);
@@ -550,9 +536,6 @@ public class OConsoleApplication {
       } else
         return m;
     }
-
-    if (lastMethodInvoked != null)
-      syntaxError(lastCommandInvoked.toString(), lastMethodInvoked);
 
     error("\n!Unrecognized command: '%s'", iCommand);
     return null;

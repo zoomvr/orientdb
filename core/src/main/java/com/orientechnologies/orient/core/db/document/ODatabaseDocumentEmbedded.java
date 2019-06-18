@@ -31,17 +31,7 @@ import com.orientechnologies.orient.core.command.OBasicCommandContext;
 import com.orientechnologies.orient.core.command.OCommandManager;
 import com.orientechnologies.orient.core.command.OScriptExecutor;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.db.ODatabase;
-import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import com.orientechnologies.orient.core.db.ODatabaseLifecycleListener;
-import com.orientechnologies.orient.core.db.ODatabaseListener;
-import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
-import com.orientechnologies.orient.core.db.OHookReplacedRecordThreadLocal;
-import com.orientechnologies.orient.core.db.OLiveQueryMonitor;
-import com.orientechnologies.orient.core.db.OLiveQueryResultListener;
-import com.orientechnologies.orient.core.db.OSharedContext;
-import com.orientechnologies.orient.core.db.OSharedContextEmbedded;
-import com.orientechnologies.orient.core.db.OrientDBConfig;
+import com.orientechnologies.orient.core.db.*;
 import com.orientechnologies.orient.core.db.record.OClassTrigger;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.ORecordElement;
@@ -57,14 +47,7 @@ import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OImmutableClass;
 import com.orientechnologies.orient.core.metadata.schema.OImmutableSchema;
 import com.orientechnologies.orient.core.metadata.schema.OView;
-import com.orientechnologies.orient.core.metadata.security.OImmutableUser;
-import com.orientechnologies.orient.core.metadata.security.ORestrictedAccessHook;
-import com.orientechnologies.orient.core.metadata.security.ORestrictedOperation;
-import com.orientechnologies.orient.core.metadata.security.ORole;
-import com.orientechnologies.orient.core.metadata.security.ORule;
-import com.orientechnologies.orient.core.metadata.security.OSecurity;
-import com.orientechnologies.orient.core.metadata.security.OToken;
-import com.orientechnologies.orient.core.metadata.security.OUser;
+import com.orientechnologies.orient.core.metadata.security.*;
 import com.orientechnologies.orient.core.metadata.sequence.OSequenceAction;
 import com.orientechnologies.orient.core.metadata.sequence.OSequenceLibraryProxy;
 import com.orientechnologies.orient.core.query.live.OLiveQueryHook;
@@ -76,11 +59,7 @@ import com.orientechnologies.orient.core.record.impl.*;
 import com.orientechnologies.orient.core.schedule.OScheduledEvent;
 import com.orientechnologies.orient.core.serialization.serializer.record.ORecordSerializerFactory;
 import com.orientechnologies.orient.core.sql.OSQLEngine;
-import com.orientechnologies.orient.core.sql.executor.LiveQueryListenerImpl;
-import com.orientechnologies.orient.core.sql.executor.OExecutionPlan;
-import com.orientechnologies.orient.core.sql.executor.OInternalExecutionPlan;
-import com.orientechnologies.orient.core.sql.executor.OInternalResultSet;
-import com.orientechnologies.orient.core.sql.executor.OResultSet;
+import com.orientechnologies.orient.core.sql.executor.*;
 import com.orientechnologies.orient.core.sql.parser.OLocalResultSet;
 import com.orientechnologies.orient.core.sql.parser.OLocalResultSetLifecycleDecorator;
 import com.orientechnologies.orient.core.sql.parser.OStatement;
@@ -95,15 +74,8 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.ORecordSer
 import com.orientechnologies.orient.core.tx.OTransactionAbstract;
 
 import java.text.SimpleDateFormat;
-import java.util.Collections;
-import java.util.Date;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -194,18 +166,18 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
 
   public void internalOpen(final String iUserName, final String iUserPassword, boolean checkPassword) {
     try {
-      OSecurity security = metadata.getSecurity();
+      OSecurityInternal security = sharedContext.getSecurity();
 
-      if (user == null || user.getVersion() != security.getVersion() || !user.getName().equalsIgnoreCase(iUserName)) {
+      if (user == null || user.getVersion() != security.getVersion(this) || !user.getName().equalsIgnoreCase(iUserName)) {
         final OUser usr;
 
         if (checkPassword) {
-          usr = security.authenticate(iUserName, iUserPassword);
+          usr = security.authenticate(this, iUserName, iUserPassword);
         } else {
-          usr = security.getUser(iUserName);
+          usr = security.getUser(this, iUserName);
         }
         if (usr != null)
-          user = new OImmutableUser(security.getVersion(), usr);
+          user = new OImmutableUser(security.getVersion(this), usr);
         else
           user = null;
 
@@ -761,7 +733,7 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
     assert microTransaction != null;
 
     try {
-      if (success)
+      if (success) {
         try {
           microTransaction.commit();
           OLiveQueryHook.notifyForTxChanges(this);
@@ -772,7 +744,7 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
           OLiveQueryHookV2.removePendingDatabaseOps(this);
           throw e;
         }
-      else {
+      } else {
         microTransaction.rollback();
         OLiveQueryHook.removePendingDatabaseOps(this);
         OLiveQueryHookV2.removePendingDatabaseOps(this);
@@ -821,9 +793,6 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
         ((ODocument) replaced).validate();
       }
       return replaced;
-    }
-    if (changed) {
-      return id;
     }
     return null;
   }
@@ -948,7 +917,7 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
           Orient.instance().getScriptManager().close(this.getName());
         }
         if (clazz.isOuser() || clazz.isOrole()) {
-          getMetadata().getSecurity().incrementVersion();
+          sharedContext.getSecurity().incrementVersion(this);
         }
         if (clazz.isSequence()) {
           ((OSequenceLibraryProxy) getMetadata().getSequenceLibrary()).getDelegate().onSequenceCreated(this, doc);
@@ -960,7 +929,7 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
           OClassTrigger.onRecordAfterCreate(doc, this);
         }
 
-        ((OSharedContextEmbedded) getSharedContext()).getViewManager().recordAdded(clazz, doc, this);
+        getSharedContext().getViewManager().recordAdded(clazz, doc, this);
       }
 
       OLiveQueryHook.addOp(doc, ORecordOperation.CREATED, this);
@@ -980,7 +949,7 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
           Orient.instance().getScriptManager().close(this.getName());
         }
         if (clazz.isOuser() || clazz.isOrole()) {
-          getMetadata().getSecurity().incrementVersion();
+          sharedContext.getSecurity().incrementVersion(this);
         }
         if (clazz.isSequence()) {
           ((OSequenceLibraryProxy) getMetadata().getSequenceLibrary()).getDelegate().onSequenceUpdated(this, doc);
@@ -989,7 +958,7 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
           OClassTrigger.onRecordAfterUpdate(doc, this);
         }
 
-        ((OSharedContextEmbedded) getSharedContext()).getViewManager().recordUpdated(clazz, doc, this);
+        getSharedContext().getViewManager().recordUpdated(clazz, doc, this);
       }
       OLiveQueryHook.addOp(doc, ORecordOperation.UPDATED, this);
       OLiveQueryHookV2.addOp(doc, ORecordOperation.UPDATED, this);
@@ -1009,7 +978,7 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
           Orient.instance().getScriptManager().close(this.getName());
         }
         if (clazz.isOuser() || clazz.isOrole()) {
-          getMetadata().getSecurity().incrementVersion();
+          sharedContext.getSecurity().incrementVersion(this);
         }
         if (clazz.isSequence()) {
           ((OSequenceLibraryProxy) getMetadata().getSequenceLibrary()).getDelegate().onSequenceDropped(this, doc);
@@ -1021,8 +990,7 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
         if (clazz.isTriggered()) {
           OClassTrigger.onRecordAfterDelete(doc, this);
         }
-
-        ((OSharedContextEmbedded) getSharedContext()).getViewManager().recordDeleted(clazz, doc, this);
+        getSharedContext().getViewManager().recordDeleted(clazz, doc, this);
       }
       OLiveQueryHook.addOp(doc, ORecordOperation.DELETED, this);
       OLiveQueryHookV2.addOp(doc, ORecordOperation.DELETED, this);
@@ -1061,6 +1029,8 @@ public class ODatabaseDocumentEmbedded extends ODatabaseDocumentAbstract impleme
             return true;
           }
         }
+        ODocumentInternal.setPropertyAccess(doc, new OPropertyAccess(doc, getSharedContext().getSecurity()));
+        ODocumentInternal.setPropertyEncryption(doc, new OPropertyEncryption());
       }
     }
     return callbackHooks(ORecordHook.TYPE.BEFORE_READ, identifiable) == ORecordHook.RESULT.SKIP;

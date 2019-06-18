@@ -15,20 +15,10 @@
  */
 package com.orientechnologies.orient.test.database.auto;
 
-import java.io.IOException;
-import java.util.Date;
-import java.util.List;
-
-import com.orientechnologies.orient.core.exception.OValidationException;
-import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Optional;
-import org.testng.annotations.Parameters;
-import org.testng.annotations.Test;
-
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.orient.core.exception.OSecurityAccessException;
 import com.orientechnologies.orient.core.exception.OSecurityException;
+import com.orientechnologies.orient.core.exception.OValidationException;
 import com.orientechnologies.orient.core.metadata.security.*;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
@@ -120,7 +110,7 @@ public class SecurityTest extends DocumentDBBaseTest {
   public void testParentRole() {
     database.open("admin", "admin");
 
-    final OSecurity security = database.getMetadata().getSecurity();
+    OSecurity security = database.getMetadata().getSecurity();
     ORole writer = security.getRole("writer");
 
     ORole writerChild = security.createRole("writerChild", writer, OSecurityRole.ALLOW_MODES.ALLOW_ALL_BUT);
@@ -149,6 +139,7 @@ public class SecurityTest extends DocumentDBBaseTest {
             database.close();
           }
           database.open("admin", "admin");
+          security = database.getMetadata().getSecurity();
         } finally {
           security.dropUser("writerChild");
         }
@@ -205,6 +196,7 @@ public class SecurityTest extends DocumentDBBaseTest {
       Assert.fail();
     } catch (OSecurityAccessException e) {
       database.open("admin", "admin");
+      security = database.getMetadata().getSecurity();
       security.dropUser("noRole");
     }
   }

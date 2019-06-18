@@ -8,17 +8,9 @@ import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.index.OIndexMultiValues;
-import com.orientechnologies.orient.core.sql.parser.OExpression;
-import com.orientechnologies.orient.core.sql.parser.OIdentifier;
-import com.orientechnologies.orient.core.sql.parser.OIndexIdentifier;
-import com.orientechnologies.orient.core.sql.parser.OInsertBody;
-import com.orientechnologies.orient.core.sql.parser.OInsertSetExpression;
+import com.orientechnologies.orient.core.sql.parser.*;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Created by luigidellaquila on 20/03/17.
@@ -166,7 +158,7 @@ public class InsertIntoIndexStep extends AbstractExecutionStep {
 
       @Override
       public Optional<OExecutionPlan> getExecutionPlan() {
-        return null;
+        return Optional.empty();
       }
 
       @Override

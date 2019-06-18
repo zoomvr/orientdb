@@ -10,44 +10,26 @@ import com.orientechnologies.common.io.OFileUtils;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.compression.impl.OZIPCompressionUtil;
-import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
-import com.orientechnologies.orient.core.db.OScenarioThreadLocal;
-import com.orientechnologies.orient.core.db.OSharedContext;
-import com.orientechnologies.orient.core.db.OrientDBConfig;
+import com.orientechnologies.orient.core.db.*;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentEmbedded;
-import com.orientechnologies.orient.core.db.record.OClassTrigger;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.ORecordOperation;
 import com.orientechnologies.orient.core.enterprise.OEnterpriseEndpoint;
-import com.orientechnologies.orient.core.exception.OCommandExecutionException;
-import com.orientechnologies.orient.core.exception.OConcurrentCreateException;
-import com.orientechnologies.orient.core.exception.OConcurrentModificationException;
-import com.orientechnologies.orient.core.exception.ODatabaseException;
-import com.orientechnologies.orient.core.exception.OLowDiskSpaceException;
-import com.orientechnologies.orient.core.exception.ORecordNotFoundException;
-import com.orientechnologies.orient.core.exception.OSchemaException;
-import com.orientechnologies.orient.core.exception.OValidationException;
-import com.orientechnologies.orient.core.hook.ORecordHook;
+import com.orientechnologies.orient.core.exception.*;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
-import com.orientechnologies.orient.core.index.OClassIndexManager;
 import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.metadata.OMetadataDefault;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
-import com.orientechnologies.orient.core.metadata.schema.OImmutableClass;
 import com.orientechnologies.orient.core.metadata.schema.OImmutableSchema;
 import com.orientechnologies.orient.core.metadata.schema.OView;
 import com.orientechnologies.orient.core.metadata.security.ORole;
 import com.orientechnologies.orient.core.metadata.security.ORule;
 import com.orientechnologies.orient.core.metadata.sequence.OSequenceAction;
-import com.orientechnologies.orient.core.metadata.sequence.OSequenceLibraryProxy;
 import com.orientechnologies.orient.core.query.live.OLiveQueryHook;
 import com.orientechnologies.orient.core.query.live.OLiveQueryHookV2;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.impl.ODocument;
-import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
-import com.orientechnologies.orient.core.schedule.OScheduledEvent;
 import com.orientechnologies.orient.core.sql.executor.OExecutionPlan;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import com.orientechnologies.orient.core.storage.ORecordDuplicatedException;
@@ -60,15 +42,7 @@ import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey;
 import com.orientechnologies.orient.core.tx.OTransactionInternal;
 import com.orientechnologies.orient.core.tx.OTransactionOptimistic;
 import com.orientechnologies.orient.server.OServer;
-import com.orientechnologies.orient.server.distributed.ODistributedConfiguration;
-import com.orientechnologies.orient.server.distributed.ODistributedDatabase;
-import com.orientechnologies.orient.server.distributed.ODistributedException;
-import com.orientechnologies.orient.server.distributed.ODistributedRequest;
-import com.orientechnologies.orient.server.distributed.ODistributedRequestId;
-import com.orientechnologies.orient.server.distributed.ODistributedResponse;
-import com.orientechnologies.orient.server.distributed.ODistributedServerLog;
-import com.orientechnologies.orient.server.distributed.ODistributedServerManager;
-import com.orientechnologies.orient.server.distributed.ODistributedTxContext;
+import com.orientechnologies.orient.server.distributed.*;
 import com.orientechnologies.orient.server.distributed.impl.metadata.OClassDistributed;
 import com.orientechnologies.orient.server.distributed.impl.metadata.OSharedContextDistributed;
 import com.orientechnologies.orient.server.distributed.impl.task.OCopyDatabaseChunkTask;
@@ -83,24 +57,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
-import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_AUTORETRY_DELAY;
-import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY;
-import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DISTRIBUTED_REPLICATION_PROTOCOL_VERSION;
-import static com.orientechnologies.orient.server.distributed.impl.ONewDistributedTxContextImpl.Status.FAILED;
-import static com.orientechnologies.orient.server.distributed.impl.ONewDistributedTxContextImpl.Status.SUCCESS;
-import static com.orientechnologies.orient.server.distributed.impl.ONewDistributedTxContextImpl.Status.TIMEDOUT;
+import static com.orientechnologies.orient.core.config.OGlobalConfiguration.*;
+import static com.orientechnologies.orient.server.distributed.impl.ONewDistributedTxContextImpl.Status.*;
 
 /**
  * Created by tglman on 30/03/17.
@@ -888,91 +849,6 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
         }
       }
     }
-  }
-
-  public void afterCreateOperations(final OIdentifiable id) {
-    if (id instanceof ODocument) {
-      ODocument doc = (ODocument) id;
-      OImmutableClass clazz = ODocumentInternal.getImmutableSchemaClass(this, doc);
-      if (clazz != null) {
-        OClassIndexManager.checkIndexesAfterCreate(doc, this);
-        if (clazz.isFunction()) {
-          this.getSharedContext().getFunctionLibrary().createdFunction(doc);
-          Orient.instance().getScriptManager().close(this.getName());
-        }
-        if (clazz.isOuser() || clazz.isOrole()) {
-          getMetadata().getSecurity().incrementVersion();
-        }
-        if (clazz.isSequence()) {
-          ((OSequenceLibraryProxy) getMetadata().getSequenceLibrary()).getDelegate().onSequenceCreated(this, doc);
-        }
-        if (clazz.isScheduler()) {
-          getMetadata().getScheduler().scheduleEvent(new OScheduledEvent(doc));
-        }
-        if (clazz.isTriggered()) {
-          OClassTrigger.onRecordAfterCreate(doc, this);
-        }
-        OLiveQueryHook.addOp(doc, ORecordOperation.CREATED, this);
-        OLiveQueryHookV2.addOp(doc, ORecordOperation.CREATED, this);
-      }
-    }
-    callbackHooks(ORecordHook.TYPE.AFTER_CREATE, id);
-  }
-
-  public void afterUpdateOperations(final OIdentifiable id) {
-    if (id instanceof ODocument) {
-      ODocument doc = (ODocument) id;
-      OImmutableClass clazz = ODocumentInternal.getImmutableSchemaClass(this, doc);
-      if (clazz != null) {
-        OClassIndexManager.checkIndexesAfterUpdate((ODocument) id, this);
-        if (clazz.isFunction()) {
-          this.getSharedContext().getFunctionLibrary().updatedFunction(doc);
-          Orient.instance().getScriptManager().close(this.getName());
-        }
-        if (clazz.isOuser() || clazz.isOrole()) {
-          getMetadata().getSecurity().incrementVersion();
-        }
-        if (clazz.isSequence()) {
-          ((OSequenceLibraryProxy) getMetadata().getSequenceLibrary()).getDelegate().onSequenceUpdated(this, doc);
-        }
-        if (clazz.isTriggered()) {
-          OClassTrigger.onRecordAfterUpdate(doc, this);
-        }
-        OLiveQueryHook.addOp(doc, ORecordOperation.UPDATED, this);
-        OLiveQueryHookV2.addOp(doc, ORecordOperation.UPDATED, this);
-      }
-    }
-    callbackHooks(ORecordHook.TYPE.AFTER_UPDATE, id);
-  }
-
-  public void afterDeleteOperations(final OIdentifiable id) {
-    if (id instanceof ODocument) {
-      ODocument doc = (ODocument) id;
-      OImmutableClass clazz = ODocumentInternal.getImmutableSchemaClass(this, doc);
-      if (clazz != null) {
-        OClassIndexManager.checkIndexesAfterDelete(doc, this);
-        if (clazz.isFunction()) {
-          this.getSharedContext().getFunctionLibrary().droppedFunction(doc);
-          Orient.instance().getScriptManager().close(this.getName());
-        }
-        if (clazz.isOuser() || clazz.isOrole()) {
-          getMetadata().getSecurity().incrementVersion();
-        }
-        if (clazz.isSequence()) {
-          ((OSequenceLibraryProxy) getMetadata().getSequenceLibrary()).getDelegate().onSequenceDropped(this, doc);
-        }
-        if (clazz.isScheduler()) {
-          final String eventName = doc.field(OScheduledEvent.PROP_NAME);
-          getSharedContext().getScheduler().removeEventInternal(eventName);
-        }
-        if (clazz.isTriggered()) {
-          OClassTrigger.onRecordAfterDelete(doc, this);
-        }
-      }
-      OLiveQueryHook.addOp(doc, ORecordOperation.DELETED, this);
-      OLiveQueryHookV2.addOp(doc, ORecordOperation.DELETED, this);
-    }
-    callbackHooks(ORecordHook.TYPE.AFTER_DELETE, id);
   }
 
   @Override

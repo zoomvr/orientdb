@@ -44,22 +44,9 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
 import com.orientechnologies.orient.core.storage.OBasicTransaction;
 import com.orientechnologies.orient.core.storage.ORecordCallback;
-import com.orientechnologies.orient.core.tx.OTransaction;
-import com.orientechnologies.orient.core.tx.OTransactionAbstract;
-import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
-import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey;
-import com.orientechnologies.orient.core.tx.OTransactionInternal;
-import com.orientechnologies.orient.core.tx.OTransactionRecordIndexOperation;
+import com.orientechnologies.orient.core.tx.*;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -72,7 +59,7 @@ public final class OMicroTransaction implements OBasicTransaction, OTransactionI
 
   private static final AtomicInteger transactionSerial = new AtomicInteger(0);
 
-  private ODatabaseDocumentInternal database;
+  private       ODatabaseDocumentInternal database;
   private final OAbstractPaginatedStorage storage;
 
   private final int id;
@@ -391,14 +378,15 @@ public final class OMicroTransaction implements OBasicTransaction, OTransactionI
     for (ORecordOperation recordOperation : recordOperations.values()) {
       final ORecord record = recordOperation.record.getRecord();
 
-      if (record.isDirty())
-        if (record instanceof ODocument) {
-          final ODocument document = (ODocument) record;
+      if (record.isDirty() && record instanceof ODocument) {
+        final ODocument document = (ODocument) record;
 
-          if (document.isTrackingChanges())
-            document.undo();
-        } else
-          record.unload();
+        if (document.isTrackingChanges())
+          document.undo();
+        else
+          document.unload();
+      } else
+        record.unload();
     }
 
     reset();
@@ -759,9 +747,9 @@ public final class OMicroTransaction implements OBasicTransaction, OTransactionI
   public void setDatabase(ODatabaseDocumentInternal database) {
     this.database = database;
   }
-  
+
   @Override
-  public boolean isUseDeltas(){
+  public boolean isUseDeltas() {
     return false;
   }
 }

@@ -20,10 +20,8 @@
 package com.orientechnologies.orient.core.metadata.security;
 
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.OConfigurationException;
-import com.orientechnologies.orient.core.hook.ORecordHook;
 import com.orientechnologies.orient.core.metadata.schema.OImmutableClass;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
@@ -65,7 +63,7 @@ public class ORestrictedAccessHook {
 
       if (identity != null) {
         for (String f : fields)
-          database.getMetadata().getSecurity().allowIdentity(iDocument, f, identity);
+          database.getSharedContext().getSecurity().allowIdentity(database, iDocument, f, identity);
         return true;
       }
     }
@@ -104,4 +102,5 @@ public class ORestrictedAccessHook {
 
     return true;
   }
+
 }

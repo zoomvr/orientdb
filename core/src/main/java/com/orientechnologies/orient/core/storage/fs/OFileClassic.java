@@ -32,11 +32,7 @@ import com.sun.jna.Native;
 import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.RandomAccessFile;
-import java.io.StringWriter;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -48,10 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static com.orientechnologies.common.io.OIOUtils.readByteBuffer;
-import static com.orientechnologies.common.io.OIOUtils.readByteBuffers;
-import static com.orientechnologies.common.io.OIOUtils.writeByteBuffer;
-import static com.orientechnologies.common.io.OIOUtils.writeByteBuffers;
+import static com.orientechnologies.common.io.OIOUtils.*;
 
 public final class OFileClassic implements OClosableItem {
   public static final  String NAME            = "classic";
@@ -123,7 +116,7 @@ public final class OFileClassic implements OClosableItem {
         try {
           ONative.instance().fallocate(fd, currentSize + HEADER_SIZE, size);
         } catch (final LastErrorException e) {
-          OLogManager.instance().warnNoDb(this,
+          OLogManager.instance().debug(this,
               "Can not allocate space (error %d) for file %s using native Linux API, more slower methods will be used",
               e.getErrorCode(), osFile.toAbsolutePath().toString());
 
