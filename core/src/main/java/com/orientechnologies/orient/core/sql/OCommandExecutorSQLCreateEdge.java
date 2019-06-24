@@ -37,12 +37,7 @@ import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.sql.filter.OSQLFilterItem;
 import com.orientechnologies.orient.core.sql.functions.OSQLFunctionRuntime;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * SQL CREATE EDGE command.
@@ -68,9 +63,7 @@ public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLSetAware i
     String queryText = textRequest.getText();
     String originalQuery = queryText;
     try {
-      // System.out.println("NEW PARSER FROM: " + queryText);
       queryText = preParse(queryText, iRequest);
-      // System.out.println("NEW PARSER TO: " + queryText);
       textRequest.setText(queryText);
 
       final ODatabaseDocument database = getDatabase();

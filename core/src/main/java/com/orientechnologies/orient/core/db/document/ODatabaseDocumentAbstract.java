@@ -32,7 +32,6 @@ import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.command.OCommandRequest;
 import com.orientechnologies.orient.core.command.OCommandRequestInternal;
 import com.orientechnologies.orient.core.config.OContextConfiguration;
-import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.config.OStorageEntryConfiguration;
 import com.orientechnologies.orient.core.conflict.ORecordConflictStrategy;
 import com.orientechnologies.orient.core.db.*;
@@ -2393,57 +2392,6 @@ public abstract class ODatabaseDocumentAbstract extends OListenerManger<ODatabas
       }
     }
     throw lastException;
-  }
-
-  private void bindPropertiesToContext(OContextConfiguration configuration, final Map<String, Object> iProperties) {
-    final String connectionStrategy = iProperties != null ? (String) iProperties.get("connectionStrategy") : null;
-    if (connectionStrategy != null)
-      configuration.setValue(OGlobalConfiguration.CLIENT_CONNECTION_STRATEGY, connectionStrategy);
-
-    final String compressionMethod = iProperties != null ?
-        (String) iProperties.get(OGlobalConfiguration.STORAGE_COMPRESSION_METHOD.getKey().toLowerCase(Locale.ENGLISH)) :
-        null;
-    if (compressionMethod != null)
-      // SAVE COMPRESSION METHOD IN CONFIGURATION
-      configuration.setValue(OGlobalConfiguration.STORAGE_COMPRESSION_METHOD, compressionMethod);
-
-    final String encryptionMethod = iProperties != null ?
-        (String) iProperties.get(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD.getKey().toLowerCase(Locale.ENGLISH)) :
-        null;
-    if (encryptionMethod != null)
-      // SAVE ENCRYPTION METHOD IN CONFIGURATION
-      configuration.setValue(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD, encryptionMethod);
-
-    final String encryptionKey = iProperties != null ?
-        (String) iProperties.get(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY.getKey().toLowerCase(Locale.ENGLISH)) :
-        null;
-    if (encryptionKey != null)
-      // SAVE ENCRYPTION KEY IN CONFIGURATION
-      configuration.setValue(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY, encryptionKey);
-  }
-
-  private void bindPropertiesToContextGlobal(OContextConfiguration configuration,
-      final Map<OGlobalConfiguration, Object> iProperties) {
-    final String connectionStrategy = iProperties != null ? (String) iProperties.get("connectionStrategy") : null;
-    if (connectionStrategy != null)
-      configuration.setValue(OGlobalConfiguration.CLIENT_CONNECTION_STRATEGY, connectionStrategy);
-
-    final String compressionMethod =
-        iProperties != null ? (String) iProperties.get(OGlobalConfiguration.STORAGE_COMPRESSION_METHOD) : null;
-    if (compressionMethod != null)
-      // SAVE COMPRESSION METHOD IN CONFIGURATION
-      configuration.setValue(OGlobalConfiguration.STORAGE_COMPRESSION_METHOD, compressionMethod);
-
-    final String encryptionMethod =
-        iProperties != null ? (String) iProperties.get(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD) : null;
-    if (encryptionMethod != null)
-      // SAVE ENCRYPTION METHOD IN CONFIGURATION
-      configuration.setValue(OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD, encryptionMethod);
-
-    final String encryptionKey = iProperties != null ? (String) iProperties.get(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY) : null;
-    if (encryptionKey != null)
-      // SAVE ENCRYPTION KEY IN CONFIGURATION
-      configuration.setValue(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY, encryptionKey);
   }
 
   public boolean isUseLightweightEdges() {

@@ -28,11 +28,7 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.metadata.OMetadataInternal;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
-import com.orientechnologies.orient.core.sql.OCommandExecutorSQLSetAware;
-import com.orientechnologies.orient.core.sql.OCommandParameters;
-import com.orientechnologies.orient.core.sql.OCommandSQLParsingException;
-import com.orientechnologies.orient.core.sql.OSQLEngine;
-import com.orientechnologies.orient.core.sql.OSQLHelper;
+import com.orientechnologies.orient.core.sql.*;
 import com.orientechnologies.orient.core.sql.filter.OSQLFilterItem;
 import com.orientechnologies.orient.core.sql.functions.OSQLFunctionRuntime;
 import com.tinkerpop.blueprints.impls.orient.OrientBaseGraph;
@@ -40,12 +36,7 @@ import com.tinkerpop.blueprints.impls.orient.OrientEdge;
 import com.tinkerpop.blueprints.impls.orient.OrientEdgeType;
 import com.tinkerpop.blueprints.impls.orient.OrientVertex;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * SQL CREATE EDGE command.
@@ -71,9 +62,7 @@ public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLSetAware i
     String queryText = textRequest.getText();
     String originalQuery = queryText;
     try {
-      // System.out.println("NEW PARSER FROM: " + queryText);
       queryText = preParse(queryText, iRequest);
-      // System.out.println("NEW PARSER TO: " + queryText);
       textRequest.setText(queryText);
 
       final ODatabaseDocument database = getDatabase();

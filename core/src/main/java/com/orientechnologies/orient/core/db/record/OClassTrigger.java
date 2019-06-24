@@ -36,11 +36,7 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
 import com.orientechnologies.orient.core.serialization.serializer.OStringSerializerHelper;
 
-import javax.script.Bindings;
-import javax.script.Invocable;
-import javax.script.ScriptContext;
-import javax.script.ScriptEngine;
-import javax.script.ScriptException;
+import javax.script.*;
 import java.lang.reflect.Method;
 
 /**
@@ -189,9 +185,12 @@ public class OClassTrigger {
       } else {
         final Object funcProp = iDocument.field(attr);
         if (funcProp != null) {
-          final String funcName = funcProp instanceof ODocument ?
-              (String) ((ODocument) funcProp).field("name") :
-              funcProp.toString();
+          final String funcName;
+          if (funcProp instanceof ODocument) {
+            funcName = ((ODocument) funcProp).field("name");
+          } else {
+            funcName = funcProp.toString();
+          }
           func = database.getMetadata().getFunctionLibrary().getFunction(funcName);
         }
       }

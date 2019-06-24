@@ -21,13 +21,7 @@ package com.orientechnologies.orient.graph.sql;
 
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.types.OModifiableBoolean;
-import com.orientechnologies.orient.core.command.OCommandDistributedReplicateRequest;
-import com.orientechnologies.orient.core.command.OCommandExecutor;
-import com.orientechnologies.orient.core.command.OCommandManager;
-import com.orientechnologies.orient.core.command.OCommandRequest;
-import com.orientechnologies.orient.core.command.OCommandRequestInternal;
-import com.orientechnologies.orient.core.command.OCommandRequestText;
-import com.orientechnologies.orient.core.command.OCommandResultListener;
+import com.orientechnologies.orient.core.command.*;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
@@ -47,11 +41,7 @@ import com.tinkerpop.blueprints.impls.orient.OrientGraph;
 import com.tinkerpop.blueprints.impls.orient.OrientVertex;
 import com.tinkerpop.blueprints.impls.orient.OrientVertexType;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -81,9 +71,7 @@ public class OCommandExecutorSQLDeleteVertex extends OCommandExecutorSQLAbstract
     String queryText = textRequest.getText();
     String originalQuery = queryText;
     try {
-      // System.out.println("NEW PARSER FROM: " + queryText);
       queryText = preParse(queryText, iRequest);
-      // System.out.println("NEW PARSER TO: " + queryText);
       textRequest.setText(queryText);
       database = getDatabase();
 

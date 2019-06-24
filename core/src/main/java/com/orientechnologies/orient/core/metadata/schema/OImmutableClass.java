@@ -35,15 +35,7 @@ import com.orientechnologies.orient.core.metadata.sequence.OSequence;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.schedule.OScheduledEvent;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -61,7 +53,7 @@ public class OImmutableClass implements OClass {
   @Deprecated
   public static final String VERTEX_CLASS_NAME = OClass.VERTEX_CLASS_NAME;
 
-  private boolean inited = false;
+  private       boolean                   inited = false;
   private final boolean                   isAbstract;
   private final boolean                   strictMode;
   private final String                    name;
@@ -166,9 +158,11 @@ public class OImmutableClass implements OClass {
       getRawIndexes(indexes);
 
       final ODatabaseDocumentInternal db = getDatabase();
-      this.autoShardingIndex = db != null && db.getMetadata() != null && db.getMetadata().getIndexManager() != null ?
-          db.getMetadata().getIndexManager().getClassAutoShardingIndex(name) :
-          null;
+      if (db != null && db.getMetadata() != null && db.getMetadata().getIndexManager() != null) {
+        this.autoShardingIndex = db.getMetadata().getIndexManager().getClassAutoShardingIndex(name);
+      } else {
+        this.autoShardingIndex = null;
+      }
     }
 
     inited = true;

@@ -35,7 +35,6 @@ import com.orientechnologies.orient.core.config.OContextConfiguration;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
-import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.OCoreException;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
@@ -316,7 +315,9 @@ public class ONetworkProtocolBinary extends ONetworkProtocol {
             }
             exception = t;
           } catch (Error err) {
-            connection.release();
+            if(connection!=null) {
+              connection.release();
+            }
             throw err;
           }
         }
@@ -852,7 +853,7 @@ public class ONetworkProtocolBinary extends ONetworkProtocol {
   protected static int trimCsvSerializedContent(OClientConnection connection, final byte[] stream) {
     int realLength = stream.length;
     final ODatabaseDocumentInternal db = ODatabaseRecordThreadLocal.instance().getIfDefined();
-    if (db != null && db instanceof ODatabaseDocument) {
+    if (db != null) {
       if (ORecordSerializerSchemaAware2CSV.NAME.equals(connection.getData().getSerializationImpl())) {
         // TRIM TAILING SPACES (DUE TO OVERSIZE)
         for (int i = stream.length - 1; i > -1; --i) {

@@ -43,15 +43,7 @@ import com.orientechnologies.orient.core.sql.filter.OSQLFilterItemField;
 import com.orientechnologies.orient.core.sql.query.OSQLAsynchQuery;
 import com.orientechnologies.orient.core.storage.OCluster;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -83,9 +75,7 @@ public class OCommandExecutorSQLInsert extends OCommandExecutorSQLSetAware
     String queryText = textRequest.getText();
     String originalQuery = queryText;
     try {
-      // System.out.println("NEW PARSER FROM: " + queryText);
       queryText = preParse(queryText, iRequest);
-      // System.out.println("NEW PARSER   TO: " + queryText);
       textRequest.setText(queryText);
 
       final ODatabaseDocument database = getDatabase();

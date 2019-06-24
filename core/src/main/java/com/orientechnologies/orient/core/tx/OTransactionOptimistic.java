@@ -589,5 +589,4 @@ public class OTransactionOptimistic extends OTransactionRealAbstract {
   public boolean getSentToServer() {
     return sentToServer;
   }
-
 }

@@ -36,28 +36,9 @@ import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URL;
-import java.sql.Array;
-import java.sql.Blob;
-import java.sql.Clob;
 import java.sql.Date;
-import java.sql.NClob;
-import java.sql.Ref;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.RowId;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.sql.SQLWarning;
-import java.sql.SQLXML;
-import java.sql.Statement;
-import java.sql.Time;
-import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Optional;
+import java.sql.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -282,8 +263,6 @@ public class OrientJdbcResultSet implements ResultSet {
     OType columnType = result.toElement().getSchemaType().map(t -> t.getProperty(columnLabel).getType()).orElse(OType.EMBEDDEDLIST);
 
     assert columnType.isEmbedded() && columnType.isMultiValue();
-
-//    System.out.println("columnType.name() = " + columnType.getDefaultJavaType());
 
     Array array = new OrientJdbcArray(result.getProperty(columnLabel));
 

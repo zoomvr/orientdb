@@ -25,12 +25,7 @@ import com.orientechnologies.orient.stresstest.workload.OWorkload;
 import java.io.Console;
 import java.io.File;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * This is the parser of the command line arguments passed with the invocation of OStressTester. It contains a static method that -
@@ -115,9 +110,11 @@ public class OStressTesterCommandLineParser {
     settings.remoteIp = options.get(OPTION_REMOTE_IP);
     settings.haMetrics = options.get(OPTION_HA_METRICS) != null ? Boolean.parseBoolean(options.get(OPTION_HA_METRICS)) : false;
     settings.workloadCfg = options.get(OPTION_WORKLOAD);
-    settings.keepDatabaseAfterTest = options.get(OPTION_KEEP_DATABASE_AFTER_TEST) != null ?
-        Boolean.parseBoolean(options.get(OPTION_KEEP_DATABASE_AFTER_TEST)) :
-        false;
+    if (options.get(OPTION_KEEP_DATABASE_AFTER_TEST) != null) {
+      settings.keepDatabaseAfterTest = Boolean.parseBoolean(options.get(OPTION_KEEP_DATABASE_AFTER_TEST));
+    } else {
+      settings.keepDatabaseAfterTest = false;
+    }
     settings.remotePort = 2424;
     settings.checkDatabase = Boolean.parseBoolean(options.get(OPTION_CHECK_DATABASE));
     if (options.get(OPTION_LOAD_BALANCING) != null)

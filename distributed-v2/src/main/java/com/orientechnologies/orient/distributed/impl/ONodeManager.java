@@ -8,18 +8,8 @@ import com.orientechnologies.orient.core.db.config.ONodeIdentity;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.DataOutput;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimerTask;
+import java.io.*;
+import java.util.*;
 
 public abstract class ONodeManager {
 
@@ -212,9 +202,11 @@ public abstract class ONodeManager {
     message.nodeIdentity = this.internalConfiguration.getNodeIdentity();
     message.group = this.config.getGroupName();
     message.term = leaderStatus.currentTerm;
-    message.role = leaderStatus.status == OLeaderElectionStateMachine.Status.LEADER ?
-        OBroadcastMessage.ROLE_COORDINATOR :
-        OBroadcastMessage.ROLE_REPLICA;
+    if (leaderStatus.status == OLeaderElectionStateMachine.Status.LEADER) {
+      message.role = OBroadcastMessage.ROLE_COORDINATOR;
+    } else {
+      message.role = OBroadcastMessage.ROLE_REPLICA;
+    }
 
     message.connectionUsername = internalConfiguration.getConnectionUsername();
     message.connectionPassword = internalConfiguration.getConnectionPassword();

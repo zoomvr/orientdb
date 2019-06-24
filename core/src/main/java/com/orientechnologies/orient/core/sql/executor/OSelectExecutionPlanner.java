@@ -13,11 +13,7 @@ import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.index.OIndexDefinition;
 import com.orientechnologies.orient.core.metadata.OMetadataInternal;
-import com.orientechnologies.orient.core.metadata.schema.OClass;
-import com.orientechnologies.orient.core.metadata.schema.OProperty;
-import com.orientechnologies.orient.core.metadata.schema.OSchema;
-import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.metadata.schema.OView;
+import com.orientechnologies.orient.core.metadata.schema.*;
 import com.orientechnologies.orient.core.sql.OCommandExecutorSQLAbstract;
 import com.orientechnologies.orient.core.sql.parser.*;
 
@@ -2184,10 +2180,12 @@ public class OSelectExecutionPlanner {
         .map(x -> (OPair<Integer, IndexSearchDescriptor>) new OPair(x.cost(ctx), x)).sorted().collect(Collectors.toList());
 
     //get only the descriptors with the lowest cost
-    descriptors = sortedDescriptors.isEmpty() ?
-        Collections.emptyList() :
-        sortedDescriptors.stream().filter(x -> x.key.equals(sortedDescriptors.get(0).key)).map(x -> x.value)
-            .collect(Collectors.toList());
+    if (sortedDescriptors.isEmpty()) {
+      descriptors = Collections.emptyList();
+    } else {
+      descriptors = sortedDescriptors.stream().filter(x -> x.key.equals(sortedDescriptors.get(0).key)).map(x -> x.value)
+          .collect(Collectors.toList());
+    }
 
     //sort remaining by the number of indexed fields
     descriptors = descriptors.stream().sorted(Comparator.comparingInt(x -> x.keyCondition.getSubBlocks().size()))

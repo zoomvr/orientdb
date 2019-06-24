@@ -28,11 +28,7 @@ import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.encryption.OEncryption;
 import com.orientechnologies.orient.core.exception.ONonEmptyComponentCanNotBeRemovedException;
 import com.orientechnologies.orient.core.exception.OTooBigIndexKeyException;
-import com.orientechnologies.orient.core.index.OAlwaysGreaterKey;
-import com.orientechnologies.orient.core.index.OAlwaysLessKey;
-import com.orientechnologies.orient.core.index.OCompositeKey;
-import com.orientechnologies.orient.core.index.OIndexKeyUpdater;
-import com.orientechnologies.orient.core.index.OIndexUpdateAction;
+import com.orientechnologies.orient.core.index.*;
 import com.orientechnologies.orient.core.index.engine.OBaseIndexEngine;
 import com.orientechnologies.orient.core.iterator.OEmptyIterator;
 import com.orientechnologies.orient.core.iterator.OEmptyMapEntryIterator;
@@ -45,13 +41,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbt
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.sbtree.OSBTreeRemoveCO;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -1721,16 +1711,24 @@ public class OSBTree<K, V> extends ODurableComponent {
               final Map.Entry<K, V> entry = convertToMapEntry(bucket.getEntry(itemIndex));
               itemIndex++;
 
-              if (fromKey != null && (fromKeyInclusive ?
-                  comparator.compare(entry.getKey(), fromKey) < 0 :
-                  comparator.compare(entry.getKey(), fromKey) <= 0)) {
-                continue;
+              if (fromKeyInclusive) {
+                if (fromKey != null && comparator.compare(entry.getKey(), fromKey) < 0) {
+                  continue;
+                }
+              } else {
+                if (fromKey != null && comparator.compare(entry.getKey(), fromKey) <= 0) {
+                  continue;
+                }
               }
 
-              if (toKey != null && (toKeyInclusive ?
-                  comparator.compare(entry.getKey(), toKey) > 0 :
-                  comparator.compare(entry.getKey(), toKey) >= 0)) {
-                break;
+              if (toKeyInclusive) {
+                if (toKey != null && comparator.compare(entry.getKey(), toKey) > 0) {
+                  break;
+                }
+              } else {
+                if (toKey != null && comparator.compare(entry.getKey(), toKey) >= 0) {
+                  break;
+                }
               }
 
               dataCache.add(entry);
@@ -1853,16 +1851,24 @@ public class OSBTree<K, V> extends ODurableComponent {
               final Map.Entry<K, V> entry = convertToMapEntry(bucket.getEntry(itemIndex));
               itemIndex--;
 
-              if (toKey != null && (toKeyInclusive ?
-                  comparator.compare(entry.getKey(), toKey) > 0 :
-                  comparator.compare(entry.getKey(), toKey) >= 0)) {
-                continue;
+              if (toKeyInclusive) {
+                if (toKey != null && comparator.compare(entry.getKey(), toKey) > 0) {
+                  continue;
+                }
+              } else {
+                if (toKey != null && comparator.compare(entry.getKey(), toKey) >= 0) {
+                  continue;
+                }
               }
 
-              if (fromKey != null && (fromKeyInclusive ?
-                  comparator.compare(entry.getKey(), fromKey) < 0 :
-                  comparator.compare(entry.getKey(), fromKey) <= 0)) {
-                break;
+              if (fromKeyInclusive) {
+                if (fromKey != null && comparator.compare(entry.getKey(), fromKey) < 0) {
+                  break;
+                }
+              } else {
+                if (fromKey != null && comparator.compare(entry.getKey(), fromKey) <= 0) {
+                  break;
+                }
               }
 
               dataCache.add(entry);

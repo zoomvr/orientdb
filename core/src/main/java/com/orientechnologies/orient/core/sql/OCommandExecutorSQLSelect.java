@@ -48,18 +48,7 @@ import com.orientechnologies.orient.core.exception.OQueryParsingException;
 import com.orientechnologies.orient.core.id.OContextualRecordId;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
-import com.orientechnologies.orient.core.index.OCompositeIndexCursor;
-import com.orientechnologies.orient.core.index.OCompositeIndexDefinition;
-import com.orientechnologies.orient.core.index.OCompositeKey;
-import com.orientechnologies.orient.core.index.OIndex;
-import com.orientechnologies.orient.core.index.OIndexChangesWrapper;
-import com.orientechnologies.orient.core.index.OIndexCursor;
-import com.orientechnologies.orient.core.index.OIndexCursorCollectionValue;
-import com.orientechnologies.orient.core.index.OIndexCursorSingleValue;
-import com.orientechnologies.orient.core.index.OIndexDefinition;
-import com.orientechnologies.orient.core.index.OIndexDefinitionMultiValue;
-import com.orientechnologies.orient.core.index.OIndexEngineException;
-import com.orientechnologies.orient.core.index.OIndexInternal;
+import com.orientechnologies.orient.core.index.*;
 import com.orientechnologies.orient.core.iterator.OIdentifiableIterator;
 import com.orientechnologies.orient.core.iterator.ORecordIteratorClass;
 import com.orientechnologies.orient.core.iterator.ORecordIteratorCluster;
@@ -78,44 +67,18 @@ import com.orientechnologies.orient.core.record.ORecordInternal;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentHelper;
 import com.orientechnologies.orient.core.serialization.serializer.OStringSerializerHelper;
-import com.orientechnologies.orient.core.sql.filter.OFilterOptimizer;
-import com.orientechnologies.orient.core.sql.filter.OSQLFilter;
-import com.orientechnologies.orient.core.sql.filter.OSQLFilterCondition;
-import com.orientechnologies.orient.core.sql.filter.OSQLFilterItem;
-import com.orientechnologies.orient.core.sql.filter.OSQLFilterItemField;
-import com.orientechnologies.orient.core.sql.filter.OSQLFilterItemVariable;
+import com.orientechnologies.orient.core.sql.filter.*;
 import com.orientechnologies.orient.core.sql.functions.OSQLFunctionRuntime;
 import com.orientechnologies.orient.core.sql.functions.coll.OSQLFunctionDistinct;
 import com.orientechnologies.orient.core.sql.functions.misc.OSQLFunctionCount;
-import com.orientechnologies.orient.core.sql.operator.OQueryOperator;
-import com.orientechnologies.orient.core.sql.operator.OQueryOperatorAnd;
-import com.orientechnologies.orient.core.sql.operator.OQueryOperatorBetween;
-import com.orientechnologies.orient.core.sql.operator.OQueryOperatorIn;
-import com.orientechnologies.orient.core.sql.operator.OQueryOperatorMajor;
-import com.orientechnologies.orient.core.sql.operator.OQueryOperatorMajorEquals;
-import com.orientechnologies.orient.core.sql.operator.OQueryOperatorMinor;
-import com.orientechnologies.orient.core.sql.operator.OQueryOperatorMinorEquals;
-import com.orientechnologies.orient.core.sql.parser.OBinaryCondition;
-import com.orientechnologies.orient.core.sql.parser.OOrderBy;
-import com.orientechnologies.orient.core.sql.parser.OOrderByItem;
-import com.orientechnologies.orient.core.sql.parser.OSelectStatement;
-import com.orientechnologies.orient.core.sql.parser.OWhereClause;
+import com.orientechnologies.orient.core.sql.operator.*;
+import com.orientechnologies.orient.core.sql.parser.*;
 import com.orientechnologies.orient.core.sql.query.OLegacyResultSet;
 import com.orientechnologies.orient.core.sql.query.OSQLQuery;
 import com.orientechnologies.orient.core.storage.OStorage.LOCKING_STRATEGY;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -286,9 +249,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
     String queryText = textRequest.getText();
     String originalQuery = queryText;
     try {
-      // System.out.println("NEW PARSER FROM: " + queryText);
       queryText = preParse(queryText, iRequest);
-      // System.out.println("NEW PARSER TO: " + queryText);
       textRequest.setText(queryText);
 
       super.parse(iRequest);
@@ -324,9 +285,11 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
               compiledFilter = OSQLEngine.getInstance()
                   .parseCondition(parserText.substring(parserGetCurrentPosition(), endPosition), getContext(), KEYWORD_WHERE);
               optimize();
-              parserSetCurrentPosition(compiledFilter.parserIsEnded() ?
-                  endPosition :
-                  compiledFilter.parserGetCurrentPosition() + parserGetCurrentPosition());
+              if (compiledFilter.parserIsEnded()) {
+                parserSetCurrentPosition(endPosition);
+              } else {
+                parserSetCurrentPosition(compiledFilter.parserGetCurrentPosition() + parserGetCurrentPosition());
+              }
             } else if (w.equals(KEYWORD_LET)) {
               parseLet();
             } else if (w.equals(KEYWORD_GROUP)) {
@@ -719,9 +682,11 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
    */
   public int getTemporaryRIDCounter(final OCommandContext iContext) {
     final OTemporaryRidGenerator parentQuery = (OTemporaryRidGenerator) iContext.getVariable("parentQuery");
-    return parentQuery != null && parentQuery != this ?
-        parentQuery.getTemporaryRIDCounter(iContext) :
-        serialTempRID.getAndIncrement();
+    if (parentQuery != null && parentQuery != this) {
+      return parentQuery.getTemporaryRIDCounter(iContext);
+    } else {
+      return serialTempRID.getAndIncrement();
+    }
   }
 
   protected boolean addResult(OIdentifiable iRecord, final OCommandContext iContext) {
@@ -1573,9 +1538,12 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
 
     final long startFetching = System.currentTimeMillis();
 
-    final int[] clusterIds = iTarget instanceof ORecordIteratorClusters ?
-        ((ORecordIteratorClusters) iTarget).getClusterIds() :
-        null;
+    final int[] clusterIds;
+    if (iTarget instanceof ORecordIteratorClusters) {
+      clusterIds = ((ORecordIteratorClusters) iTarget).getClusterIds();
+    } else {
+      clusterIds = null;
+    }
 
     parallel = (parallel || getDatabase().getConfiguration().getValueAsBoolean(OGlobalConfiguration.QUERY_PARALLEL_AUTO))
         && canRunParallel(clusterIds, iTarget);

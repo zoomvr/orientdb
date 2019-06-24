@@ -47,13 +47,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cel
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.co.cellbtreesinglevalue.OCellBTreeSingleValueRemoveCO;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * This is implementation which is based on B+-tree implementation threaded tree.
@@ -1599,16 +1593,24 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
                 final Map.Entry<K, ORID> entry = convertToMapEntry(bucket.getEntry(itemIndex));
                 itemIndex++;
 
-                if (fromKey != null && (fromKeyInclusive ?
-                    comparator.compare(entry.getKey(), fromKey) < 0 :
-                    comparator.compare(entry.getKey(), fromKey) <= 0)) {
-                  continue;
+                if (fromKeyInclusive) {
+                  if (fromKey != null && comparator.compare(entry.getKey(), fromKey) < 0) {
+                    continue;
+                  }
+                } else {
+                  if (fromKey != null && comparator.compare(entry.getKey(), fromKey) <= 0) {
+                    continue;
+                  }
                 }
 
-                if (toKey != null && (toKeyInclusive ?
-                    comparator.compare(entry.getKey(), toKey) > 0 :
-                    comparator.compare(entry.getKey(), toKey) >= 0)) {
-                  break mainCycle;
+                if (toKeyInclusive) {
+                  if (toKey != null && comparator.compare(entry.getKey(), toKey) > 0) {
+                    break mainCycle;
+                  }
+                } else {
+                  if (toKey != null && comparator.compare(entry.getKey(), toKey) >= 0) {
+                    break mainCycle;
+                  }
                 }
 
                 dataCache.add(entry);
@@ -1736,16 +1738,24 @@ public final class OCellBTreeSingleValue<K> extends ODurableComponent {
                 final Map.Entry<K, ORID> entry = convertToMapEntry(bucket.getEntry(itemIndex));
                 itemIndex--;
 
-                if (toKey != null && (toKeyInclusive ?
-                    comparator.compare(entry.getKey(), toKey) > 0 :
-                    comparator.compare(entry.getKey(), toKey) >= 0)) {
-                  continue;
+                if (toKeyInclusive) {
+                  if (toKey != null && comparator.compare(entry.getKey(), toKey) > 0) {
+                    continue;
+                  }
+                } else {
+                  if (toKey != null && comparator.compare(entry.getKey(), toKey) >= 0) {
+                    continue;
+                  }
                 }
 
-                if (fromKey != null && (fromKeyInclusive ?
-                    comparator.compare(entry.getKey(), fromKey) < 0 :
-                    comparator.compare(entry.getKey(), fromKey) <= 0)) {
-                  break mainCycle;
+                if (fromKeyInclusive) {
+                  if (fromKey != null && comparator.compare(entry.getKey(), fromKey) < 0) {
+                    break mainCycle;
+                  }
+                } else {
+                  if (fromKey != null && comparator.compare(entry.getKey(), fromKey) <= 0) {
+                    break mainCycle;
+                  }
                 }
 
                 dataCache.add(entry);

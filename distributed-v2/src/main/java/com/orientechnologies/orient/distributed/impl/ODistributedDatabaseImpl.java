@@ -42,23 +42,8 @@ import com.orientechnologies.orient.distributed.impl.task.ODistributedLockTask;
 import com.orientechnologies.orient.distributed.impl.task.OWaitForTask;
 import com.orientechnologies.orient.server.OServer;
 import com.orientechnologies.orient.server.OSystemDatabase;
-import com.orientechnologies.orient.server.distributed.ODistributedConfiguration;
-import com.orientechnologies.orient.server.distributed.ODistributedDatabase;
-import com.orientechnologies.orient.server.distributed.ODistributedDatabaseRepairer;
-import com.orientechnologies.orient.server.distributed.ODistributedException;
-import com.orientechnologies.orient.server.distributed.ODistributedMomentum;
-import com.orientechnologies.orient.server.distributed.ODistributedRequest;
-import com.orientechnologies.orient.server.distributed.ODistributedRequestId;
-import com.orientechnologies.orient.server.distributed.ODistributedResponse;
-import com.orientechnologies.orient.server.distributed.ODistributedResponseManager;
-import com.orientechnologies.orient.server.distributed.ODistributedResponseManagerImpl;
-import com.orientechnologies.orient.server.distributed.ODistributedServerLog;
+import com.orientechnologies.orient.server.distributed.*;
 import com.orientechnologies.orient.server.distributed.ODistributedServerLog.DIRECTION;
-import com.orientechnologies.orient.server.distributed.ODistributedServerManager;
-import com.orientechnologies.orient.server.distributed.ODistributedSyncConfiguration;
-import com.orientechnologies.orient.server.distributed.ODistributedTxContext;
-import com.orientechnologies.orient.server.distributed.OModifiableDistributedConfiguration;
-import com.orientechnologies.orient.server.distributed.ORemoteServerController;
 import com.orientechnologies.orient.server.distributed.task.OAbstractRemoteTask;
 import com.orientechnologies.orient.server.distributed.task.ODistributedOperationException;
 import com.orientechnologies.orient.server.distributed.task.ODistributedRecordLockedException;
@@ -66,16 +51,7 @@ import com.orientechnologies.orient.server.distributed.task.ORemoteTask;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -165,7 +141,6 @@ public class ODistributedDatabaseImpl implements ODistributedDatabase {
     }
 
     startTxTimeoutTimerTask();
-
 
     Orient.instance().getProfiler()
         .registerHookValue("distributed.db." + databaseName + ".msgSent", "Number of replication messages sent from current node",
@@ -504,10 +479,13 @@ public class ODistributedDatabaseImpl implements ODistributedDatabase {
           .getNodesConcurInQuorum(manager, cfg, iRequest, iNodes, databaseName, localResult);
 
       // AFTER COMPUTED THE QUORUM, REMOVE THE OFFLINE NODES TO HAVE THE LIST OF REAL AVAILABLE NODES
-      final int availableNodes = checkNodesAreOnline ?
-          manager.getNodesWithStatus(iNodes, databaseName, ODistributedServerManager.DB_STATUS.ONLINE,
-              ODistributedServerManager.DB_STATUS.BACKUP, ODistributedServerManager.DB_STATUS.SYNCHRONIZING) :
-          iNodes.size();
+      final int availableNodes;
+      if (checkNodesAreOnline) {
+        availableNodes = manager.getNodesWithStatus(iNodes, databaseName, ODistributedServerManager.DB_STATUS.ONLINE,
+            ODistributedServerManager.DB_STATUS.BACKUP, ODistributedServerManager.DB_STATUS.SYNCHRONIZING);
+      } else {
+        availableNodes = iNodes.size();
+      }
 
       final int expectedResponses = localResult != null ? availableNodes + 1 : availableNodes;
 
@@ -602,10 +580,9 @@ public class ODistributedDatabaseImpl implements ODistributedDatabase {
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
+      String names = iClusterNames != null ? "." + iClusterNames : "";
       throw OException.wrapException(new ODistributedException(
-          "Error on executing distributed request (" + iRequest + ") against database '" + databaseName + (iClusterNames != null ?
-              "." + iClusterNames :
-              "") + "' to nodes " + iNodes), e);
+          "Error on executing distributed request (" + iRequest + ") against database '" + databaseName + names + "' to nodes " + iNodes), e);
     } finally {
       if (iAfterSentCallback != null && !afterSendCallBackCalled)
         iAfterSentCallback.call(iRequest.getId());

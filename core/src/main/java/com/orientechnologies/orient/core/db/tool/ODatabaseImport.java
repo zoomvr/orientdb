@@ -54,12 +54,10 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
 import com.orientechnologies.orient.core.serialization.serializer.OJSONReader;
 import com.orientechnologies.orient.core.serialization.serializer.OStringSerializerHelper;
-import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OLinkSerializer;
 import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerJSON;
 import com.orientechnologies.orient.core.storage.OPhysicalPosition;
 import com.orientechnologies.orient.core.storage.OStorage;
 import com.orientechnologies.orient.core.storage.index.hashindex.local.OHashIndexFactory;
-import com.orientechnologies.orient.core.storage.index.hashindex.local.OMurmurHash3HashFunction;
 
 import java.io.*;
 import java.lang.reflect.InvocationTargetException;
@@ -118,8 +116,6 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
       bf.reset();
       inStream = bf;
     }
-
-    OMurmurHash3HashFunction<OIdentifiable> keyHashFunction = new OMurmurHash3HashFunction<>(OLinkSerializer.INSTANCE);
 
     jsonReader = new OJSONReader(new InputStreamReader(inStream));
     database.declareIntent(new OIntentMassiveInsert());

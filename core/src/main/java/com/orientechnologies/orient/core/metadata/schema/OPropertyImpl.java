@@ -40,15 +40,7 @@ import com.orientechnologies.orient.core.storage.OAutoshardedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Contains the description of a persistent class property.
@@ -657,9 +649,11 @@ public abstract class OPropertyImpl implements OProperty {
     regexp = (String) (document.containsField("regexp") ? document.field("regexp") : null);
     linkedClassName = (String) (document.containsField("linkedClass") ? document.field("linkedClass") : null);
     linkedType = document.field("linkedType") != null ? OType.getById(((Integer) document.field("linkedType")).byteValue()) : null;
-    customFields = (Map<String, String>) (document.containsField("customFields") ?
-        document.field("customFields", OType.EMBEDDEDMAP) :
-        null);
+    if (document.containsField("customFields")) {
+      customFields = document.field("customFields", OType.EMBEDDEDMAP);
+    } else {
+      customFields = null;
+    }
     description = (String) (document.containsField("description") ? document.field("description") : null);
   }
 

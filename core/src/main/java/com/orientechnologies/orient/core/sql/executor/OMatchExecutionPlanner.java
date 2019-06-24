@@ -4,7 +4,6 @@ import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.command.OBasicCommandContext;
 import com.orientechnologies.orient.core.command.OCommandContext;
 import com.orientechnologies.orient.core.db.ODatabase;
-import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OSchema;
@@ -534,70 +533,6 @@ public class OMatchExecutionPlanner {
     from.setItem(fromItem);
     prefetchStm.setTarget(from);
     return prefetchStm;
-  }
-
-  /**
-   * sort edges in the order they will be matched
-   */
-  private List<EdgeTraversal> sortEdges(Map<String, Long> estimatedRootEntries, Pattern pattern, OCommandContext ctx) {
-    OQueryStats stats = null;
-    if (ctx != null && ctx.getDatabase() != null) {
-      stats = OQueryStats.get((ODatabaseDocumentInternal) ctx.getDatabase());
-    }
-    //TODO use the stats
-
-    List<EdgeTraversal> result = new ArrayList<EdgeTraversal>();
-
-    List<OPair<Long, String>> rootWeights = new ArrayList<OPair<Long, String>>();
-    for (Map.Entry<String, Long> root : estimatedRootEntries.entrySet()) {
-      rootWeights.add(new OPair<Long, String>(root.getValue(), root.getKey()));
-    }
-    Collections.sort(rootWeights);
-
-    Set<PatternEdge> traversedEdges = new HashSet<PatternEdge>();
-    Set<PatternNode> traversedNodes = new HashSet<PatternNode>();
-    List<PatternNode> nextNodes = new ArrayList<PatternNode>();
-
-    while (result.size() < pattern.getNumOfEdges()) {
-      for (OPair<Long, String> rootPair : rootWeights) {
-        PatternNode root = pattern.get(rootPair.getValue());
-        if (root.isOptionalNode()) {
-          continue;
-        }
-        if (!traversedNodes.contains(root)) {
-          nextNodes.add(root);
-          break;
-        }
-      }
-
-      if (nextNodes.isEmpty()) {
-        break;
-      }
-      while (!nextNodes.isEmpty()) {
-        PatternNode node = nextNodes.remove(0);
-        traversedNodes.add(node);
-        for (PatternEdge edge : node.out) {
-          if (!traversedEdges.contains(edge)) {
-            result.add(new EdgeTraversal(edge, true));
-            traversedEdges.add(edge);
-            if (!traversedNodes.contains(edge.in) && !nextNodes.contains(edge.in)) {
-              nextNodes.add(edge.in);
-            }
-          }
-        }
-        for (PatternEdge edge : node.in) {
-          if (!traversedEdges.contains(edge) && edge.item.isBidirectional()) {
-            result.add(new EdgeTraversal(edge, false));
-            traversedEdges.add(edge);
-            if (!traversedNodes.contains(edge.out) && !nextNodes.contains(edge.out)) {
-              nextNodes.add(edge.out);
-            }
-          }
-        }
-      }
-    }
-
-    return result;
   }
 
   private void buildPatterns(OCommandContext ctx) {
