@@ -29,7 +29,7 @@ import java.util.Map.Entry;
 
 import static com.orientechnologies.orient.core.serialization.serializer.record.binary.HelperClasses.*;
 
-public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
+public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
   private final OBinaryComparatorV0 comparator = new OBinaryComparatorV0();
 
   private int findMatchingFieldName(final BytesContainer bytes, int len, byte[][] fields) {
@@ -83,14 +83,9 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
 
       final int len = OVarIntSerializer.readAsInteger(bytes);
       boolean found;
-      int fieldLength;
       if (len > 0) {
         int fieldPos = findMatchingFieldName(bytes, len, fields);
         bytes.skip(len);
-        Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-        fieldLength = pointerAndType.getFirstVal();
-        type = pointerAndType.getSecondVal();
-
         if (fieldPos >= 0) {
           fieldName = iFields[fieldPos];
           found = true;
@@ -103,11 +98,13 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
         final OGlobalProperty prop = getGlobalProperty(document, len);
         found = checkIfPropertyNameMatchSome(prop, iFields);
 
-        fieldLength = OVarIntSerializer.readAsInteger(bytes);
-        type = getPropertyTypeFromStream(prop, bytes);
-
         fieldName = prop.getName();
       }
+
+      Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
+      final int fieldLength = pointerAndType.getFirstVal();
+      type = pointerAndType.getSecondVal();
+
       if (found) {
         if (fieldLength != 0) {
           int headerCursor = bytes.offset;
@@ -170,43 +167,30 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
     while (bytes.offset < valuesStart) {
 
       final int len = OVarIntSerializer.readAsInteger(bytes);
-
+      final boolean match;
       if (len > 0) {
-
-        boolean match = checkMatchForLargerThenZero(bytes, field, len);
-
+        match = checkMatchForLargerThenZero(bytes, field, len);
         bytes.skip(len);
-        Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-        final int fieldLength = pointerAndType.getFirstVal();
-        final OType type = pointerAndType.getSecondVal();
-
-        if (match) {
-          if (fieldLength == 0 || !getComparator().isBinaryComparable(type)) {
-            return null;
-          }
-
-          bytes.offset = currentValuePos;
-          return new OBinaryField(iFieldName, type, bytes, null);
-        }
-        currentValuePos += fieldLength;
       } else {
-
         final int id = (len * -1) - 1;
         final OGlobalProperty prop = schema.getGlobalPropertyById(id);
-        final int fieldLength = OVarIntSerializer.readAsInteger(bytes);
-        final OType type;
-        type = getPropertyTypeFromStream(prop, bytes);
-
-        if (iFieldName.equals(prop.getName())) {
-          if (fieldLength == 0 || !getComparator().isBinaryComparable(type)) {
-            return null;
-          }
-          bytes.offset = currentValuePos;
-          final OProperty classProp = iClass.getProperty(iFieldName);
-          return new OBinaryField(iFieldName, type, bytes, classProp != null ? classProp.getCollate() : null);
-        }
-        currentValuePos += fieldLength;
+        match = iFieldName.equals(prop.getName());
       }
+
+      Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
+      final int fieldLength = pointerAndType.getFirstVal();
+      final OType type = pointerAndType.getSecondVal();
+
+      if (match) {
+        if (fieldLength == 0 || !getComparator().isBinaryComparable(type)) {
+          return null;
+        }
+        bytes.offset = currentValuePos;
+        final OProperty classProp = iClass.getProperty(iFieldName);
+        return new OBinaryField(iFieldName, type, bytes, classProp != null ? classProp.getCollate() : null);
+      }
+      currentValuePos += fieldLength;
+
     }
     return null;
   }
@@ -227,16 +211,15 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
         // PARSE FIELD NAME
         fieldName = stringFromBytes(bytes.bytes, bytes.offset, len).intern();
         bytes.skip(len);
-        Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-        fieldLength = pointerAndType.getFirstVal();
-        type = pointerAndType.getSecondVal();
       } else {
         // LOAD GLOBAL PROPERTY BY ID
         prop = getGlobalProperty(document, len);
         fieldName = prop.getName();
-        fieldLength = OVarIntSerializer.readAsInteger(bytes);
-        type = getPropertyTypeFromStream(prop, bytes);
       }
+
+      Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
+      fieldLength = pointerAndType.getFirstVal();
+      type = pointerAndType.getSecondVal();
 
       if (!ODocumentInternal.rawContainsField(document, fieldName)) {
         if (fieldLength != 0) {
@@ -333,16 +316,10 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
         }
       }
 
-      if (docEntry.property == null) {
-        String fieldName = field.getKey();
-        writeString(headerBuffer, fieldName);
-      } else {
-        OVarIntSerializer.write(headerBuffer, (docEntry.property.getId() + 1) * -1);
-      }
-
-      final Object value = field.getValue().value;
-
+      int valueLength;
       final OType type;
+      // Write Value
+      final Object value = field.getValue().value;
       if (value != null) {
         type = getFieldType(field.getValue());
         if (type == null) {
@@ -351,20 +328,24 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
         }
         int startOffset = valuesBuffer.offset;
         serializeValue(valuesBuffer, value, type, getLinkedType(document, type, field.getKey()), schema, encryption);
-        int valueLength = valuesBuffer.offset - startOffset;
-        OVarIntSerializer.write(headerBuffer, valueLength);
-      }
-      //handle null fields
-      else {
-        OVarIntSerializer.write(headerBuffer, 0);
+        valueLength = valuesBuffer.offset - startOffset;
+      } else {
+        //handle null fields
+        valueLength = 0;
         type = OType.ANY;
       }
 
-      //write type. Type should be written both for regular and null fields
-      if (field.getValue().property == null || field.getValue().property.getType() == OType.ANY) {
-        int typeOffset = headerBuffer.alloc(OByteSerializer.BYTE_SIZE);
-        OByteSerializer.INSTANCE.serialize((byte) type.getId(), headerBuffer.bytes, typeOffset);
+      //Write Header
+      if (docEntry.property == null) {
+        String fieldName = field.getKey();
+        writeString(headerBuffer, fieldName);
+      } else {
+        OVarIntSerializer.write(headerBuffer, (docEntry.property.getId() + 1) * -1);
       }
+      OVarIntSerializer.write(headerBuffer, valueLength);
+      //write type.
+      int typeOffset = headerBuffer.alloc(OByteSerializer.BYTE_SIZE);
+      OByteSerializer.INSTANCE.serialize((byte) type.getId(), headerBuffer.bytes, typeOffset);
     }
   }
 
@@ -436,48 +417,34 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
     while (bytes.offset < valuesStart) {
 
       int len = OVarIntSerializer.readAsInteger(bytes);
-
+      final boolean match;
       if (len > 0) {
         // CHECK BY FIELD NAME SIZE: THIS AVOID EVEN THE UNMARSHALLING OF FIELD NAME        
-        boolean match = checkMatchForLargerThenZero(bytes, field, len);
+        match = checkMatchForLargerThenZero(bytes, field, len);
 
         bytes.skip(len);
-        Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-        int fieldLength = pointerAndType.getFirstVal();
-        OType type = pointerAndType.getSecondVal();
-
-        if (match) {
-          if (fieldLength == 0) {
-            return null;
-          }
-
-          bytes.offset = cumulativeLength;
-          Object value = deserializeValue(bytes, type, null, false, fieldLength, false, schema);
-          //noinspection unchecked
-          return (RET) value;
-        }
-        cumulativeLength += fieldLength;
       } else {
         // LOAD GLOBAL PROPERTY BY ID
         final int id = (len * -1) - 1;
         final OGlobalProperty prop = schema.getGlobalPropertyById(id);
-        final int fieldLength = OVarIntSerializer.readAsInteger(bytes);
-        OType type = getPropertyTypeFromStream(prop, bytes);
 
-        if (iFieldName.equals(prop.getName())) {
-
-          if (fieldLength == 0) {
-            return null;
-          }
-
-          bytes.offset = cumulativeLength;
-
-          Object value = deserializeValue(bytes, type, null, false, fieldLength, false, schema);
-          //noinspection unchecked
-          return (RET) value;
-        }
-        cumulativeLength += fieldLength;
+        match = iFieldName.equals(prop.getName());
       }
+      Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
+      final int fieldLength = pointerAndType.getFirstVal();
+      final OType type = pointerAndType.getSecondVal();
+      if (match) {
+        if (fieldLength == 0) {
+          return null;
+        }
+
+        bytes.offset = cumulativeLength;
+        Object value = deserializeValue(bytes, type, null, false, fieldLength, false, schema);
+        //noinspection unchecked
+        return (RET) value;
+      }
+      cumulativeLength += fieldLength;
+
     }
     return null;
   }
@@ -491,6 +458,25 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
     return new Tuple<>(fieldSize, type);
   }
 
+  private byte setEncryptFlag(byte b, boolean encrypted) {
+    if (encrypted) {
+      return (byte) (b * -1);
+    } else {
+      return b;
+    }
+  }
+
+  private boolean isPropertyEncrypted(byte b) {
+    return b < 0;
+  }
+
+  private OType getTypeFromByte(byte b) {
+    if (b < 0) {
+      b *= -1;
+    }
+    return OType.getById(b);
+  }
+
   public void deserializeDebug(BytesContainer bytes, ODatabaseDocumentInternal db, ORecordSerializationDebug debugInfo,
       OImmutableSchema schema) {
 
@@ -499,13 +485,13 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
 
     debugInfo.properties = new ArrayList<>();
     int last = 0;
-    String fieldName;
+
     OType type;
     int cumulativeLength = 0;
     while (true) {
       ORecordSerializationDebugProperty debugProperty = new ORecordSerializationDebugProperty();
       OGlobalProperty prop;
-
+      String fieldName = null;
       int fieldLength;
 
       try {
@@ -519,23 +505,23 @@ public class ORecordSerializerBinaryV1 implements ODocumentSerializer {
           fieldName = stringFromBytes(bytes.bytes, bytes.offset, len).intern();
           bytes.skip(len);
 
-          Tuple<Integer, OType> valuePositionAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-          fieldLength = valuePositionAndType.getFirstVal();
-          type = valuePositionAndType.getSecondVal();
         } else {
           // LOAD GLOBAL PROPERTY BY ID
           final int id = (len * -1) - 1;
           debugProperty.globalId = id;
           prop = schema.getGlobalPropertyById(id);
-          fieldLength = OVarIntSerializer.readAsInteger(bytes);
           debugProperty.valuePos = headerPos + headerLength + cumulativeLength;
           if (prop != null) {
             fieldName = prop.getName();
-            type = getPropertyTypeFromStream(prop, bytes);
-          } else {
-            cumulativeLength += fieldLength;
-            continue;
           }
+        }
+        Tuple<Integer, OType> valuePositionAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
+        fieldLength = valuePositionAndType.getFirstVal();
+        type = valuePositionAndType.getSecondVal();
+
+        if (fieldName == null) {
+          cumulativeLength += fieldLength;
+          continue;
         }
         debugProperty.name = fieldName;
         debugProperty.type = type;

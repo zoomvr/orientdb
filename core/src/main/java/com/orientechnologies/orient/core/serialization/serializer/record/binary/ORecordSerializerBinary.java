@@ -42,9 +42,10 @@ public class ORecordSerializerBinary implements ORecordSerializer {
   private final byte                  currentSerializerVersion;
 
   private void init() {
-    serializerByVersion = new ODocumentSerializer[2];
+    serializerByVersion = new ODocumentSerializer[3];
     serializerByVersion[0] = new ORecordSerializerBinaryV0();
     serializerByVersion[1] = new ORecordSerializerBinaryV1();
+    serializerByVersion[2] = new ORecordSerializerBinaryV2();
   }
 
   public ORecordSerializerBinary(byte serializerVersion) {
