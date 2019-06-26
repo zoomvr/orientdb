@@ -64,6 +64,7 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
   }
 
   public void deserializePartial(ODocument document, BytesContainer bytes, String[] iFields) {
+    OPropertyEncryption propertyEncryption = ODocumentInternal.getPropertyEncryption(document);
     // TRANSFORMS FIELDS FOM STRINGS TO BYTE[]            
     final byte[][] fields = new byte[iFields.length][];
     for (int i = 0; i < iFields.length; ++i) {
@@ -101,15 +102,26 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
         fieldName = prop.getName();
       }
 
-      Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-      final int fieldLength = pointerAndType.getFirstVal();
-      type = pointerAndType.getSecondVal();
+      final int fieldLength = OVarIntSerializer.readAsInteger(bytes);
+      final byte typeValue = readByte(bytes);
+      type = getTypeFromByte(typeValue);
+      final boolean encrypted = isPropertyEncrypted(typeValue);
 
       if (found) {
         if (fieldLength != 0) {
           int headerCursor = bytes.offset;
           bytes.offset = currentValuePos;
-          final Object value = deserializeValue(bytes, type, document);
+          final Object value;
+          if (encrypted) {
+            assert propertyEncryption != null;
+            byte[] encryptedBytes = new byte[fieldLength];
+            System.arraycopy(bytes.bytes, bytes.offset, encryptedBytes, 0, fieldLength);
+            bytes.skip(fieldLength);
+            byte[] decryptedBytes = propertyEncryption.decrypt(fieldName, encryptedBytes);
+            value = deserializeValue(new BytesContainer(decryptedBytes), type, document);
+          } else {
+            value = deserializeValue(bytes, type, document);
+          }
           bytes.offset = headerCursor;
           ODocumentInternal.rawField(document, fieldName, value, type);
         } else {
@@ -177,9 +189,10 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
         match = iFieldName.equals(prop.getName());
       }
 
-      Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-      final int fieldLength = pointerAndType.getFirstVal();
-      final OType type = pointerAndType.getSecondVal();
+      final int fieldLength = OVarIntSerializer.readAsInteger(bytes);
+      final byte typeValue = readByte(bytes);
+      final OType type = getTypeFromByte(typeValue);
+      final boolean encrypted = isPropertyEncrypted(typeValue);
 
       if (match) {
         if (fieldLength == 0 || !getComparator().isBinaryComparable(type)) {
@@ -187,7 +200,18 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
         }
         bytes.offset = currentValuePos;
         final OProperty classProp = iClass.getProperty(iFieldName);
-        return new OBinaryField(iFieldName, type, bytes, classProp != null ? classProp.getCollate() : null);
+        if (encrypted) {
+          assert encryption != null;
+          byte[] encryptedBytes = new byte[fieldLength];
+          System.arraycopy(bytes.bytes, bytes.offset, encryptedBytes, 0, fieldLength);
+          bytes.skip(fieldLength);
+          byte[] decryptedBytes = encryption.decrypt(iFieldName, encryptedBytes);
+          return new OBinaryField(iFieldName, type, new BytesContainer(decryptedBytes),
+              classProp != null ? classProp.getCollate() : null);
+        } else {
+          return new OBinaryField(iFieldName, type, bytes, classProp != null ? classProp.getCollate() : null);
+        }
+
       }
       currentValuePos += fieldLength;
 
@@ -196,6 +220,7 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
   }
 
   public void deserialize(final ODocument document, final BytesContainer bytes) {
+    OPropertyEncryption propertyEncryption = ODocumentInternal.getPropertyEncryption(document);
     int headerLength = OVarIntSerializer.readAsInteger(bytes);
     int headerStart = bytes.offset;
     int valuesStart = headerStart + headerLength;
@@ -217,16 +242,29 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
         fieldName = prop.getName();
       }
 
-      Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-      fieldLength = pointerAndType.getFirstVal();
-      type = pointerAndType.getSecondVal();
+      fieldLength = OVarIntSerializer.readAsInteger(bytes);
+      final byte typeValue = readByte(bytes);
+      type = getTypeFromByte(typeValue);
+      final boolean encrypted = isPropertyEncrypted(typeValue);
 
       if (!ODocumentInternal.rawContainsField(document, fieldName)) {
         if (fieldLength != 0) {
           int headerCursor = bytes.offset;
 
           bytes.offset = cumulativeSize;
-          final Object value = deserializeValue(bytes, type, document);
+
+          final Object value;
+          if (encrypted) {
+            assert propertyEncryption != null;
+            byte[] encryptedBytes = new byte[fieldLength];
+            System.arraycopy(bytes.bytes, bytes.offset, encryptedBytes, 0, fieldLength);
+            bytes.skip(fieldLength);
+            byte[] decryptedBytes = propertyEncryption.decrypt(fieldName, encryptedBytes);
+            value = deserializeValue(new BytesContainer(decryptedBytes), type, document);
+          } else {
+            value = deserializeValue(bytes, type, document);
+          }
+
           if (bytes.offset > last)
             last = bytes.offset;
           bytes.offset = headerCursor;
@@ -316,7 +354,7 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
         }
       }
 
-      int valueLength;
+      final int valueLength;
       final OType type;
       // Write Value
       final Object value = field.getValue().value;
@@ -326,9 +364,18 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
           throw new OSerializationException(
               "Impossible serialize value of type " + value.getClass() + " with the ODocument binary serializer");
         }
-        int startOffset = valuesBuffer.offset;
-        serializeValue(valuesBuffer, value, type, getLinkedType(document, type, field.getKey()), schema, encryption);
-        valueLength = valuesBuffer.offset - startOffset;
+        if (encryption != null && encryption.isEncrypted(field.getKey())) {
+          BytesContainer plainBytes = new BytesContainer();
+          serializeValue(plainBytes, value, type, getLinkedType(document, type, field.getKey()), schema, encryption);
+          byte[] encrypted = encryption.encrypt(field.getKey(), plainBytes.fitBytes());
+          final int start = valuesBuffer.alloc(encrypted.length);
+          System.arraycopy(encrypted, 0, valuesBuffer.bytes, start, encrypted.length);
+          valueLength = encrypted.length;
+        } else {
+          int startOffset = valuesBuffer.offset;
+          serializeValue(valuesBuffer, value, type, getLinkedType(document, type, field.getKey()), schema, encryption);
+          valueLength = valuesBuffer.offset - startOffset;
+        }
       } else {
         //handle null fields
         valueLength = 0;
@@ -345,7 +392,8 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
       OVarIntSerializer.write(headerBuffer, valueLength);
       //write type.
       int typeOffset = headerBuffer.alloc(OByteSerializer.BYTE_SIZE);
-      OByteSerializer.INSTANCE.serialize((byte) type.getId(), headerBuffer.bytes, typeOffset);
+      final byte typeByte = setEncryptFlag((byte) type.getId(), false);
+      OByteSerializer.INSTANCE.serialize(typeByte, headerBuffer.bytes, typeOffset);
     }
   }
 
@@ -430,16 +478,29 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
 
         match = iFieldName.equals(prop.getName());
       }
-      Tuple<Integer, OType> pointerAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-      final int fieldLength = pointerAndType.getFirstVal();
-      final OType type = pointerAndType.getSecondVal();
+
+      final int fieldLength = OVarIntSerializer.readAsInteger(bytes);
+      final byte typeValue = readByte(bytes);
+      final OType type = getTypeFromByte(typeValue);
+      final boolean encrypted = isPropertyEncrypted(typeValue);
+
       if (match) {
         if (fieldLength == 0) {
           return null;
         }
 
         bytes.offset = cumulativeLength;
-        Object value = deserializeValue(bytes, type, null, false, fieldLength, false, schema);
+        final Object value;
+        if (encrypted) {
+          assert encryption != null;
+          byte[] encryptedBytes = new byte[fieldLength];
+          System.arraycopy(bytes.bytes, bytes.offset, encryptedBytes, 0, fieldLength);
+          bytes.skip(fieldLength);
+          byte[] decryptedBytes = encryption.decrypt(iFieldName, encryptedBytes);
+          value = deserializeValue(new BytesContainer(decryptedBytes), type, null, false, fieldLength, false, schema);
+        } else {
+          value = deserializeValue(bytes, type, null, false, fieldLength, false, schema);
+        }
         //noinspection unchecked
         return (RET) value;
       }
@@ -515,9 +576,10 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
             fieldName = prop.getName();
           }
         }
-        Tuple<Integer, OType> valuePositionAndType = getFieldSizeAndTypeFromCurrentPosition(bytes);
-        fieldLength = valuePositionAndType.getFirstVal();
-        type = valuePositionAndType.getSecondVal();
+        fieldLength = OVarIntSerializer.readAsInteger(bytes);
+        final byte typeValue = readByte(bytes);
+        type = getTypeFromByte(typeValue);
+        final boolean encrypted = isPropertyEncrypted(typeValue);
 
         if (fieldName == null) {
           cumulativeLength += fieldLength;
@@ -538,7 +600,20 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
           int headerCursor = bytes.offset;
           bytes.offset = valuePos;
           try {
-            debugProperty.value = deserializeValue(bytes, type, new ODocument());
+            final Object value;
+            if (encrypted) {
+              //TODO:
+              OPropertyEncryption encryption = null;
+              assert encryption != null;
+              byte[] encryptedBytes = new byte[fieldLength];
+              System.arraycopy(bytes.bytes, bytes.offset, encryptedBytes, 0, fieldLength);
+              bytes.skip(fieldLength);
+              byte[] decryptedBytes = encryption.decrypt(fieldName, encryptedBytes);
+              value = deserializeValue(new BytesContainer(decryptedBytes), type, null);
+            } else {
+              value = deserializeValue(bytes, type, null);
+            }
+            debugProperty.value = value;
           } catch (RuntimeException ex) {
             debugProperty.faildToRead = true;
             debugProperty.readingException = ex;
