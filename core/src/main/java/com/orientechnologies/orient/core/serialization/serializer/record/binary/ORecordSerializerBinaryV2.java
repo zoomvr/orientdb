@@ -653,7 +653,8 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
         serializeValue(bytes, value, type, null, schema, encryption);
       } else {
         //signal for null value
-        OByteSerializer.INSTANCE.serialize((byte) -1, bytes.bytes, bytes.alloc(1));
+        int pointer = bytes.alloc(1);
+        OByteSerializer.INSTANCE.serialize((byte) -1, bytes.bytes, pointer);
       }
     }
 
@@ -692,17 +693,20 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
       OType keyType = readOType(bytes, false);
       String key = readString(bytes);
       OType valueType = HelperClasses.readType(bytes);
-      if (valueType != null) {
-        MapRecordInfo recordInfo = new MapRecordInfo();
-        recordInfo.fieldStartOffset = bytes.offset;
-        recordInfo.fieldType = valueType;
-        recordInfo.key = key;
-        recordInfo.keyType = keyType;
-        int currentOffset = bytes.offset;
+      MapRecordInfo recordInfo = new MapRecordInfo();
+      recordInfo.fieldType = valueType;
+      recordInfo.key = key;
+      recordInfo.keyType = keyType;
+      int currentOffset = bytes.offset;
 
+      if (valueType != null) {
+        recordInfo.fieldStartOffset = bytes.offset;
         deserializeValue(bytes, valueType, null, true, -1, true, schema);
         recordInfo.fieldLength = bytes.offset - currentOffset;
-
+        retList.add(recordInfo);
+      } else {
+        recordInfo.fieldStartOffset = 0;
+        recordInfo.fieldLength = 0;
         retList.add(recordInfo);
       }
     }
@@ -1059,13 +1063,15 @@ public class ORecordSerializerBinaryV2 implements ODocumentSerializer {
     for (MapRecordInfo recordInfo : positionsWithLengths) {
       String key = recordInfo.key;
       Object value;
-      if (recordInfo.fieldType.isEmbedded()) {
+      if (recordInfo.fieldType != null && recordInfo.fieldType.isEmbedded()) {
         value = new OResultBinary(schema, bytes.bytes, recordInfo.fieldStartOffset, recordInfo.fieldLength, this);
-      } else {
+      } else if (recordInfo.fieldStartOffset != 0) {
         int currentOffset = bytes.offset;
         bytes.offset = recordInfo.fieldStartOffset;
         value = deserializeValue(bytes, recordInfo.fieldType, null);
         bytes.offset = currentOffset;
+      } else {
+        value = null;
       }
       retVal.put(key, value);
     }
