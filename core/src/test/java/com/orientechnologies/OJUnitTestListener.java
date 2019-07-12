@@ -22,6 +22,8 @@ package com.orientechnologies;
 import com.orientechnologies.common.directmemory.OByteBufferPool;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.Orient;
+import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
+import com.orientechnologies.orient.core.exception.ODatabaseException;
 import org.junit.Assert;
 import org.junit.runner.Description;
 import org.junit.runner.Result;
@@ -72,4 +74,10 @@ public class OJUnitTestListener extends RunListener {
     }
   }
 
+  @Override
+  public void testFinished(Description description) throws Exception {
+    if(ODatabaseRecordThreadLocal.instance().getIfDefined() != null){
+      throw new ODatabaseException("Test :"+description.getDisplayName()+" leaked a database in the thread local");
+    }
+  }
 }
