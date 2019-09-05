@@ -47,6 +47,9 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
   private           List<ORecordOperationRequest>                   operations;
   private           OCommandDistributedReplicateRequest.QUORUM_TYPE quorumType = OCommandDistributedReplicateRequest.QUORUM_TYPE.WRITE;
   private transient int                                             retryCount = 0;
+  int leftLimit  = 1;
+  int rightLimit = Integer.MAX_VALUE;
+
 
   public OTransactionPhase1Task() {
     ops = new ArrayList<>();
@@ -232,10 +235,8 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
 
   @Override
   public int[] getPartitionKey() {
-    if (operations.size() > 0)
-      return operations.stream().mapToInt((x) -> x.getId().getClusterId()).toArray();
-    else
-      return ops.stream().mapToInt((x) -> x.getRID().getClusterId()).toArray();
+    int generatedInteger = leftLimit + (int) (Math.random() * (rightLimit - leftLimit));
+    return new int[] { generatedInteger };
   }
 
   @Override

@@ -29,6 +29,8 @@ public class OTransactionPhase2Task extends OAbstractReplicatedTask {
   private          int[]                 involvedClusters;
   private          boolean               hasResponse = false;
   private volatile int                   retryCount  = 0;
+  int leftLimit  = 1;
+  int rightLimit = Integer.MAX_VALUE;
 
   public OTransactionPhase2Task(ODistributedRequestId transactionId, boolean success, int[] involvedClusters,
       OLogSequenceNumber lsn) {
@@ -164,6 +166,7 @@ public class OTransactionPhase2Task extends OAbstractReplicatedTask {
 
   @Override
   public int[] getPartitionKey() {
-    return involvedClusters;
+    int generatedInteger = leftLimit + (int) (Math.random() * (rightLimit - leftLimit));
+    return new int[] { generatedInteger };
   }
 }
