@@ -50,7 +50,6 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
   int leftLimit  = 1;
   int rightLimit = Integer.MAX_VALUE;
 
-
   public OTransactionPhase1Task() {
     ops = new ArrayList<>();
     operations = new ArrayList<>();
@@ -235,8 +234,7 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
 
   @Override
   public int[] getPartitionKey() {
-    int generatedInteger = leftLimit + (int) (Math.random() * (rightLimit - leftLimit));
-    return new int[] { generatedInteger };
+    return new int[] { ops.stream().mapToInt((x) -> x.getRID().getClusterId()).reduce(0, (a, b) -> a + b) };
   }
 
   @Override

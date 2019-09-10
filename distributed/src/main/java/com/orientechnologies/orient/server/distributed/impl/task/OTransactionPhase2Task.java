@@ -15,6 +15,8 @@ import com.orientechnologies.orient.server.distributed.task.OAbstractReplicatedT
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DISTRIBUTED_CONCURRENT_TX_MAX_AUTORETRY;
 
@@ -166,7 +168,6 @@ public class OTransactionPhase2Task extends OAbstractReplicatedTask {
 
   @Override
   public int[] getPartitionKey() {
-    int generatedInteger = leftLimit + (int) (Math.random() * (rightLimit - leftLimit));
-    return new int[] { generatedInteger };
+    return new int[] { Arrays.stream(involvedClusters).boxed().reduce(0, (a, b) -> a + b) };
   }
 }
