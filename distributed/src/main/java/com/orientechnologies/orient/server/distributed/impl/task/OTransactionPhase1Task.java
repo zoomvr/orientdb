@@ -234,7 +234,11 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
 
   @Override
   public int[] getPartitionKey() {
-    return new int[] { ops.stream().mapToInt((x) -> x.getRID().getClusterId()).reduce(0, (a, b) -> a + b) };
+    if (operations.size() > 0)
+      return new int[] { operations.stream().mapToInt((x) -> x.getId().getClusterId()).reduce(0, (a, b) -> a + b) };
+    else
+      return new int[] { ops.stream().mapToInt((x) -> x.getRID().getClusterId()).reduce(0, (a, b) -> a + b) };
+
   }
 
   @Override
