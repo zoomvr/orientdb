@@ -696,7 +696,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
             internalBegin2pc(txContext, local);
             txContext.setStatus(SUCCESS);
             break;
-          } catch (ODistributedRecordLockedException | ODistributedKeyLockedException ex) {
+          } catch (ODistributedRecordLockedException | ODistributedKeyLockedException | ConcurrentModificationException ex) {
             // Just retry
           } catch (Exception ex) {
             OLogManager.instance()

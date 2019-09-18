@@ -18,6 +18,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSe
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionInternal;
 import com.orientechnologies.orient.server.OServer;
+import com.orientechnologies.orient.server.distributed.ODistributedDatabase;
 import com.orientechnologies.orient.server.distributed.ODistributedRequestId;
 import com.orientechnologies.orient.server.distributed.ODistributedServerManager;
 import com.orientechnologies.orient.server.distributed.ORemoteTaskFactory;
@@ -92,6 +93,7 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
   public OCommandDistributedReplicateRequest.QUORUM_TYPE getQuorumType() {
     return quorumType;
   }
+
 
   @Override
   public Object execute(ODistributedRequestId requestId, OServer iServer, ODistributedServerManager iManager,
@@ -234,11 +236,14 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
 
   @Override
   public int[] getPartitionKey() {
-    if (operations.size() > 0)
-      return new int[] { operations.stream().mapToInt((x) -> x.getId().getClusterId()).reduce(0, (a, b) -> a + b) };
-    else
-      return new int[] { ops.stream().mapToInt((x) -> x.getRID().getClusterId()).reduce(0, (a, b) -> a + b) };
 
+    Integer reduce;
+    if (operations.size() > 0)
+      reduce = operations.stream().mapToInt((x) -> x.getId().getClusterId()).reduce(0, (a, b) -> a + b);
+    else
+      reduce = ops.stream().mapToInt((x) -> x.getRID().getClusterId()).reduce(0, (a, b) -> a + b);
+
+    return new int[] { reduce % 2 == 1 ? reduce : reduce + 1 };
   }
 
   @Override
