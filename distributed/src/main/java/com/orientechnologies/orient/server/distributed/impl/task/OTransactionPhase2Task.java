@@ -103,16 +103,9 @@ public class OTransactionPhase2Task extends OAbstractReplicatedTask {
           OLogManager.instance()
               .debug(OTransactionPhase2Task.this, "Received second phase but not yet first phase, re-enqueue second phase");
 
-          Orient.instance().submit(() -> {
-            try {
-              Thread.sleep(delay);
-              ((ODatabaseDocumentDistributed) database).getStorageDistributed().getLocalDistributedDatabase()
-                  .reEnqueue(requestId.getNodeId(), requestId.getMessageId(), database.getName(), this, retryCount);
-            } catch (InterruptedException e) {
-              e.printStackTrace();
-            }
-          });
-          
+          ((ODatabaseDocumentDistributed) database).getStorageDistributed().getLocalDistributedDatabase()
+              .reEnqueue(requestId.getNodeId(), requestId.getMessageId(), database.getName(), this, retryCount);
+
           hasResponse = false;
         } else {
           Orient.instance().submit(() -> {
@@ -135,15 +128,9 @@ public class OTransactionPhase2Task extends OAbstractReplicatedTask {
           OLogManager.instance()
               .debug(OTransactionPhase2Task.this, "Received second phase but not yet first phase, re-enqueue second phase");
 
-          Orient.instance().submit(() -> {
-            try {
-              Thread.sleep(delay);
-              ((ODatabaseDocumentDistributed) database).getStorageDistributed().getLocalDistributedDatabase()
-                  .reEnqueue(requestId.getNodeId(), requestId.getMessageId(), database.getName(), this, retryCount);
-            } catch (InterruptedException e) {
-              e.printStackTrace();
-            }
-          });
+          ((ODatabaseDocumentDistributed) database).getStorageDistributed().getLocalDistributedDatabase()
+              .reEnqueue(requestId.getNodeId(), requestId.getMessageId(), database.getName(), this, retryCount);
+
           hasResponse = false;
         } else {
           //ABORT THE OPERATION IF THERE IS A NOT VALID TRANSACTION ACTIVE WILL BE ROLLBACK ON RE-INSTALL

@@ -70,7 +70,7 @@ public class SplitBraiNetworkIT extends AbstractHARemoveNode {
       executeMultipleTest();
     } catch (AssertionError e) {
       final String message = e.getMessage();
-      Assert.assertTrue(
+      Assert.assertTrue(message,
           message.contains("Server 2 count is not what was expected expected:<" + expected + "> but was:<" + currentRecords + ">"));
     }
 
