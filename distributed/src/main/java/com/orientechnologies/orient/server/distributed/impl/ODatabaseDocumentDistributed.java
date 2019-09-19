@@ -639,7 +639,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       throw e;
     } catch (ODistributedRecordLockedException | ODistributedKeyLockedException ex) {
       /// ?? do i've to save this state as well ?
-        txContext.setStatus(TIMEDOUT);
+      txContext.setStatus(TIMEDOUT);
       getStorageDistributed().getLocalDistributedDatabase().registerTxContext(requestId, txContext);
       throw ex;
     } catch (ORecordDuplicatedException ex) {
@@ -696,8 +696,12 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
             internalBegin2pc(txContext, local);
             txContext.setStatus(SUCCESS);
             break;
-          } catch (ODistributedRecordLockedException | ODistributedKeyLockedException | ConcurrentModificationException ex) {
+          } catch (ODistributedRecordLockedException | ODistributedKeyLockedException ex) {
             // Just retry
+          } catch (OConcurrentModificationException ex) {
+            if (ex.getEnhancedRecordVersion() <= ex.getEnhancedDatabaseVersion()) {
+              break;
+            }
           } catch (Exception ex) {
             OLogManager.instance()
                 .warn(ODatabaseDocumentDistributed.this, "Error beginning timed out transaction: %s ", ex, transactionId);
