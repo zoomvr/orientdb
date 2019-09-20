@@ -94,14 +94,18 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
     return quorumType;
   }
 
-
   @Override
   public Object execute(ODistributedRequestId requestId, OServer iServer, ODistributedServerManager iManager,
       ODatabaseDocumentInternal database) throws Exception {
-    convert(database);
-    OTransactionOptimisticDistributed tx = new OTransactionOptimisticDistributed(database, ops);
-    //No need to increase the lock timeout here with the retry because this retries are not deadlock retries
-    OTransactionResultPayload res1 = executeTransaction(requestId, (ODatabaseDocumentDistributed) database, tx, false, retryCount);
+    boolean success = convert(database);
+
+    OTransactionResultPayload res1 = null;
+    if (success) {
+      OTransactionOptimisticDistributed tx = new OTransactionOptimisticDistributed(database, ops);
+      //No need to increase the lock timeout here with the retry because this retries are not deadlock retries
+      res1 = executeTransaction(requestId, (ODatabaseDocumentDistributed) database, tx, false, retryCount);
+    }
+
     if (res1 == null) {
       retryCount++;
       ((ODatabaseDocumentDistributed) database).getStorageDistributed().getLocalDistributedDatabase()
@@ -158,7 +162,10 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
     }
   }
 
-  private void convert(ODatabaseDocumentInternal database) {
+  private boolean convert(ODatabaseDocumentInternal database) {
+
+    List<ORecordOperation> recordOperations = new ArrayList<>();
+
     for (ORecordOperationRequest req : operations) {
       byte type = req.getType();
       if (type == ORecordOperation.LOADED) {
@@ -176,17 +183,20 @@ public class OTransactionPhase1Task extends OAbstractReplicatedTask {
       case ORecordOperation.DELETED:
         record = database.getRecord(req.getId());
         if (record == null) {
-          record = Orient.instance().getRecordFactoryManager()
-              .newInstance(req.getRecordType(), req.getId().getClusterId(), database);
+          return false;
         }
         break;
       }
       ORecordInternal.setIdentity(record, (ORecordId) req.getId());
       ORecordInternal.setVersion(record, req.getVersion());
       ORecordOperation op = new ORecordOperation(record, type);
-      ops.add(op);
+      recordOperations.add(op);
     }
+    ops.addAll(recordOperations);
+    recordOperations.clear();
     operations.clear();
+
+    return true;
   }
 
   @Override
