@@ -496,45 +496,46 @@ public class ODistributedDatabaseImpl implements ODistributedDatabase {
 
       if (ODistributedServerLog.isDebugEnabled())
         ODistributedServerLog.debug(this, localNodeName, iNodes.toString(), DIRECTION.OUT, "Sending request %s...", iRequest);
+      // the messages to the nodes are asynchronous, this make sure that all the server receive the messages in the same order
+      synchronized (this) {
+        for (String node : iNodes) {
+          // CATCH ANY EXCEPTION LOG IT AND IGNORE TO CONTINUE SENDING REQUESTS TO OTHER NODES
+          try {
+            final ORemoteServerController remoteServer = manager.getRemoteServer(node);
 
-      for (String node : iNodes) {
-        // CATCH ANY EXCEPTION LOG IT AND IGNORE TO CONTINUE SENDING REQUESTS TO OTHER NODES
-        try {
-          final ORemoteServerController remoteServer = manager.getRemoteServer(node);
+            remoteServer.sendRequest(iRequest);
 
-          remoteServer.sendRequest(iRequest);
+          } catch (Exception e) {
+            currentResponseMgr.removeServerBecauseUnreachable(node);
 
-        } catch (Exception e) {
-          currentResponseMgr.removeServerBecauseUnreachable(node);
+            String reason = e.getMessage();
+            if (e instanceof ODistributedException && e.getCause() instanceof IOException) {
+              // CONNECTION ERROR: REMOVE THE CONNECTION
+              reason = e.getCause().getMessage();
+              manager.closeRemoteServer(node);
 
-          String reason = e.getMessage();
-          if (e instanceof ODistributedException && e.getCause() instanceof IOException) {
-            // CONNECTION ERROR: REMOVE THE CONNECTION
-            reason = e.getCause().getMessage();
-            manager.closeRemoteServer(node);
+            } else if (e instanceof OSecurityAccessException) {
+              // THE CONNECTION COULD BE STALE, CREATE A NEW ONE AND RETRY
+              manager.closeRemoteServer(node);
+              try {
+                final ORemoteServerController remoteServer = manager.getRemoteServer(node);
+                remoteServer.sendRequest(iRequest);
+                continue;
 
-          } else if (e instanceof OSecurityAccessException) {
-            // THE CONNECTION COULD BE STALE, CREATE A NEW ONE AND RETRY
-            manager.closeRemoteServer(node);
-            try {
-              final ORemoteServerController remoteServer = manager.getRemoteServer(node);
-              remoteServer.sendRequest(iRequest);
-              continue;
-
-            } catch (Exception ex) {
-              // IGNORE IT BECAUSE MANAGED BELOW
+              } catch (Exception ex) {
+                // IGNORE IT BECAUSE MANAGED BELOW
+              }
             }
-          }
 
-          if (!manager.isNodeAvailable(node))
-            // NODE IS NOT AVAILABLE
-            ODistributedServerLog.debug(this, localNodeName, node, ODistributedServerLog.DIRECTION.OUT,
-                "Error on sending distributed request %s. The target node is not available. Active nodes: %s", e, iRequest,
-                manager.getAvailableNodeNames(databaseName));
-          else
-            ODistributedServerLog.error(this, localNodeName, node, ODistributedServerLog.DIRECTION.OUT,
-                "Error on sending distributed request %s (err=%s). Active nodes: %s", iRequest, reason,
-                manager.getAvailableNodeNames(databaseName));
+            if (!manager.isNodeAvailable(node))
+              // NODE IS NOT AVAILABLE
+              ODistributedServerLog.debug(this, localNodeName, node, ODistributedServerLog.DIRECTION.OUT,
+                  "Error on sending distributed request %s. The target node is not available. Active nodes: %s", e, iRequest,
+                  manager.getAvailableNodeNames(databaseName));
+            else
+              ODistributedServerLog.error(this, localNodeName, node, ODistributedServerLog.DIRECTION.OUT,
+                  "Error on sending distributed request %s (err=%s). Active nodes: %s", iRequest, reason, manager.getAvailableNodeNames(databaseName));
+          }
         }
       }
 

@@ -44,6 +44,8 @@ import java.util.Set;
 public interface ODistributedServerManager {
   String FILE_DISTRIBUTED_DB_CONFIG = "distributed-config.json";
 
+
+
   /**
    * Server status.
    */
@@ -320,4 +322,5 @@ public interface ODistributedServerManager {
   default void messageProcessEnd(ODistributedRequest iRequest, Object responsePayload) {
 
   }
+  void closeRemoteServer(String server);
 }

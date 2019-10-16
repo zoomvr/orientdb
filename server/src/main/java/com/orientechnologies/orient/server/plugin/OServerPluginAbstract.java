@@ -23,11 +23,12 @@ import com.orientechnologies.orient.server.OClientConnection;
 import com.orientechnologies.orient.server.OServer;
 import com.orientechnologies.orient.server.config.OServerParameterConfiguration;
 
+
 /**
  * Abstract class to make OServerHandler implementation easier.
- * 
+ *
  * @author Luca Garulli (l.garulli--(at)--orientdb.com)
- * 
+ *
  */
 public abstract class OServerPluginAbstract implements OServerPlugin {
   protected boolean enabled = true;
