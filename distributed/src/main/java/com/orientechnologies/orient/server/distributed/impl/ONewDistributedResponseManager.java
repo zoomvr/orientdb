@@ -11,20 +11,20 @@ import java.util.*;
 
 public class ONewDistributedResponseManager implements ODistributedResponseManager {
 
-  private final    OTransactionPhase1Task                        iRequest;
-  private final    Collection<String>                            iNodes;
-  private final    Set<String>                                   nodesConcurToTheQuorum;
-  private final    int                                           availableNodes;
-  private final    int                                           expectedResponses;
-  private final    int                                           quorum;
-  private final    long                                          timeout;
-  private volatile int                                           responseCount;
-  private final    List<String>                                  debugNodeReplied = new ArrayList<>();
-  private volatile Map<Integer, List<OTransactionResultPayload>> resultsByType    = new HashMap<>();
-  private volatile IdentityHashMap<OTransactionResultPayload, String> payloadToNode = new IdentityHashMap<>();
-  private volatile boolean                                       finished         = false;
-  private volatile boolean                                       quorumReached    = false;
-  private volatile Object                                        finalResult;
+  private final    OTransactionPhase1Task                             iRequest;
+  private final    Collection<String>                                 iNodes;
+  private final    Set<String>                                        nodesConcurToTheQuorum;
+  private final    int                                                availableNodes;
+  private final    int                                                expectedResponses;
+  private final    int                                                quorum;
+  private final    long                                               timeout;
+  private volatile int                                                responseCount;
+  private final    List<String>                                       debugNodeReplied = new ArrayList<>();
+  private volatile Map<Integer, List<OTransactionResultPayload>>      resultsByType    = new HashMap<>();
+  private volatile IdentityHashMap<OTransactionResultPayload, String> payloadToNode    = new IdentityHashMap<>();
+  private volatile boolean                                            finished         = false;
+  private volatile boolean                                            quorumReached    = false;
+  private volatile Object                                             finalResult;
 
   public ONewDistributedResponseManager(OTransactionPhase1Task iRequest, Collection<String> iNodes,
       Set<String> nodesConcurToTheQuorum, int availableNodes, int expectedResponses, int quorum) {
@@ -65,6 +65,9 @@ public class ONewDistributedResponseManager implements ODistributedResponseManag
       try {
         if (!quorumReached) {
           wait(timeout);
+        }
+        if (quorumReached && !finished) {
+          wait(timeout / 10);
         }
         if (interrupted) {
           Thread.currentThread().interrupt();
@@ -137,7 +140,7 @@ public class ONewDistributedResponseManager implements ODistributedResponseManag
     return null;
   }
 
-  public String getNodeNameFromPayload(OTransactionResultPayload payload){
+  public String getNodeNameFromPayload(OTransactionResultPayload payload) {
     return this.payloadToNode.get(payload);
   }
 
@@ -180,6 +183,7 @@ public class ONewDistributedResponseManager implements ODistributedResponseManag
       }
       if (responseCount == expectedResponses) {
         this.finished = true;
+        this.notifyAll();
       }
     } else if (responseCount == expectedResponses) {
       if (quorumReached) {
@@ -188,8 +192,8 @@ public class ONewDistributedResponseManager implements ODistributedResponseManag
         this.finished = true;
         finalResult = null;
         this.finalResult = null;
-        this.notifyAll();
       }
+      this.notifyAll();
     }
   }
 
