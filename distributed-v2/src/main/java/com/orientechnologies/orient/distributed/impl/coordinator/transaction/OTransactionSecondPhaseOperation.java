@@ -41,7 +41,7 @@ public class OTransactionSecondPhaseOperation implements ONodeRequest {
   public ONodeResponse execute(ONodeIdentity nodeFrom, OLogId opId, ODistributedExecutor executor,
       ODatabaseDocumentInternal session) {
     OTransactionOptimisticDistributed tx = ((ODatabaseDocumentDistributed) session)
-        .txSecondPhase(operationId, operations, indexes, success);
+        .txSecondPhase(operationId, opId, operations, indexes, success);
 
     List<OCreatedRecordResponse> createdRecords = new ArrayList<>(tx.getCreatedRecords().size());
     List<OUpdatedRecordResponse> updatedRecords = new ArrayList<>(tx.getUpdatedRecords().size());

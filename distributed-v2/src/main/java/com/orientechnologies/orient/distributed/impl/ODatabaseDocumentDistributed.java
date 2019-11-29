@@ -33,6 +33,7 @@ import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey;
 import com.orientechnologies.orient.core.tx.OTransactionInternal;
 import com.orientechnologies.orient.distributed.OrientDBDistributed;
+import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
 import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitContext;
 import com.orientechnologies.orient.distributed.impl.coordinator.OSubmitResponse;
 import com.orientechnologies.orient.distributed.impl.coordinator.ddl.ODDLQuerySubmitRequest;
@@ -234,7 +235,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
     firstPhaseDataChecks(tx);
   }
 
-  public OTransactionOptimisticDistributed txSecondPhase(OSessionOperationId operationId, List<ORecordOperationRequest> operations,
+  public OTransactionOptimisticDistributed txSecondPhase(OSessionOperationId operationId, OLogId opLogId, List<ORecordOperationRequest> operations,
       List<OIndexOperationRequest> indexes, boolean success) {
     //MAKE delta be used by default
     OTransactionOptimisticDistributed tx = new OTransactionOptimisticDistributed(this, new ArrayList<>());
