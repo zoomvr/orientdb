@@ -238,7 +238,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   public OTransactionOptimisticDistributed txSecondPhase(OSessionOperationId operationId, OLogId opLogId, List<ORecordOperationRequest> operations,
       List<OIndexOperationRequest> indexes, boolean success) {
     //MAKE delta be used by default
-    OTransactionOptimisticDistributed tx = new OTransactionOptimisticDistributed(this, new ArrayList<>());
+    OTransactionOptimisticDistributed tx = new OTransactionOptimisticDistributed(this, new ArrayList<>(), opLogId);
     tx.begin(operations, indexes);
     try {
       if (success) {

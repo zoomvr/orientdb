@@ -22,6 +22,7 @@ import com.orientechnologies.orient.core.schedule.OScheduledEvent;
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.ORecordSerializerNetworkDistributed;
 import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
 import com.orientechnologies.orient.core.tx.OTransactionOptimistic;
+import com.orientechnologies.orient.distributed.impl.coordinator.OLogId;
 import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OIndexKeyChange;
 import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OIndexKeyOperation;
 import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OIndexOperationRequest;
@@ -32,11 +33,18 @@ public class OTransactionOptimisticDistributed extends OTransactionOptimistic {
   private final Map<ORID, ORecord>     createdRecords = new HashMap<>();
   private final Map<ORID, ORecord>     updatedRecords = new HashMap<>();
   private final Set<ORID>              deletedRecord  = new HashSet<>();
+  private final OLogId oplogId;
   private       List<ORecordOperation> changes;
 
-  public OTransactionOptimisticDistributed(ODatabaseDocumentInternal database, List<ORecordOperation> changes) {
+
+  public OTransactionOptimisticDistributed(ODatabaseDocumentInternal database, List<ORecordOperation> changes, OLogId oplogId) {
     super(database);
     this.changes = changes;
+    this.oplogId = oplogId;
+  }
+
+  public OTransactionOptimisticDistributed(ODatabaseDocumentInternal database, List<ORecordOperation> changes) {
+    this(database, changes, null);
   }
 
   public void begin(List<ORecordOperationRequest> operations, List<OIndexOperationRequest> indexes) {
@@ -231,4 +239,7 @@ public class OTransactionOptimisticDistributed extends OTransactionOptimistic {
     updatedRids.put(oldId, id);
   }
 
+  public OLogId getOplogId() {
+    return oplogId;
+  }
 }

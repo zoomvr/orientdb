@@ -77,6 +77,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.po.sbt
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.po.sbtree.v2.nullbucket.SBTreeNullBucketV2InitPO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.po.sbtree.v2.nullbucket.SBTreeNullBucketV2RemoveValuePO;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.po.sbtree.v2.nullbucket.SBTreeNullBucketV2SetValuePO;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.distributed.*;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
@@ -592,6 +593,9 @@ public final class OWALRecordsFactory {
       break;
     case LOCAL_HASH_TABLE_V2_DIRECTORY_FIRST_PAGE_SET_POINTER_PO:
       walRecord = new LocalHashTableV2DirectoryFirstPageSetPointerPO();
+      break;
+    case DISTRIBUTED_TX_INFO_PO:
+      walRecord = new DistributedTxInfoWALRecord();
       break;
     default:
       if (idToTypeMap.containsKey(recordId))
