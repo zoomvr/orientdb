@@ -105,12 +105,12 @@
         <module>test-commons</module>
         <module>client</module>
         <module>core</module>
-        <module>object</module>
+<!--        <module>object</module>-->
         <module>server</module>
         <module>tools</module>
-<!--        <module>tests</module>-->
+        <module>tests</module>
         <module>distributed</module>
-        <module>distributed-v2</module>
+<!--        <module>distributed-v2</module>-->
         <module>graphdb</module>
         <module>lucene</module>
         <module>jdbc</module>
