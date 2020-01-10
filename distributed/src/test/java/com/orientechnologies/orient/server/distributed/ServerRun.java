@@ -196,7 +196,7 @@ System.out.println("----- db exists = " + orientDB.exists(dbName));
         if (dm != null) {
           HazelcastInstance hz = dm.getHazelcastInstance();
           final Node node = getHazelcastNode(hz);
-          node.getConnectionManager().shutdown();
+          node.getNetworkingService().shutdown();
           node.shutdown(true);
           hz.getLifecycleService().terminate();
         }
