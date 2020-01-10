@@ -158,4 +158,20 @@ public class OStorageEncryptionTestIT {
     }
   }
 
+  @Test(expected = ODatabaseException.class)
+  public void testEncryptionSingleDatabaseFail() {
+    final File dbDirectoryFile = cleanAndGetDirectory();
+
+    try (final OrientDB orientDB = new OrientDB("embedded:" + dbDirectoryFile.getAbsolutePath(), OrientDBConfig.defaultConfig())) {
+      final OrientDBConfig orientDBConfig = OrientDBConfig.builder()
+          .addConfig(OGlobalConfiguration.STORAGE_ENCRYPTION_KEY, "T1JJRU5UREJfSVNfQ09PTA==").build();
+
+      orientDB.create("encryption", ODatabaseType.PLOCAL, orientDBConfig);
+    }
+    try (final OrientDB orientDB = new OrientDB("embedded:" + dbDirectoryFile.getAbsolutePath(), OrientDBConfig.defaultConfig())) {
+      try (final ODatabaseSession session = orientDB.open("encryption", "admin", "admin")) {
+      }
+    }
+  }
+
 }
