@@ -32,7 +32,6 @@ import com.orientechnologies.orient.server.config.OServerCommandConfiguration;
 import com.orientechnologies.orient.server.config.OServerParameterConfiguration;
 import com.orientechnologies.orient.server.network.protocol.OBeforeDatabaseOpenNetworkEventListener;
 import com.orientechnologies.orient.server.network.protocol.ONetworkProtocol;
-import com.orientechnologies.orient.server.network.protocol.http.OHttpNetworkCommandManager;
 import com.orientechnologies.orient.server.network.protocol.http.command.OServerCommand;
 
 import java.io.IOException;
@@ -41,19 +40,19 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class OServerNetworkListener extends Thread {
-  private OServerSocketFactory                          socketFactory;
-  private ServerSocket                                  serverSocket;
-  private InetSocketAddress                             inboundAddr;
-  private Class<? extends ONetworkProtocol>             protocolType;
-  private volatile boolean                              active            = true;
-  private List<OServerCommandConfiguration>             statefulCommands  = new ArrayList<OServerCommandConfiguration>();
-  private List<OServerCommand>                          statelessCommands = new ArrayList<OServerCommand>();
-  private int                                           socketBufferSize;
-  private OContextConfiguration                         configuration;
-  private OServer                                       server;
-  private int                                           protocolVersion = -1;
-  private List<OBeforeDatabaseOpenNetworkEventListener> beforeDatabaseOpenNetworkEventListener = new ArrayList<OBeforeDatabaseOpenNetworkEventListener>();
+public abstract class OServerNetworkListener extends Thread {
+  private          OServerSocketFactory                          socketFactory;
+  private          ServerSocket                                  serverSocket;
+  private          InetSocketAddress                             inboundAddr;
+  private          Class<? extends ONetworkProtocol>             protocolType;
+  private volatile boolean                                       active                                 = true;
+  private          List<OServerCommandConfiguration>             statefulCommands                       = new ArrayList<OServerCommandConfiguration>();
+  private          List<OServerCommand>                          statelessCommands                      = new ArrayList<OServerCommand>();
+  private          int                                           socketBufferSize;
+  private          OContextConfiguration                         configuration;
+  private          OServer                                       server;
+  private          int                                           protocolVersion                        = -1;
+  private          List<OBeforeDatabaseOpenNetworkEventListener> beforeDatabaseOpenNetworkEventListener = new ArrayList<OBeforeDatabaseOpenNetworkEventListener>();
 
   public OServerNetworkListener(final OServer iServer, final OServerSocketFactory iSocketFactory, final String iHostName,
       final String iHostPortRange, final String iProtocolName, final Class<? extends ONetworkProtocol> iProtocol,
@@ -268,10 +267,6 @@ public class OServerNetworkListener extends Thread {
     }
 
     return address + ":" + serverSocket.getLocalPort();
-  }
-
-  public static void main(String[] args) {
-    System.out.println(OServerNetworkListener.getLocalHostIp());
   }
 
   public static String getLocalHostIp() {
