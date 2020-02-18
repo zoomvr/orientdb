@@ -55,7 +55,7 @@ node {
                 } finally {
                     junit allowEmptyResults: true, testResults: '**/target/surefire-reports/TEST-*.xml'
                     junit allowEmptyResults: true, testResults: '**/target/failsafe-reports/TEST-*.xml'
-                    jacoco(execPattern: '**/*.exec')
+                    jacoco(execPattern: 'orientdb/target/jacoco.exec')
                 }
             
 
