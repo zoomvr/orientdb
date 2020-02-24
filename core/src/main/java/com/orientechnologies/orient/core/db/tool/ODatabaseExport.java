@@ -19,6 +19,11 @@
  */
 package com.orientechnologies.orient.core.db.tool;
 
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.orientechnologies.common.io.OIOException;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
@@ -27,22 +32,25 @@ import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.config.OStorageConfiguration;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.index.OIndexDefinition;
 import com.orientechnologies.orient.core.index.OIndexManagerProxy;
 import com.orientechnologies.orient.core.index.ORuntimeKeyIndexDefinition;
 import com.orientechnologies.orient.core.iterator.ORecordIteratorCluster;
-import com.orientechnologies.orient.core.metadata.OMetadataInternal;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OProperty;
 import com.orientechnologies.orient.core.metadata.schema.OSchema;
 import com.orientechnologies.orient.core.metadata.schema.OSchemaShared;
 import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.impl.ODocument;
-import com.orientechnologies.orient.core.serialization.serializer.OJSONWriter;
+import com.orientechnologies.orient.core.serialization.serializer.record.string.ORecordSerializerJSON;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.*;
 import java.util.zip.Deflater;
 import java.util.zip.GZIPOutputStream;
@@ -55,10 +63,10 @@ import java.util.zip.GZIPOutputStream;
 public class ODatabaseExport extends ODatabaseImpExpAbstract {
   public static final int VERSION = 12;
 
-  protected OJSONWriter writer;
-  protected long        recordExported;
-  protected int compressionLevel  = Deflater.BEST_SPEED;
-  protected int compressionBuffer = 16384;              // 16Kb
+  protected JsonGenerator writer;
+  protected long          recordExported;
+  protected int           compressionLevel  = Deflater.BEST_SPEED;
+  protected int           compressionBuffer = 16384;              // 16Kb
 
   public ODatabaseExport(final ODatabaseDocumentInternal iDatabase, final String iFileName, final OCommandOutputListener iListener)
       throws IOException {
@@ -82,16 +90,22 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
       }
     };
 
-    writer = new OJSONWriter(new OutputStreamWriter(gzipOS));
-    writer.beginObject();
+    JsonFactory jfactory = new JsonFactory();
+    writer = jfactory.createGenerator(gzipOS, JsonEncoding.UTF8);
+    writer.setCodec(new JsonMapper());
+
+    writer.writeStartObject();
   }
 
-  public ODatabaseExport(final ODatabaseDocumentInternal iDatabase, final OutputStream iOutputStream,
+  public ODatabaseExport(final ODatabaseDocumentInternal iDatabase, final OutputStream outputStream,
       final OCommandOutputListener iListener) throws IOException {
     super(iDatabase, "streaming", iListener);
 
-    writer = new OJSONWriter(new OutputStreamWriter(iOutputStream));
-    writer.beginObject();
+    JsonFactory jfactory = new JsonFactory();
+    writer = jfactory.createGenerator(outputStream, JsonEncoding.UTF8);
+    writer.setCodec(new JsonMapper());
+
+    writer.writeStartObject();
   }
 
   @Override
@@ -111,16 +125,17 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
 
       long time = System.currentTimeMillis();
 
+      final ObjectMapper objectMapper = new ObjectMapper();
       if (includeInfo)
         exportInfo();
       if (includeClusterDefinitions)
         exportClusters();
       if (includeSchema)
-        exportSchema();
+        exportSchema(objectMapper);
       if (includeRecords)
         exportRecords();
       if (includeIndexDefinitions)
-        exportIndexDefinitions();
+        exportIndexDefinitions(objectMapper);
       if (includeManualIndexes)
         exportManualIndexes();
 
@@ -145,7 +160,7 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
 
     final Set<ORID> brokenRids = new HashSet<ORID>();
 
-    writer.beginCollection(level, true, "records");
+    writer.writeArrayFieldStart("records");
     int exportedClusters = 0;
     int maxClusterId = getMaxClusterId();
     for (int i = 0; exportedClusters <= maxClusterId; ++i) {
@@ -228,26 +243,22 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
       totalExportedRecords += clusterExportedRecordsCurrent;
       totalFoundRecords += clusterExportedRecordsTot;
     }
-    writer.endCollection(level, true);
+    writer.writeEndArray();
 
     listener.onMessage(
         "\n\nDone. Exported " + totalExportedRecords + " of total " + totalFoundRecords + " records. " + brokenRids.size()
             + " records were detected as broken\n");
 
-    writer.beginCollection(level, true, "brokenRids");
+    writer.writeArrayFieldStart("brokenRids");
 
     boolean firsBrokenRid = true;
 
     for (ORID rid : brokenRids) {
-      if (firsBrokenRid)
-        firsBrokenRid = false;
-      else
-        writer.append(",");
+      writer.writeString(rid.toString());
 
-      writer.append(rid.toString());
     }
 
-    writer.endCollection(level, true);
+    writer.writeEndArray();
 
     return totalExportedRecords;
   }
@@ -259,7 +270,7 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
       return;
 
     try {
-      writer.endObject();
+      writer.writeEndObject();
       writer.close();
       writer = null;
     } catch (IOException e) {
@@ -289,7 +300,7 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
   private void exportClusters() throws IOException {
     listener.onMessage("\nExporting clusters...");
 
-    writer.beginCollection(1, true, "clusters");
+    writer.writeArrayFieldStart("clusters");
     int exportedClusters = 0;
 
     int maxClusterId = getMaxClusterId();
@@ -311,43 +322,43 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
           continue;
       }
 
-      writer.beginObject(2, true, null);
+      writer.writeStartObject();
 
-      writer.writeAttribute(0, false, "name", clusterName);
-      writer.writeAttribute(0, false, "id", clusterId);
+      writer.writeStringField("name", clusterName);
+      writer.writeNumberField("id", clusterId);
 
       exportedClusters++;
-      writer.endObject(2, false);
+      writer.writeEndObject();
     }
 
     listener.onMessage("OK (" + exportedClusters + " clusters)");
 
-    writer.endCollection(1, true);
+    writer.writeEndArray();
   }
 
   private void exportInfo() throws IOException {
     listener.onMessage("\nExporting database info...");
 
-    writer.beginObject(1, true, "info");
-    writer.writeAttribute(2, true, "name", database.getName().replace('\\', '/'));
-    writer.writeAttribute(2, true, "default-cluster-id", database.getDefaultClusterId());
-    writer.writeAttribute(2, true, "exporter-version", VERSION);
-    writer.writeAttribute(2, true, "engine-version", OConstants.getVersion());
+    writer.writeObjectFieldStart("info");
+    writer.writeStringField("name", database.getName().replace('\\', '/'));
+    writer.writeNumberField("default-cluster-id", database.getDefaultClusterId());
+    writer.writeNumberField("exporter-version", VERSION);
+    writer.writeStringField("engine-version", OConstants.getVersion());
     final String engineBuild = OConstants.getBuildNumber();
     if (engineBuild != null)
-      writer.writeAttribute(2, true, "engine-build", engineBuild);
-    writer.writeAttribute(2, true, "storage-config-version", OStorageConfiguration.CURRENT_VERSION);
-    writer.writeAttribute(2, true, "schema-version", OSchemaShared.CURRENT_VERSION_NUMBER);
-    writer.writeAttribute(2, true, "schemaRecordId", database.getStorage().getConfiguration().getSchemaRecordId());
-    writer.writeAttribute(2, true, "indexMgrRecordId", database.getStorage().getConfiguration().getIndexMgrRecordId());
-    writer.endObject(1, true);
+      writer.writeStringField("engine-build", engineBuild);
+    writer.writeNumberField("storage-config-version", OStorageConfiguration.CURRENT_VERSION);
+    writer.writeNumberField("schema-version", OSchemaShared.CURRENT_VERSION_NUMBER);
+    writer.writeStringField("schemaRecordId", database.getStorage().getConfiguration().getSchemaRecordId());
+    writer.writeStringField("indexMgrRecordId", database.getStorage().getConfiguration().getIndexMgrRecordId());
+    writer.writeEndObject();
 
     listener.onMessage("OK");
   }
 
-  private void exportIndexDefinitions() throws IOException {
+  private void exportIndexDefinitions(ObjectMapper objectMapper) throws IOException {
     listener.onMessage("\nExporting index info...");
-    writer.beginCollection(1, true, "indexes");
+    writer.writeArrayFieldStart("indexes");
 
     final OIndexManagerProxy indexManager = database.getMetadata().getIndexManager();
     indexManager.reload();
@@ -370,37 +381,44 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
       }
 
       listener.onMessage("\n- Index " + index.getName() + "...");
-      writer.beginObject(2, true, null);
-      writer.writeAttribute(3, true, "name", index.getName());
-      writer.writeAttribute(3, true, "type", index.getType());
+      writer.writeStartObject();
+      writer.writeStringField("name", index.getName());
+      writer.writeStringField("type", index.getType());
       if (index.getAlgorithm() != null)
-        writer.writeAttribute(3, true, "algorithm", index.getAlgorithm());
+        writer.writeStringField("algorithm", index.getAlgorithm());
 
-      if (!index.getClusters().isEmpty())
-        writer.writeAttribute(3, true, "clustersToIndex", index.getClusters());
+      if (!index.getClusters().isEmpty()) {
+        writer.writeFieldName("clustersToIndex");
+        objectMapper.writeValue(writer, index.getClusters());
+      }
 
       if (index.getDefinition() != null) {
-        writer.beginObject(4, true, "definition");
+        writer.writeObjectFieldStart("definition");
 
-        writer.writeAttribute(5, true, "defClass", index.getDefinition().getClass().getName());
-        writer.writeAttribute(5, true, "stream", index.getDefinition().toStream());
+        writer.writeStringField("defClass", index.getDefinition().getClass().getName());
+        writer.writeFieldName("stream");
+        ORecordSerializerJSON.toJSON(index.getDefinition().toStream(), writer,
+            "rid,version,class,type,attribSameRow,keepTypes,alwaysFetchEmbedded,fetchPlan:*:0");
 
-        writer.endObject(4, true);
+        writer.writeEndObject();
       }
 
       final ODocument metadata = index.getMetadata();
-      if (metadata != null)
-        writer.writeAttribute(4, true, "metadata", metadata);
+      if (metadata != null) {
+        writer.writeFieldName("metadata");
+        ORecordSerializerJSON
+            .toJSON(metadata, writer, "rid,version,class,type,attribSameRow,keepTypes,alwaysFetchEmbedded,fetchPlan:*:0");
+      }
 
       final ODocument configuration = index.getConfiguration();
       if (configuration.field("blueprintsIndexClass") != null)
-        writer.writeAttribute(4, true, "blueprintsIndexClass", configuration.field("blueprintsIndexClass"));
+        writer.writeStringField("blueprintsIndexClass", configuration.field("blueprintsIndexClass").toString());
 
-      writer.endObject(2, true);
+      writer.writeEndObject();
       listener.onMessage("OK");
     }
 
-    writer.endCollection(1, true);
+    writer.writeEndArray();
     listener.onMessage("\nOK (" + indexes.size() + " indexes)");
   }
 
@@ -416,7 +434,7 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
     ODocument exportEntry = new ODocument();
 
     int manualIndexes = 0;
-    writer.beginCollection(1, true, "manualIndexes");
+    writer.writeArrayFieldStart("manualIndexes");
     for (OIndex<?> index : indexes) {
       if (index.getName().equals(ODatabaseImport.EXPORT_IMPORT_MAP_NAME))
         continue;
@@ -424,18 +442,15 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
       if (!index.isAutomatic()) {
         listener.onMessage("\n- Exporting index " + index.getName() + " ...");
 
-        writer.beginObject(2, true, null);
-        writer.writeAttribute(3, true, "name", index.getName());
+        writer.writeStartObject();
+        writer.writeStringField("name", index.getName());
 
         List<ODocument> indexContent = database.query(new OSQLSynchQuery<ODocument>("select from index:" + index.getName()));
 
-        writer.beginCollection(3, true, "content");
+        writer.writeArrayFieldStart("content");
 
         int i = 0;
         for (ODocument indexEntry : indexContent) {
-          if (i > 0)
-            writer.append(",");
-
           indexEntry.setLazyLoad(false);
           final OIndexDefinition indexDefinition = index.getDefinition();
 
@@ -461,32 +476,34 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
 
           i++;
 
-          writer.append(exportEntry.toJSON());
+          ORecordSerializerJSON
+              .toJSON(exportEntry, writer, "rid,version,class,type,attribSameRow,keepTypes,alwaysFetchEmbedded,fetchPlan:*:0");
 
           final long percent = indexContent.size() / 10;
           if (percent > 0 && (i % percent) == 0)
             listener.onMessage(".");
         }
-        writer.endCollection(3, true);
+        writer.writeEndArray();
+        writer.writeEndObject();
 
-        writer.endObject(2, true);
         listener.onMessage("OK (entries=" + index.getSize() + ")");
         manualIndexes++;
       }
     }
-    writer.endCollection(1, true);
+    writer.writeEndArray();
     listener.onMessage("\nOK (" + manualIndexes + " manual indexes)");
   }
 
-  private void exportSchema() throws IOException {
+  private void exportSchema(ObjectMapper objectMapper) throws IOException {
     listener.onMessage("\nExporting schema...");
 
-    writer.beginObject(1, true, "schema");
-    OSchema s = ((OMetadataInternal) database.getMetadata()).getImmutableSchemaSnapshot();
-    writer.writeAttribute(2, true, "version", s.getVersion());
-    writer.writeAttribute(2, false, "blob-clusters", database.getBlobClusterIds());
+    writer.writeObjectFieldStart("schema");
+    OSchema s = database.getMetadata().getImmutableSchemaSnapshot();
+    writer.writeNumberField("version", s.getVersion());
+    writer.writeFieldName("blob-clusters");
+    objectMapper.writeValue(writer, database.getBlobClusterIds());
     if (!s.getClasses().isEmpty()) {
-      writer.beginCollection(2, true, "classes");
+      writer.writeArrayFieldStart("classes");
 
       final List<OClass> classes = new ArrayList<OClass>(s.getClasses());
       Collections.sort(classes);
@@ -501,78 +518,86 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
             continue;
         }
 
-        writer.beginObject(3, true, null);
-        writer.writeAttribute(0, false, "name", cls.getName());
-        writer.writeAttribute(0, false, "default-cluster-id", cls.getDefaultClusterId());
-        writer.writeAttribute(0, false, "cluster-ids", cls.getClusterIds());
+        writer.writeStartObject();
+        writer.writeStringField("name", cls.getName());
+        writer.writeNumberField("default-cluster-id", cls.getDefaultClusterId());
+        writer.writeFieldName("cluster-ids");
+        objectMapper.writeValue(writer, cls.getClusterIds());
+
         if (cls.getOverSize() > 1)
-          writer.writeAttribute(0, false, "oversize", cls.getClassOverSize());
+          writer.writeNumberField("oversize", cls.getClassOverSize());
         if (cls.isStrictMode())
-          writer.writeAttribute(0, false, "strictMode", cls.isStrictMode());
-        if (!cls.getSuperClasses().isEmpty())
-          writer.writeAttribute(0, false, "super-classes", cls.getSuperClassesNames());
+          writer.writeBooleanField("strictMode", cls.isStrictMode());
+        if (!cls.getSuperClasses().isEmpty()) {
+          writer.writeFieldName("super-classes");
+          objectMapper.writeValue(writer, cls.getSuperClassesNames());
+        }
         if (cls.getShortName() != null)
-          writer.writeAttribute(0, false, "short-name", cls.getShortName());
+          writer.writeStringField("short-name", cls.getShortName());
         if (cls.isAbstract())
-          writer.writeAttribute(0, false, "abstract", cls.isAbstract());
-        writer.writeAttribute(0, false, "cluster-selection", cls.getClusterSelection().getName()); // @SINCE 1.7
+          writer.writeBooleanField("abstract", cls.isAbstract());
+        writer.writeStringField("cluster-selection", cls.getClusterSelection().getName()); // @SINCE 1.7
 
         if (!cls.properties().isEmpty()) {
-          writer.beginCollection(4, true, "properties");
+          writer.writeArrayFieldStart("properties");
 
           final List<OProperty> properties = new ArrayList<OProperty>(cls.declaredProperties());
           Collections.sort(properties);
 
           for (OProperty p : properties) {
-            writer.beginObject(5, true, null);
-            writer.writeAttribute(0, false, "name", p.getName());
-            writer.writeAttribute(0, false, "type", p.getType().toString());
+            writer.writeStartObject();
+            writer.writeStringField("name", p.getName());
+            writer.writeStringField("type", p.getType().toString());
             if (p.isMandatory())
-              writer.writeAttribute(0, false, "mandatory", p.isMandatory());
+              writer.writeBooleanField("mandatory", p.isMandatory());
             if (p.isReadonly())
-              writer.writeAttribute(0, false, "readonly", p.isReadonly());
+              writer.writeBooleanField("readonly", p.isReadonly());
             if (p.isNotNull())
-              writer.writeAttribute(0, false, "not-null", p.isNotNull());
+              writer.writeBooleanField("not-null", p.isNotNull());
             if (p.getLinkedClass() != null)
-              writer.writeAttribute(0, false, "linked-class", p.getLinkedClass().getName());
+              writer.writeStringField("linked-class", p.getLinkedClass().getName());
             if (p.getLinkedType() != null)
-              writer.writeAttribute(0, false, "linked-type", p.getLinkedType().toString());
+              writer.writeStringField("linked-type", p.getLinkedType().toString());
             if (p.getMin() != null)
-              writer.writeAttribute(0, false, "min", p.getMin());
+              writer.writeStringField("min", p.getMin());
             if (p.getMax() != null)
-              writer.writeAttribute(0, false, "max", p.getMax());
+              writer.writeStringField("max", p.getMax());
             if (p.getCollate() != null)
-              writer.writeAttribute(0, false, "collate", p.getCollate().getName());
+              writer.writeStringField("collate", p.getCollate().getName());
             if (p.getDefaultValue() != null)
-              writer.writeAttribute(0, false, "default-value", p.getDefaultValue());
+              writer.writeStringField("default-value", p.getDefaultValue());
             if (p.getRegexp() != null)
-              writer.writeAttribute(0, false, "regexp", p.getRegexp());
+              writer.writeStringField("regexp", p.getRegexp());
             final Set<String> customKeys = p.getCustomKeys();
             final Map<String, String> custom = new HashMap<String, String>();
             for (String key : customKeys)
               custom.put(key, p.getCustom(key));
 
-            if (!custom.isEmpty())
-              writer.writeAttribute(0, false, "customFields", custom);
+            if (!custom.isEmpty()) {
+              writer.writeFieldName("customFields");
+              objectMapper.writeValue(writer, custom);
+            }
 
-            writer.endObject(0, false);
+            writer.writeEndObject();
           }
-          writer.endCollection(4, true);
+          writer.writeEndArray();
         }
         final Set<String> customKeys = cls.getCustomKeys();
         final Map<String, String> custom = new HashMap<String, String>();
         for (String key : customKeys)
           custom.put(key, cls.getCustom(key));
 
-        if (!custom.isEmpty())
-          writer.writeAttribute(0, false, "customFields", custom);
+        if (!custom.isEmpty()) {
+          writer.writeFieldName("customFields");
+          objectMapper.writeValue(writer, custom);
+        }
 
-        writer.endObject(3, true);
+        writer.writeEndObject();
       }
-      writer.endCollection(2, true);
+      writer.writeEndArray();
     }
 
-    writer.endObject(1, true);
+    writer.writeEndObject();
 
     listener.onMessage("OK (" + s.getClasses().size() + " classes)");
   }
@@ -583,14 +608,10 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
         if (rec.getIdentity().isValid())
           rec.reload();
 
-        if (useLineFeedForRecords)
-          writer.append("\n");
-
-        if (recordExported > 0)
-          writer.append(",");
-
-        writer.append(rec.toJSON("rid,type,version,class,attribSameRow,keepTypes,alwaysFetchEmbedded,dateAsLong"));
-
+        if (rec.getIdentity().equals(new ORecordId("#29:0"))) {
+          System.out.println();
+        }
+        ORecordSerializerJSON.toJSON(rec, writer, "rid,type,version,class,attribSameRow,keepTypes,alwaysFetchEmbedded,dateAsLong");
         recordExported++;
         recordNum++;
 

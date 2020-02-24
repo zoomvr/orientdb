@@ -332,20 +332,38 @@ public class ORecordSerializerJSON extends ORecordSerializerStringAbstract {
     return new byte[] {};
   }
 
-  public static void toJSON(final ODocument record, final JsonGenerator json, final String format) {
+  public static void toJSON(final ORecord record, final JsonGenerator json, final String format) {
     try {
-      final FormatSettings settings = new FormatSettings(format);
-
       json.writeStartObject();
 
-      OJacksonFetchContext context = new OJacksonFetchContext(json, settings);
-      context.writeSignature(json, record);
+      try {
+        final FormatSettings settings = new FormatSettings(format);
 
-      final OFetchPlan fp = OFetchHelper.buildFetchPlan(settings.fetchPlan);
+        OJacksonFetchContext context = new OJacksonFetchContext(json, settings);
+        context.writeSignature(json, record);
 
-      OFetchHelper.fetch(record, null, fp, new OJacksonFetchListener(format), context, format);
+        if (record instanceof ODocument) {
+          final OFetchPlan fp = OFetchHelper.buildFetchPlan(settings.fetchPlan);
 
-      json.writeEndObject();
+          OFetchHelper.fetch(record, null, fp, new OJacksonFetchListener(format), context, format);
+        } else if (record instanceof ORecordStringable) {
+
+          // STRINGABLE
+          final ORecordStringable stringableRecord = (ORecordStringable) record;
+          json.writeStringField("value", stringableRecord.value());
+
+        } else if (record instanceof OBlob) {
+          // BYTES
+          final OBlob blobRecord = (OBlob) record;
+          json.writeBinaryField("value", blobRecord.toStream());
+        } else {
+          throw new OSerializationException("Error on marshalling record of type '" + record.getClass()
+              + "' to JSON. The record type cannot be exported to JSON");
+        }
+      } finally {
+        json.writeEndObject();
+      }
+
     } catch (IOException e) {
       throw OException.wrapException(new OSerializationException("Error on marshalling of record to JSON"), e);
     }

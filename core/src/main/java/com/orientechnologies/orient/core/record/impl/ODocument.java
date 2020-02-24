@@ -67,19 +67,19 @@ public class ODocument extends ORecordAbstract
   public static final    byte     RECORD_TYPE      = 'd';
   protected static final String[] EMPTY_STRINGS    = new String[] {};
   private static final   long     serialVersionUID = 1L;
-  protected int _fieldSize;
+  protected              int      _fieldSize;
 
   protected Map<String, ODocumentEntry> _fields;
 
-  protected           boolean                             _trackingChanges    = true;
-  protected           boolean                             _ordered            = true;
-  protected           boolean                             _lazyLoad           = true;
-  protected           boolean                             _allowChainedAccess = true;
-  protected transient List<WeakReference<ORecordElement>> _owners             = null;
-  protected OImmutableSchema _schema;
-  private   String           _className;
-  private   OImmutableClass  _immutableClazz;
-  private int _immutableSchemaVersion = 1;
+  protected           boolean                             _trackingChanges        = true;
+  protected           boolean                             _ordered                = true;
+  protected           boolean                             _lazyLoad               = true;
+  protected           boolean                             _allowChainedAccess     = true;
+  protected transient List<WeakReference<ORecordElement>> _owners                 = null;
+  protected           OImmutableSchema                    _schema;
+  private             String                              _className;
+  private             OImmutableClass                     _immutableClazz;
+  private             int                                 _immutableSchemaVersion = 1;
 
   /**
    * Internal constructor used on unmarshalling.
@@ -113,8 +113,8 @@ public class ODocument extends ORecordAbstract
   }
 
   /**
-   * Creates a new instance in memory linked by the Record Id to the persistent one. New instances are not persistent until
-   * {@link #save()} is called.
+   * Creates a new instance in memory linked by the Record Id to the persistent one. New instances are not persistent until {@link
+   * #save()} is called.
    *
    * @param iRID Record Id
    */
@@ -528,9 +528,9 @@ public class ODocument extends ORecordAbstract
       destination._owners = null;
 
     if (_fields != null) {
-      destination._fields = _fields instanceof LinkedHashMap ?
-          new LinkedHashMap<String, ODocumentEntry>() :
-          new HashMap<String, ODocumentEntry>();
+      destination._fields = _fields instanceof LinkedHashMap
+          ? new LinkedHashMap<String, ODocumentEntry>()
+          : new HashMap<String, ODocumentEntry>();
       for (Entry<String, ODocumentEntry> entry : _fields.entrySet()) {
         ODocumentEntry docEntry = entry.getValue().clone();
         destination._fields.put(entry.getKey(), docEntry);
@@ -699,11 +699,8 @@ public class ODocument extends ORecordAbstract
    * attention to respect the OrientDB record format.
    * <p>
    * <code>
-   * record.reset();<br>
-   * record.setClassName("Account");<br>
-   * record.fromString(new String("Account@id:" + data.getCyclesDone() + ",name:'Luca',surname:'Garulli',birthDate:" + date.getTime()<br>
-   * + ",salary:" + 3000f + i));<br>
-   * record.save();<br>
+   * record.reset();<br> record.setClassName("Account");<br> record.fromString(new String("Account@id:" + data.getCyclesDone() +
+   * ",name:'Luca',surname:'Garulli',birthDate:" + date.getTime()<br> + ",salary:" + 3000f + i));<br> record.save();<br>
    * </code>
    * </p>
    *
@@ -788,10 +785,13 @@ public class ODocument extends ORecordAbstract
   }
 
   /**
-   * Evaluates a SQL expression against current document. Example: <code>long amountPlusVat = doc.eval("amount * 120 / 100");</code>
+   * Evaluates a SQL expression against current document. Example: <code>long amountPlusVat = doc.eval("amount * 120 /
+   * 100");</code>
    *
    * @param iExpression SQL expression to evaluate.
+   *
    * @return The result of expression
+   *
    * @throws OQueryParsingException in case the expression is not valid
    */
   public Object eval(final String iExpression) {
@@ -800,13 +800,14 @@ public class ODocument extends ORecordAbstract
 
   /**
    * Evaluates a SQL expression against current document by passing a context. The expression can refer to the variables contained
-   * in the context. Example: <code>
-   * OCommandContext context = new OBasicCommandContext().setVariable("vat", 20);
-   * long amountPlusVat = doc.eval("amount * (100+$vat) / 100", context);
+   * in the context. Example: <code> OCommandContext context = new OBasicCommandContext().setVariable("vat", 20); long amountPlusVat
+   * = doc.eval("amount * (100+$vat) / 100", context);
    * </code>
    *
    * @param iExpression SQL expression to evaluate.
+   *
    * @return The result of expression
+   *
    * @throws OQueryParsingException in case the expression is not valid
    */
   public Object eval(final String iExpression, final OCommandContext iContext) {
@@ -817,6 +818,7 @@ public class ODocument extends ORecordAbstract
    * Reads the field value.
    *
    * @param iFieldName field name
+   *
    * @return field value if defined, otherwise null
    */
   public <RET> RET field(final String iFieldName) {
@@ -830,7 +832,7 @@ public class ODocument extends ORecordAbstract
         unTrack((ORID) value);
         track((OIdentifiable) newValue);
         value = newValue;
-        if(this.isTrackingChanges()) {
+        if (this.isTrackingChanges()) {
           ORecordInternal.setDirtyManager((ORecord) value, this.getDirtyManager());
         }
         if (!iFieldName.contains(".")) {
@@ -851,6 +853,7 @@ public class ODocument extends ORecordAbstract
    *
    * @param iFieldName field name
    * @param iFieldType Forced type.
+   *
    * @return field value if defined, otherwise null
    */
   public <RET> RET field(final String iFieldName, final Class<?> iFieldType) {
@@ -867,6 +870,7 @@ public class ODocument extends ORecordAbstract
    *
    * @param iFieldName field name
    * @param iFieldType Forced type.
+   *
    * @return field value if defined, otherwise null
    */
   public <RET> RET field(final String iFieldName, final OType iFieldType) {
@@ -905,9 +909,10 @@ public class ODocument extends ORecordAbstract
   /**
    * Writes the field value. This method sets the current document as dirty.
    *
-   * @param iFieldName     field name. If contains dots (.) the change is applied to the nested documents in chain. To disable this feature call
-   *                       {@link #setAllowChainedAccess(boolean)} to false.
+   * @param iFieldName     field name. If contains dots (.) the change is applied to the nested documents in chain. To disable this
+   *                       feature call {@link #setAllowChainedAccess(boolean)} to false.
    * @param iPropertyValue field value
+   *
    * @return The Record instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   public ODocument field(final String iFieldName, Object iPropertyValue) {
@@ -930,9 +935,8 @@ public class ODocument extends ORecordAbstract
   }
 
   /**
-   * Deprecated. Use fromMap(Map) instead.<br>
-   * Fills a document passing the field names/values as a Map String,Object where the keys are the field names and the values are
-   * the field values.
+   * Deprecated. Use fromMap(Map) instead.<br> Fills a document passing the field names/values as a Map String,Object where the keys
+   * are the field names and the values are the field values.
    *
    * @see #fromMap(Map)
    */
@@ -962,13 +966,14 @@ public class ODocument extends ORecordAbstract
    * if the type defined in the schema support less precision than the iPropertyValue provided, the iPropertyValue will be converted
    * following the java casting rules with possible precision loss.
    *
-   * @param iFieldName     field name. If contains dots (.) the change is applied to the nested documents in chain. To disable this feature call
-   *                       {@link #setAllowChainedAccess(boolean)} to false.
+   * @param iFieldName     field name. If contains dots (.) the change is applied to the nested documents in chain. To disable this
+   *                       feature call {@link #setAllowChainedAccess(boolean)} to false.
    * @param iPropertyValue field value.
    * @param iFieldType     Forced type (not auto-determined)
+   *
    * @return The Record instance itself giving a "fluent interface". Useful to call multiple methods in chain. If the updated
-   * document is another document (using the dot (.) notation) then the document returned is the changed one or NULL if no
-   * document has been found in chain
+   * document is another document (using the dot (.) notation) then the document returned is the changed one or NULL if no document
+   * has been found in chain
    */
   public ODocument field(String iFieldName, Object iPropertyValue, OType... iFieldType) {
     if (iFieldName == null)
@@ -1212,9 +1217,11 @@ public class ODocument extends ORecordAbstract
    * on the value of the parameter 'iUpdateOnlyMode'.
    *
    * @param iOther                              Other ODocument instance to merge
-   * @param iUpdateOnlyMode                     if true, the other document properties will always be added or overwritten. If false, the missed properties in the
-   *                                            "other" document will be removed by original document
+   * @param iUpdateOnlyMode                     if true, the other document properties will always be added or overwritten. If
+   *                                            false, the missed properties in the "other" document will be removed by original
+   *                                            document
    * @param iMergeSingleItemsOfMultiValueFields If true, merges single items of multi field fields (collections, maps, arrays, etc)
+   *
    * @return
    */
   public ODocument merge(final ODocument iOther, boolean iUpdateOnlyMode, boolean iMergeSingleItemsOfMultiValueFields) {
@@ -1232,9 +1239,11 @@ public class ODocument extends ORecordAbstract
    * on the value of the parameter 'iUpdateOnlyMode'.
    *
    * @param iOther                              Other ODocument instance to merge
-   * @param iUpdateOnlyMode                     if true, the other document properties will always be added or overwritten. If false, the missed properties in the
-   *                                            "other" document will be removed by original document
+   * @param iUpdateOnlyMode                     if true, the other document properties will always be added or overwritten. If
+   *                                            false, the missed properties in the "other" document will be removed by original
+   *                                            document
    * @param iMergeSingleItemsOfMultiValueFields If true, merges single items of multi field fields (collections, maps, arrays, etc)
+   *
    * @return
    */
   public ODocument merge(final Map<String, Object> iOther, final boolean iUpdateOnlyMode,
@@ -1524,11 +1533,11 @@ public class ODocument extends ORecordAbstract
    * The following code will clear all data from specified document.
    * </p>
    * <code>
-   * doc.clear();
-   * doc.save();
+   * doc.clear(); doc.save();
    * </code>
    *
    * @return this
+   *
    * @see #reset()
    */
   @Override
@@ -1549,8 +1558,7 @@ public class ODocument extends ORecordAbstract
    * The following code will create a new document in database.
    * </p>
    * <code>
-   * doc.clear();
-   * doc.save();
+   * doc.clear(); doc.save();
    * </code>
    * <p/>
    * <p>
@@ -1558,6 +1566,7 @@ public class ODocument extends ORecordAbstract
    * </p>
    *
    * @return this
+   *
    * @throws IllegalStateException if transaction is begun.
    * @see #clear()
    */
@@ -1580,8 +1589,8 @@ public class ODocument extends ORecordAbstract
   }
 
   /**
-   * Rollbacks changes to the loaded version without reloading the document. Works only if tracking changes is enabled @see
-   * {@link #isTrackingChanges()} and {@link #setTrackingChanges(boolean)} methods.
+   * Rollbacks changes to the loaded version without reloading the document. Works only if tracking changes is enabled @see {@link
+   * #isTrackingChanges()} and {@link #setTrackingChanges(boolean)} methods.
    */
   public ODocument undo() {
     if (!_trackingChanges)
@@ -1650,10 +1659,11 @@ public class ODocument extends ORecordAbstract
   }
 
   /**
-   * Enabled or disabled the tracking of changes in the document. This is needed by some triggers like
-   * {@link com.orientechnologies.orient.core.index.OClassIndexManager} to determine what fields are changed to update indexes.
+   * Enabled or disabled the tracking of changes in the document. This is needed by some triggers like {@link
+   * com.orientechnologies.orient.core.index.OClassIndexManager} to determine what fields are changed to update indexes.
    *
    * @param iTrackingChanges True to enable it, otherwise false
+   *
    * @return this
    */
   public ODocument setTrackingChanges(final boolean iTrackingChanges) {
@@ -2272,7 +2282,7 @@ public class ODocument extends ORecordAbstract
         OType type = prop.getType();
         OType linkedType = prop.getLinkedType();
         OClass linkedClass = prop.getLinkedClass();
-        if(type == OType.EMBEDDED && linkedClass!=null){
+        if (type == OType.EMBEDDED && linkedClass != null) {
           convertToEmbeddedType(prop);
           continue;
         }
@@ -2710,6 +2720,7 @@ public class ODocument extends ORecordAbstract
       convertFieldsToClass(klazz);
     }
   }
+
   /**
    * Checks and convert the field of the document matching the types specified by the class.
    **/

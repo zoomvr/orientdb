@@ -37,7 +37,7 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
   /**
    * Removes all the dependencies with other records. All the relationships remain in form of RecordID. If some links contain dirty
    * records, the detach cannot be complete and this method returns false.
-   * 
+   *
    * @return True if the document has been successfully detached, otherwise false.
    */
   boolean detach();
@@ -45,7 +45,7 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
   /**
    * Resets the record to be reused. The record is fresh like just created. Use this method to recycle records avoiding the creation
    * of them stressing the JVM Garbage Collector.
-   * 
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET reset();
@@ -53,21 +53,21 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
   /**
    * Unloads current record. All information are lost but the record identity. At the next access the record will be auto-reloaded.
    * Useful to free memory or to avoid to keep an old version of it.
-   * 
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET unload();
 
   /**
    * All the fields are deleted but the record identity is maintained. Use this to remove all the document's fields.
-   * 
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET clear();
 
   /**
    * Creates a copy of the record. All the record contents are copied.
-   * 
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET copy();
@@ -81,22 +81,23 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
    * Returns the current version number of the record. When the record is created has version = 0. At every change the storage
    * increment the version number. Version number is used by Optimistic transactions to check if the record is changed in the
    * meanwhile of the transaction.
-   * 
-   * @see OTransactionOptimistic
+   *
    * @return The version number. 0 if it's a brand new record.
+   *
+   * @see OTransactionOptimistic
    */
   int getVersion();
 
   /**
    * Returns the database where the record belongs.
-   * 
+   *
    * @return
    */
   ODatabaseDocument getDatabase();
 
   /**
    * Checks if the record is dirty, namely if it was changed in memory.
-   * 
+   *
    * @return True if dirty, otherwise false
    */
   boolean isDirty();
@@ -105,7 +106,7 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
    * Loads the record content in memory. If the record is in cache will be returned a new instance, so pay attention to use the
    * returned. If the record is dirty, then it returns to the original content. If the record does not exist a
    * ORecordNotFoundException exception is thrown.
-   * 
+   *
    * @return The record loaded or itself if the record has been reloaded from the storage. Useful to call methods in chain.
    */
   <RET extends ORecord> RET load() throws ORecordNotFoundException;
@@ -113,7 +114,7 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
   /**
    * Loads the record content in memory. No cache is used. If the record is dirty, then it returns to the original content. If the
    * record does not exist a ORecordNotFoundException exception is thrown.
-   * 
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET reload() throws ORecordNotFoundException;
@@ -127,7 +128,7 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
    * The current transaction will continue to see the record as modified, while others not. If a Pessimistic transaction is running,
    * then an exclusive lock is acquired against the record. Current transaction will continue to see the record as modified, while
    * others cannot access to it since it's locked.
-   * 
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET save();
@@ -138,7 +139,7 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
    * the record will be changed at commit time. The current transaction will continue to see the record as modified, while others
    * not. If a Pessimistic transaction is running, then an exclusive lock is acquired against the record. Current transaction will
    * continue to see the record as modified, while others cannot access to it since it's locked.
-   * 
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET save(String iCluster);
@@ -153,48 +154,48 @@ public interface ORecord extends ORecordElement, OIdentifiable, Serializable, OS
    * The current transaction will continue to see the record as deleted, while others not. If a Pessimistic transaction is running,
    * then an exclusive lock is acquired against the record. Current transaction will continue to see the record as deleted, while
    * others cannot access to it since it's locked.
-   * 
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET delete();
 
   /**
    * Fills the record parsing the content in JSON format.
-   * 
-   * @param iJson
-   *          Object content in JSON format
+   *
+   * @param iJson Object content in JSON format
+   *
    * @return The Object instance itself giving a "fluent interface". Useful to call multiple methods in chain.
    */
   <RET extends ORecord> RET fromJSON(String iJson);
 
   /**
    * Exports the record in JSON format.
-   * 
+   *
    * @return Object content in JSON format
    */
   String toJSON();
 
   /**
    * Exports the record in JSON format specifying additional formatting settings.
-   * 
-   * @param iFormat
-   *          Format settings separated by comma. Available settings are:
-   *          <ul>
-   *          <li><b>rid</b>: exports the record's id as property "@rid"</li>
-   *          <li><b>version</b>: exports the record's version as property "@version"</li>
-   *          <li><b>class</b>: exports the record's class as property "@class"</li>
-   *          <li><b>attribSameRow</b>: exports all the record attributes in the same row</li>
-   *          <li><b>indent:&lt;level&gt;</b>: Indents the output if the &lt;level&gt; specified. Default is 0</li>
-   *          </ul>
-   *          Example: "rid,version,class,indent:6" exports record id, version and class properties along with record properties
-   *          using an indenting level equals of 6.
+   *
+   * @param iFormat Format settings separated by comma. Available settings are:
+   *                <ul>
+   *                <li><b>rid</b>: exports the record's id as property "@rid"</li>
+   *                <li><b>version</b>: exports the record's version as property "@version"</li>
+   *                <li><b>class</b>: exports the record's class as property "@class"</li>
+   *                <li><b>attribSameRow</b>: exports all the record attributes in the same row</li>
+   *                <li><b>indent:&lt;level&gt;</b>: Indents the output if the &lt;level&gt; specified. Default is 0</li>
+   *                </ul>
+   *                Example: "rid,version,class,indent:6" exports record id, version and class properties along with record properties
+   *                using an indenting level equals of 6.
+   *
    * @return Object content in JSON format
    */
   String toJSON(String iFormat);
 
   /**
    * Returns the size in bytes of the record. The size can be computed only for not new records.
-   * 
+   *
    * @return the size in bytes
    */
   int getSize();

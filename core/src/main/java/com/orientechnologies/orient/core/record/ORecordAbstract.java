@@ -48,19 +48,19 @@ import java.util.WeakHashMap;
 @SuppressWarnings({ "unchecked", "serial" })
 public abstract class ORecordAbstract implements ORecord {
   protected ORecordId _recordId;
-  protected int _recordVersion = 0;
+  protected int       _recordVersion = 0;
 
   protected byte[] _source;
   protected int    _size;
 
-  protected transient ORecordSerializer _recordFormat;
+  protected transient ORecordSerializer     _recordFormat;
   protected           boolean               _dirty          = true;
   protected           boolean               _contentChanged = true;
   protected           ORecordElement.STATUS _status         = ORecordElement.STATUS.LOADED;
   protected transient Set<ORecordListener>  _listeners      = null;
 
   private transient Set<OIdentityChangeListener> newIdentityChangeListeners = null;
-  protected ODirtyManager _dirtyManager;
+  protected         ODirtyManager                _dirtyManager;
 
   public ORecordAbstract() {
   }

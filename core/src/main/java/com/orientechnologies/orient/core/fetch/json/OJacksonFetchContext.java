@@ -65,7 +65,11 @@ public class OJacksonFetchContext implements OFetchContext {
       final Iterable<?> iterable) {
     try {
       manageTypes(fieldName, iterable, null);
-      jsonGenerator.writeArrayFieldStart(fieldName);
+      if (fieldName != null) {
+        jsonGenerator.writeArrayFieldStart(fieldName);
+      } else {
+        jsonGenerator.writeStartArray();
+      }
       collectionStack.add(iRootRecord);
     } catch (IOException e) {
       throw OException.wrapException(
@@ -85,7 +89,11 @@ public class OJacksonFetchContext implements OFetchContext {
 
   public void onBeforeMap(final ODocument iRootRecord, final String iFieldName, final Object iUserObject) {
     try {
-      jsonGenerator.writeObjectFieldStart(iFieldName);
+      if (iFieldName != null) {
+        jsonGenerator.writeObjectFieldStart(iFieldName);
+      } else {
+        jsonGenerator.writeStartObject();
+      }
       if (!(iUserObject instanceof ODocument)) {
         collectionStack.add(new ODocument()); // <-- sorry for this... fixes #2845 but this mess should be rewritten...
       }
@@ -117,7 +125,12 @@ public class OJacksonFetchContext implements OFetchContext {
         fieldName = null;
       else
         fieldName = iFieldName;
-      jsonGenerator.writeObjectFieldStart(fieldName);
+      if (fieldName == null) {
+        jsonGenerator.writeStartObject();
+      } else {
+        jsonGenerator.writeObjectFieldStart(fieldName);
+      }
+
       writeSignature(jsonGenerator, iDocument);
     } catch (IOException e) {
       throw OException

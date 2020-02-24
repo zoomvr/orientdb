@@ -92,7 +92,9 @@ public class OJacksonFetchListener implements OFetchListener {
       throws IOException {
     if (value == null) {
       jsonGenerator.writeNull();
+      return;
     }
+
     final boolean oldAutoConvertSettings;
 
     if (value instanceof ORecordLazyMultiValue) {
@@ -103,6 +105,8 @@ public class OJacksonFetchListener implements OFetchListener {
 
     if (value instanceof Boolean) {
       jsonGenerator.writeBoolean((Boolean) value);
+    } else if (value instanceof Byte) {
+      jsonGenerator.writeNumber((Byte) value);
     } else if (value instanceof Integer) {
       jsonGenerator.writeNumber((Integer) value);
     } else if (value instanceof Long) {
@@ -262,7 +266,7 @@ public class OJacksonFetchListener implements OFetchListener {
   public void parseLinked(final ODocument iRootRecord, final OIdentifiable iLinked, final Object iUserObject,
       final String iFieldName, final OFetchContext iContext) throws OFetchException {
     try {
-      writeLinkedAttribute(((OJacksonFetchContext)iContext).getJsonGenerator(), iLinked, iFieldName);
+      writeLinkedAttribute(((OJacksonFetchContext) iContext).getJsonGenerator(), iLinked, iFieldName);
     } catch (IOException e) {
       throw OException.wrapException(new OFetchException(
           "Error writing linked field " + iFieldName + " (record:" + iLinked.getIdentity() + ") of record " + iRootRecord

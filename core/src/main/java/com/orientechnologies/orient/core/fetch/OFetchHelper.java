@@ -573,10 +573,13 @@ public class OFetchHelper {
         return;
 
       iContext.onBeforeDocument(iRootRecord, linked, fieldName, iUserObject);
-      Object userObject = iListener.fetchLinked(iRootRecord, iUserObject, fieldName, linked, iContext);
-      processRecord(linked, userObject, iFetchPlan, iCurrentLevel, iLevelFromRoot, iFieldDepthLevel, parsedRecords,
-          iFieldPathFromRoot, iListener, iContext, "");
-      iContext.onAfterDocument(iRootRecord, linked, fieldName, iUserObject);
+      try {
+        Object userObject = iListener.fetchLinked(iRootRecord, iUserObject, fieldName, linked, iContext);
+        processRecord(linked, userObject, iFetchPlan, iCurrentLevel, iLevelFromRoot, iFieldDepthLevel, parsedRecords,
+            iFieldPathFromRoot, iListener, iContext, "");
+      } finally {
+        iContext.onAfterDocument(iRootRecord, linked, fieldName, iUserObject);
+      }
     } else {
       iContext.onBeforeStandardField(fieldValue, fieldName, iRootRecord, null);
       iListener.parseLinked(iRootRecord, fieldValue, iUserObject, fieldName, iContext);
