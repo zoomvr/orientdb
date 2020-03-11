@@ -1,10 +1,8 @@
 package com.orientechnologies.orient.server.distributed.impl;
 
-import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.ORecordOperation;
-import com.orientechnologies.orient.core.exception.ORecordNotFoundException;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.index.OClassIndexManager;
 import com.orientechnologies.orient.core.metadata.schema.OImmutableClass;
@@ -16,14 +14,15 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.record.impl.ODocumentInternal;
 import com.orientechnologies.orient.core.schedule.OScheduledEvent;
 import com.orientechnologies.orient.core.tx.OTransactionOptimistic;
+import com.orientechnologies.orient.core.tx.OTxMetadataHolder;
 
 import java.util.*;
 
 public class OTransactionOptimisticDistributed extends OTransactionOptimistic {
-  private final Map<ORID, ORecord>     createdRecords = new HashMap<>();
-  private final Map<ORID, ORecord>     updatedRecords = new HashMap<>();
-  private final Set<ORID>              deletedRecord  = new HashSet<>();
-  private       List<ORecordOperation> changes;
+  private final Map<ORID, ORecord>          createdRecords = new HashMap<>();
+  private final Map<ORID, ORecord>          updatedRecords = new HashMap<>();
+  private final Set<ORID>                   deletedRecord  = new HashSet<>();
+  private       List<ORecordOperation>      changes;
 
   public OTransactionOptimisticDistributed(ODatabaseDocumentInternal database, List<ORecordOperation> changes) {
     super(database);
@@ -154,4 +153,5 @@ public class OTransactionOptimisticDistributed extends OTransactionOptimistic {
   public void setDatabase(ODatabaseDocumentInternal database) {
     this.database = database;
   }
+
 }
