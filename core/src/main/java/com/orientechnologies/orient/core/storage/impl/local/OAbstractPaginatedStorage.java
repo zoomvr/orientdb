@@ -103,10 +103,7 @@ import com.orientechnologies.orient.core.storage.ridbag.sbtree.OIndexRIDContaine
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManager;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManagerAbstract;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManagerShared;
-import com.orientechnologies.orient.core.tx.OTransactionAbstract;
-import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
-import com.orientechnologies.orient.core.tx.OTransactionIndexChangesPerKey;
-import com.orientechnologies.orient.core.tx.OTransactionInternal;
+import com.orientechnologies.orient.core.tx.*;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -1095,11 +1092,11 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     }
   }
 
-  private List<OTransactionData> extractTransactionsFromWal(Set<byte[]> transactionsMetadata) {
+  public OBackgroundNewDelta extractTransactionsFromWal(List<OTransactionId> transactionsMetadata) {
     List<OTransactionData> finished = new ArrayList<>();
     stateLock.acquireReadLock();
     try {
-      Set<byte[]> transactionsToRead = new HashSet<>(transactionsMetadata);
+      Set<OTransactionId> transactionsToRead = new HashSet<>(transactionsMetadata);
       // we iterate till the last record is contained in wal at the moment when we call this method
       OLogSequenceNumber beginLsn = writeAheadLog.end();
       Map<OOperationUnitId, OTransactionData> units = new HashMap<>();
@@ -1126,12 +1123,13 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
             if (record instanceof OAtomicUnitStartMetadataRecord) {
               byte[] meta = ((OAtomicUnitStartMetadataRecord) record).getMetadata();
+              OTxMetadataHolder data = OTxMetadataHolderImpl.read(meta);
               //TODO: This will not be a byte to byte compare, but should compare only the tx id not all status
-              if (transactionsToRead.contains(meta)) {
+              if (transactionsToRead.contains(data.getId())) {
                 OOperationUnitId unitId = ((OAtomicUnitStartMetadataRecord) record).getOperationUnitId();
-                units.put(unitId, new OTransactionData(meta));
+                units.put(unitId, new OTransactionData(data.getId()));
               }
-              transactionsToRead.remove(meta);
+              transactionsToRead.remove(data.getId());
             }
             if (record instanceof OAtomicUnitEndRecord) {
               OOperationUnitId opId = ((OAtomicUnitEndRecord) record).getOperationUnitId();
@@ -1146,7 +1144,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             }
             if (transactionsToRead.isEmpty() && units.isEmpty()) {
               //all read stop scanning and return the transactions
-              return finished;
+              return new OBackgroundNewDelta(finished);
             }
           }
 
@@ -1155,14 +1153,12 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       } finally {
         writeAheadLog.removeCutTillLimit(beginLsn);
       }
-
+      return new OBackgroundNewDelta(finished);
     } catch (final IOException e) {
       throw OException.wrapException(new OStorageException("Error of reading of records from  WAL"), e);
     } finally {
       stateLock.releaseReadLock();
     }
-
-    return finished;
   }
 
   protected void serializeDeltaContent(OutputStream stream, OCommandOutputListener outputListener, SortedSet<ORID> sortedRids,
